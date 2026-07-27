@@ -15,18 +15,26 @@ Every arrow is a polyline made of grid cells. Its head defines the direction
 in which the whole body moves, one cell at a time, like the snake in the
 classic Snake game.
 
-Click an arrow to launch it. To remove the arrow, it must leave the board
-completely without hitting another arrow. A successful arrow is highlighted
-in blue while moving. On collision it turns red, rewinds to its original
-position, and costs one of the three lives. The goal is to clear the board.
+Click an arrow to launch it. A launched arrow is highlighted in blue, starts
+slowly, and accelerates smoothly like a small rocket without a maximum-speed
+cap. To remove the arrow, it must leave the board completely. Hitting a
+stationary arrow or its own body costs one of the three lives: the failed
+arrow turns red, rewinds to its original position, and remains red while idle.
+The goal is to clear the board.
 
 Self-collision is evaluated dynamically rather than from a static snapshot.
 The head may enter a cell vacated by its own tail on the same movement tick,
 but it may not pass through any other part of its body.
 
-Several arrows can move simultaneously. Their movement is resolved in
-synchronized cell steps, so a newly launched arrow can collide with another
-arrow that is already moving. Timing is therefore part of the puzzle.
+Several arrows can move simultaneously. If two moving arrows touch, the batch
+costs one life, but both arrows pass through each other and continue forward
+instead of rewinding. A half-second hit-stop makes the contact and lost life
+clearly visible before movement resumes. Timing is therefore part of the
+puzzle.
+
+Movement and collision occupancy are resolved at synchronized cell boundaries,
+while rendering is continuous at pixel resolution. Corners remain orthogonal:
+the line grows at the head and retracts at the tail without diagonal warping.
 
 ## Current features
 
@@ -36,6 +44,8 @@ arrow that is already moving. Timing is therefore part of the puzzle.
 - Constructive generation with a stored valid solution order
 - Dynamic self-collision and simultaneous moving-arrow collisions
 - Three lives with animated collision recovery
+- Persistent light-grey grid dots revealed as arrows leave
+- Smooth, continuously accelerating forward motion
 - Windowed and fullscreen modes
 - Pointer-centred zoom and middle-button panning
 - Deterministic seeds and extensive generator tests
@@ -147,12 +157,19 @@ $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
 & .\build\windows-msvc\arrow_puzzle.exe
 ```
 
+Additional screenshot-only hooks are available:
+
+- `ARROWPUZZLE_SCREENSHOT_FRAME` selects the captured frame (default: `30`)
+- `ARROWPUZZLE_SCREENSHOT_REMOVE` hides the first N arrows before capture
+- `ARROWPUZZLE_SCREENSHOT_LAUNCH` launches one arrow by zero-based index
+
 ## Project structure
 
 ```text
 include/arrow/       Public C++ headers
 src/Board.cpp        Board state, movement rules, and solution checks
 src/Generator.cpp    Constructive level generator and candidate scoring
+src/MotionResolver.cpp  Moving/static collision classification
 src/Game.cpp         raylib rendering, input, and animation
 tests/               Board and generator tests
 tools/               Windows build helper

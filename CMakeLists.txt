@@ -29,6 +29,7 @@ FetchContent_MakeAvailable(raylib)
 add_library(arrow_core STATIC
     src/Board.cpp
     src/Generator.cpp
+    src/MotionResolver.cpp
 )
 
 target_include_directories(arrow_core PUBLIC include)

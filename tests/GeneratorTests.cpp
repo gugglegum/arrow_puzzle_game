@@ -1,4 +1,5 @@
 #include "arrow/Generator.hpp"
+#include "arrow/MotionResolver.hpp"
 
 #include <algorithm>
 #include <array>
@@ -296,6 +297,182 @@ void require(bool condition, const std::string& message) {
     }
 }
 
+struct OwnedMotionBody {
+    std::vector<arrow::Cell> cells;
+    std::vector<arrow::Cell> proposal;
+    std::vector<arrow::Cell> reservedTarget;
+    bool present{true};
+    bool moving{true};
+    bool selfBlocked{};
+};
+
+arrow::MotionResolution resolveOwnedMotion(
+    const std::vector<OwnedMotionBody>& bodies,
+    const std::vector<std::uint8_t>& previousContacts = {}
+) {
+    std::vector<arrow::MotionBodyView> views;
+    views.reserve(bodies.size());
+    for (const OwnedMotionBody& body : bodies) {
+        views.push_back({
+            body.cells,
+            body.proposal,
+            body.reservedTarget,
+            body.present,
+            body.moving,
+            body.selfBlocked
+        });
+    }
+    return arrow::resolveMotionStep(views, previousContacts);
+}
+
+void verifyMotionResolution() {
+    const OwnedMotionBody first{
+        {{0, 0}, {-1, 0}},
+        {{1, 0}, {0, 0}}
+    };
+    const OwnedMotionBody second{
+        {{2, 0}, {3, 0}},
+        {{1, 0}, {2, 0}}
+    };
+    const std::vector softBodies{first, second};
+    const arrow::MotionResolution firstContact =
+        resolveOwnedMotion(softBodies);
+    require(
+        firstContact.hardFailures == std::vector<std::uint8_t>({0, 0}),
+        "moving arrows incorrectly became hard failures"
+    );
+    require(
+        firstContact.hasNewMovingContact,
+        "first moving-arrow contact was not reported"
+    );
+    require(
+        firstContact.movingContacts[1] != 0 &&
+            firstContact.movingContacts[2] != 0,
+        "moving-arrow contact matrix is not symmetric"
+    );
+
+    const arrow::MotionResolution continuedContact =
+        resolveOwnedMotion(
+            softBodies,
+            firstContact.movingContacts
+        );
+    require(
+        !continuedContact.hasNewMovingContact,
+        "continuous moving overlap charged a second event"
+    );
+
+    const std::vector clearBodies{
+        OwnedMotionBody{
+            {{0, 0}, {-1, 0}},
+            {{-1, 0}, {0, 0}}
+        },
+        OwnedMotionBody{
+            {{4, 0}, {5, 0}},
+            {{5, 0}, {4, 0}}
+        }
+    };
+    const arrow::MotionResolution clearedContact =
+        resolveOwnedMotion(
+            clearBodies,
+            continuedContact.movingContacts
+        );
+    require(
+        std::ranges::none_of(
+            clearedContact.movingContacts,
+            [](std::uint8_t value) { return value != 0; }
+        ),
+        "separated moving arrows kept a stale contact"
+    );
+    require(
+        resolveOwnedMotion(
+            softBodies,
+            clearedContact.movingContacts
+        ).hasNewMovingContact,
+        "moving-arrow recontact was not reported"
+    );
+
+    const arrow::MotionResolution headSwap = resolveOwnedMotion({
+        OwnedMotionBody{{{0, 0}}, {{1, 0}}},
+        OwnedMotionBody{{{1, 0}}, {{0, 0}}}
+    });
+    require(
+        headSwap.hardFailures ==
+            std::vector<std::uint8_t>({0, 0}) &&
+            headSwap.hasNewMovingContact,
+        "opposite moving heads could not pass through each other"
+    );
+
+    const OwnedMotionBody stationary{
+        {{1, 0}, {1, 1}},
+        {},
+        {},
+        true,
+        false,
+        false
+    };
+    const arrow::MotionResolution hardHit =
+        resolveOwnedMotion({first, stationary});
+    require(
+        hardHit.hardFailures == std::vector<std::uint8_t>({1, 0}),
+        "stationary obstacle was not a hard failure"
+    );
+    require(
+        !hardHit.hasNewMovingContact,
+        "stationary obstacle was reported as a moving contact"
+    );
+
+    const OwnedMotionBody cascadeFirst{
+        {{2, 0}, {1, 0}},
+        {{3, 0}, {2, 0}}
+    };
+    const OwnedMotionBody cascadeFollower{
+        {{0, 0}, {-1, 0}},
+        {{1, 0}, {0, 0}}
+    };
+    const OwnedMotionBody cascadeObstacle{
+        {{3, 0}, {3, 1}},
+        {},
+        {},
+        true,
+        false,
+        false
+    };
+    const arrow::MotionResolution cascade = resolveOwnedMotion({
+        cascadeFirst,
+        cascadeFollower,
+        cascadeObstacle
+    });
+    require(
+        cascade.hardFailures ==
+            std::vector<std::uint8_t>({1, 1, 0}),
+        "unreleased moving tail did not propagate a hard failure"
+    );
+
+    const OwnedMotionBody cascadeThird{
+        {{-2, 0}, {-3, 0}},
+        {{-1, 0}, {-2, 0}}
+    };
+    const arrow::MotionResolution transitiveCascade =
+        resolveOwnedMotion({
+            cascadeFirst,
+            cascadeFollower,
+            cascadeThird,
+            cascadeObstacle
+        });
+    require(
+        transitiveCascade.hardFailures ==
+            std::vector<std::uint8_t>({1, 1, 1, 0}),
+        "hard failure did not propagate through three moving arrows"
+    );
+
+    OwnedMotionBody selfBlocked = first;
+    selfBlocked.selfBlocked = true;
+    require(
+        resolveOwnedMotion({selfBlocked}).hardFailures[0] != 0,
+        "self-collision was not treated as a hard failure"
+    );
+}
+
 void verifyDynamicSelfCollision() {
     const arrow::Arrow clearsTailInTime{
         {
@@ -557,6 +734,7 @@ Quality verifyBoard(
 
 int main(int argc, char** argv) {
     try {
+        verifyMotionResolution();
         verifyDynamicSelfCollision();
 
         int defaultSeedCount = 1000;
