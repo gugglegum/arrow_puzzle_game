@@ -1,5 +1,18 @@
 # Third-Party Notices
 
+## Inter 4.1
+
+Arrow Puzzle bundles the unchanged `Inter-Medium.ttf` font from the official
+Inter 4.1 release.
+
+- Project: <https://rsms.me/inter/>
+- Source: <https://github.com/rsms/inter/releases/tag/v4.1>
+- Copyright: Copyright (c) 2016 The Inter Project Authors
+- License: SIL Open Font License, Version 1.1
+
+The complete license is included at
+[`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt).
+
 ## raylib 5.5
 
 Arrow Puzzle downloads raylib 5.5 at configure time and links it statically.

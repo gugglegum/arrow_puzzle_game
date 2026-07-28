@@ -43,12 +43,35 @@ else()
     target_compile_options(arrow_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+set(ARROWPUZZLE_UI_FONT
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-Medium.ttf"
+)
+set(ARROWPUZZLE_EMBEDDED_FONT_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/EmbeddedUiFont.cpp"
+)
+add_custom_command(
+    OUTPUT "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DINPUT_FILE=${ARROWPUZZLE_UI_FONT}"
+        "-DOUTPUT_FILE=${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedUiFont.cmake"
+    DEPENDS
+        "${ARROWPUZZLE_UI_FONT}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedUiFont.cmake"
+    COMMENT "Embedding Inter UI font"
+    VERBATIM
+)
+
 add_executable(arrow_puzzle WIN32
+    "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
     src/Game.cpp
     src/main.cpp
+    src/UiFontData.hpp
 )
 
 target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib Threads::Threads)
+target_include_directories(arrow_puzzle PRIVATE src)
 
 if(MSVC)
     target_compile_options(arrow_puzzle PRIVATE /W4 /permissive- /utf-8)

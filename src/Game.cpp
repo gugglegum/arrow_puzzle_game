@@ -3,6 +3,7 @@
 #include "arrow/Generator.hpp"
 #include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
+#include "UiFontData.hpp"
 
 #include <raylib.h>
 
@@ -50,6 +51,22 @@ constexpr Color kSoft{226, 232, 241, 255};
 constexpr Color kMuted{104, 115, 132, 255};
 constexpr Color kGridDot{220, 225, 234, 255};
 
+struct TextStyle {
+    float size;
+    float spacing;
+};
+
+constexpr int kUiFontRasterSize = 64;
+constexpr TextStyle kBrandText{24.0F, 0.8F};
+constexpr TextStyle kHudText{19.0F, 0.4F};
+constexpr TextStyle kOverlayTitleText{24.0F, 0.6F};
+constexpr TextStyle kOverlayDetailText{17.0F, 0.1F};
+constexpr TextStyle kErrorTitleText{26.0F, 0.6F};
+constexpr TextStyle kErrorActionText{18.0F, 0.1F};
+constexpr TextStyle kErrorDetailText{15.0F, 0.0F};
+constexpr TextStyle kBannerText{25.0F, 0.1F};
+constexpr TextStyle kHelpText{17.0F, 0.1F};
+
 enum class Motion {
     Idle,
     Forward,
@@ -83,6 +100,54 @@ struct ArrowHeadTriangle {
     Vector2 left;
     Vector2 right;
 };
+
+Vector2 measureText(
+    Font font,
+    const char* text,
+    TextStyle style
+) {
+    return MeasureTextEx(
+        font,
+        text,
+        style.size,
+        style.spacing
+    );
+}
+
+void drawText(
+    Font font,
+    const char* text,
+    Vector2 position,
+    TextStyle style,
+    Color color
+) {
+    DrawTextEx(
+        font,
+        text,
+        position,
+        style.size,
+        style.spacing,
+        color
+    );
+}
+
+void drawCenteredText(
+    Font font,
+    const char* text,
+    float centerX,
+    float y,
+    TextStyle style,
+    Color color
+) {
+    const Vector2 size = measureText(font, text, style);
+    drawText(
+        font,
+        text,
+        {centerX - size.x * 0.5F, y},
+        style,
+        color
+    );
+}
 
 Vector2 cellCenter(Cell cell) {
     return {
@@ -426,6 +491,37 @@ int Game::run() {
     SetWindowMinSize(720, 600);
     SetTargetFPS(60);
     SetExitKey(KEY_NULL);
+
+    const Font defaultFont = GetFontDefault();
+    const int uiFontDataSize =
+        assets::kUiFontDataSize <=
+                static_cast<std::size_t>(
+                    std::numeric_limits<int>::max()
+                )
+            ? static_cast<int>(assets::kUiFontDataSize)
+            : 0;
+    Font uiFont = LoadFontFromMemory(
+        ".ttf",
+        assets::kUiFontData,
+        uiFontDataSize,
+        kUiFontRasterSize,
+        nullptr,
+        0
+    );
+    const bool ownsUiFont =
+        uiFont.texture.id != defaultFont.texture.id;
+    if (ownsUiFont) {
+        SetTextureFilter(
+            uiFont.texture,
+            TEXTURE_FILTER_BILINEAR
+        );
+    } else {
+        uiFont = defaultFont;
+        TraceLog(
+            LOG_WARNING,
+            "Could not load the embedded UI font"
+        );
+    }
 
     std::uint32_t seed = unsignedFromEnvironment(
         "ARROWPUZZLE_SEED"
@@ -1504,18 +1600,41 @@ int Game::run() {
             static_cast<int>(kHudHeight),
             kSoft
         );
-        DrawText("ARROW PUZZLE", 28, 20, 26, kInk);
+        const Vector2 brandSize = measureText(
+            uiFont,
+            "ARROW PUZZLE",
+            kBrandText
+        );
+        drawText(
+            uiFont,
+            "ARROW PUZZLE",
+            {
+                28.0F,
+                (kHudHeight - brandSize.y) * 0.5F
+            },
+            kBrandText,
+            kInk
+        );
         const std::string countText =
             generationInProgress
             ? "GENERATING"
             : !generationError.empty()
                 ? "GENERATION FAILED"
                 : "ARROWS  " + std::to_string(remaining);
-        DrawText(
+        const Vector2 countSize = measureText(
+            uiFont,
             countText.c_str(),
-            GetScreenWidth() / 2 - MeasureText(countText.c_str(), 22) / 2,
-            24,
-            22,
+            kHudText
+        );
+        drawText(
+            uiFont,
+            countText.c_str(),
+            {
+                static_cast<float>(GetScreenWidth()) * 0.5F -
+                    countSize.x * 0.5F,
+                (kHudHeight - countSize.y) * 0.5F
+            },
+            kHudText,
             kMuted
         );
         for (int index = 0; index < 3; ++index) {
@@ -1588,24 +1707,22 @@ int Game::run() {
                 kBlue
             );
             const char* title = "GENERATING LEVEL";
-            const int titleSize = 26;
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 title,
-                GetScreenWidth() / 2 -
-                    MeasureText(title, titleSize) / 2,
-                static_cast<int>(spinnerCenter.y + 43.0F),
-                titleSize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                spinnerCenter.y + 43.0F,
+                kOverlayTitleText,
                 kInk
             );
             const char* detail =
                 "Searching for an interesting puzzle...";
-            const int detailSize = 17;
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 detail,
-                GetScreenWidth() / 2 -
-                    MeasureText(detail, detailSize) / 2,
-                static_cast<int>(spinnerCenter.y + 79.0F),
-                detailSize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                spinnerCenter.y + 79.0F,
+                kOverlayDetailText,
                 kMuted
             );
             generationOverlayRendered = true;
@@ -1623,24 +1740,22 @@ int Game::run() {
                  static_cast<int>(kHudHeight)) /
                 2;
             const char* title = "GENERATION FAILED";
-            const int titleSize = 28;
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 title,
-                GetScreenWidth() / 2 -
-                    MeasureText(title, titleSize) / 2,
-                centerY - 58,
-                titleSize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(centerY) - 58.0F,
+                kErrorTitleText,
                 kRed
             );
             const char* retry =
                 "Press R to try another level  /  Esc to quit";
-            const int retrySize = 19;
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 retry,
-                GetScreenWidth() / 2 -
-                    MeasureText(retry, retrySize) / 2,
-                centerY - 10,
-                retrySize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(centerY) - 10.0F,
+                kErrorActionText,
                 kInk
             );
             std::string errorDetail = generationError;
@@ -1649,60 +1764,61 @@ int Game::run() {
                 errorDetail.resize(maximumErrorLength - 3);
                 errorDetail += "...";
             }
-            const int errorSize = 15;
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 errorDetail.c_str(),
-                GetScreenWidth() / 2 -
-                    MeasureText(
-                        errorDetail.c_str(),
-                        errorSize
-                    ) /
-                        2,
-                centerY + 31,
-                errorSize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(centerY) + 31.0F,
+                kErrorDetailText,
                 kMuted
             );
         } else if (remaining == 0) {
             const char* text = "FIELD CLEARED!  Press R for a new puzzle";
-            const int fontSize = 28;
-            const int width = MeasureText(text, fontSize);
+            const Vector2 textSize = measureText(
+                uiFont,
+                text,
+                kBannerText
+            );
             DrawRectangleRounded(
                 {
-                    GetScreenWidth() * 0.5F - width * 0.5F - 24.0F,
+                    GetScreenWidth() * 0.5F -
+                        textSize.x * 0.5F -
+                        24.0F,
                     GetScreenHeight() - 84.0F,
-                    static_cast<float>(width + 48),
+                    textSize.x + 48.0F,
                     52.0F
                 },
                 0.25F,
                 8,
                 Fade(RAYWHITE, 0.94F)
             );
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 text,
-                GetScreenWidth() / 2 - width / 2,
-                GetScreenHeight() - 70,
-                fontSize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(GetScreenHeight()) - 70.0F,
+                kBannerText,
                 kBlue
             );
         } else if (lives == 0) {
             const char* text = "NO LIVES LEFT  -  Press R to restart";
-            const int fontSize = 26;
-            const int width = MeasureText(text, fontSize);
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 text,
-                GetScreenWidth() / 2 - width / 2,
-                GetScreenHeight() - 48,
-                fontSize,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(GetScreenHeight()) - 48.0F,
+                kBannerText,
                 kRed
             );
         } else {
             const char* help =
                 "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   R new";
-            DrawText(
+            drawCenteredText(
+                uiFont,
                 help,
-                GetScreenWidth() / 2 - MeasureText(help, 17) / 2,
-                GetScreenHeight() - 30,
-                17,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(GetScreenHeight()) - 30.0F,
+                kHelpText,
                 kMuted
             );
         }
@@ -1720,6 +1836,9 @@ int Game::run() {
         }
     }
 
+    if (ownsUiFont) {
+        UnloadFont(uiFont);
+    }
     CloseWindow();
     if (generationFuture.valid()) {
         generationFuture.wait();

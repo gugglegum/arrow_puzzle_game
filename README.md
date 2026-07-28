@@ -59,6 +59,7 @@ another arrow's speed.
 - Event-driven cell collision checks that prevent high-speed tunnelling
 - Windowed and fullscreen modes
 - Pointer-centred zoom and middle-button panning
+- Screen-optimized Inter typography with consistent anti-aliased strokes
 - Deterministic seeds and extensive generator tests
 - No ads, telemetry, accounts, or runtime network access
 
@@ -91,6 +92,9 @@ The build helper looks for CMake and Ninja in `PATH`. If they are not found,
 it tries the standard bundled-tool locations used by CLion. raylib does not
 need to be installed manually: CMake downloads the pinned raylib 5.5 source
 during the first configuration and builds it statically.
+At build time the bundled Inter font is converted to C++ data and linked
+directly into the executable. The finished game neither depends on fonts
+installed in Windows nor needs a separate runtime asset directory.
 
 ### One-command Release build
 
@@ -180,6 +184,8 @@ Additional screenshot-only hooks are available:
 
 ```text
 include/arrow/       Public C++ headers
+assets/fonts/        Inter UI font source and its OFL license
+cmake/               Build-time font embedding helper
 src/Board.cpp        Board state, movement rules, and solution checks
 src/Generator.cpp    Constructive level generator and candidate scoring
 src/MotionKinematics.cpp  Independent accelerated movement calculations
@@ -245,3 +251,7 @@ raylib 5.5 is distributed under the unmodified zlib/libpng license and is
 compatible with static linking in this MIT-licensed project. See
 [Third-Party Notices](THIRD_PARTY_NOTICES.md) for its copyright and license
 text.
+
+The bundled Inter 4.1 font remains under the SIL Open Font License 1.1. Its
+complete license is stored in
+[`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt).
