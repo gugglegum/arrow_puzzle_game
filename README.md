@@ -9,6 +9,17 @@ The project is an early but fully playable prototype. It starts directly on a
 generated 40 x 40 board; menus, difficulty selection, saving, and loading are
 planned but not implemented yet.
 
+## Download
+
+Download the latest Windows x64 build from
+[GitHub Releases](https://github.com/gugglegum/arrow_puzzle_game/releases/latest),
+extract the ZIP archive, and run `ArrowPuzzle.exe`. The executable is
+standalone; the accompanying text files are license notices, not runtime
+dependencies.
+
+The current build is not digitally signed, so Windows SmartScreen may display
+an unknown-publisher warning.
+
 ## Gameplay
 
 Every arrow is a polyline made of grid cells. Its head defines the direction
@@ -107,7 +118,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 The helper configures the project, builds it, and runs the complete test suite.
-The generator stress test creates 1,300 boards and can take several minutes.
+The generator stress test creates 1,311 boards and can take several minutes.
 
 The resulting executable is:
 
