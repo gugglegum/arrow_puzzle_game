@@ -37,7 +37,8 @@ struct MotionResolution {
 [[nodiscard]] MotionResolution resolveMotionStep(
     std::span<const MotionBodyView> bodies,
     std::span<const std::uint8_t> previousMovingContacts,
-    MotionBounds bounds = {}
+    MotionBounds bounds = {},
+    bool trackMovingContacts = true
 );
 
 } // namespace arrow

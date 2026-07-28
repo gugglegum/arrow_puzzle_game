@@ -63,6 +63,10 @@ compile_commands.json
 
 # Runtime and diagnostic output
 arrow-puzzle-screenshot.png
+/settings.txt
+/settings.txt.tmp
+/savegame.txt
+/savegame.txt.tmp
 *.dmp
 *.log
 

@@ -381,7 +381,8 @@ struct OwnedMotionBody {
 arrow::MotionResolution resolveOwnedMotion(
     const std::vector<OwnedMotionBody>& bodies,
     const std::vector<std::uint8_t>& previousContacts = {},
-    arrow::MotionBounds bounds = {}
+    arrow::MotionBounds bounds = {},
+    bool trackMovingContacts = true
 ) {
     std::vector<arrow::MotionBodyView> views;
     views.reserve(bodies.size());
@@ -398,7 +399,8 @@ arrow::MotionResolution resolveOwnedMotion(
     return arrow::resolveMotionStep(
         views,
         previousContacts,
-        bounds
+        bounds,
+        trackMovingContacts
     );
 }
 
@@ -414,6 +416,15 @@ void verifyMotionResolution() {
     const std::vector softBodies{first, second};
     const arrow::MotionResolution firstContact =
         resolveOwnedMotion(softBodies);
+    const arrow::MotionResolution hardOnly =
+        resolveOwnedMotion(softBodies, {}, {}, false);
+    require(
+        hardOnly.hardFailures ==
+            std::vector<std::uint8_t>({0, 0}) &&
+            hardOnly.movingContacts.empty() &&
+            !hardOnly.hasNewMovingContact,
+        "hard-only resolution unnecessarily tracked moving contacts"
+    );
     require(
         firstContact.hardFailures == std::vector<std::uint8_t>({0, 0}),
         "moving arrows incorrectly became hard failures"
@@ -1275,8 +1286,9 @@ Quality verifyBoard(
     );
     if (options.columns == 20 && options.rows == 20) {
         require(
-            quality.initiallyRemovable == 1,
-            "default board does not have exactly one initial move"
+            quality.initiallyRemovable >= 2 &&
+                quality.initiallyRemovable <= 5,
+            "default board does not have a controlled set of initial moves"
         );
         require(
             quality.intendedOrderValid,
@@ -1410,6 +1422,10 @@ int main(int argc, char** argv) {
             arrow::GeneratorOptions{}.candidateAttempts == 8,
             "default generator quality no longer evaluates eight candidates"
         );
+        require(
+            arrow::GeneratorOptions{}.allowArrowLoops,
+            "dynamic arrow loops are no longer enabled by default"
+        );
 
         bool oddDimensionsRejected = false;
         try {
@@ -1458,6 +1474,9 @@ int main(int argc, char** argv) {
             std::numeric_limits<std::size_t>::max();
         std::size_t minimumLargeComplexTightSelfPasses =
             std::numeric_limits<std::size_t>::max();
+        std::size_t minimumLargeInitial =
+            std::numeric_limits<std::size_t>::max();
+        std::size_t maximumLargeInitial = 0;
         Quality seed64HighQuality;
         for (std::uint32_t largeSeed : largeBoardSeeds) {
             const arrow::GeneratorOptions largeBoardOptions{
@@ -1485,9 +1504,14 @@ int main(int argc, char** argv) {
                 "40x40 board lost its short/medium/long mix"
             );
             require(
-                quality.initiallyRemovable == 1 &&
+                quality.initiallyRemovable >= 2 &&
+                    quality.initiallyRemovable <= 6 &&
                     quality.directionCount >= 3,
-                "40x40 board has a weak dependency structure"
+                "40x40 board has a weak dependency structure: " +
+                    std::to_string(
+                        quality.initiallyRemovable
+                    ) +
+                    " initial moves"
             );
             minimumLargeTightSelfPasses = std::min(
                 minimumLargeTightSelfPasses,
@@ -1496,6 +1520,14 @@ int main(int argc, char** argv) {
             minimumLargeComplexTightSelfPasses = std::min(
                 minimumLargeComplexTightSelfPasses,
                 quality.longComplexTightSelfPassArrows
+            );
+            minimumLargeInitial = std::min(
+                minimumLargeInitial,
+                quality.initiallyRemovable
+            );
+            maximumLargeInitial = std::max(
+                maximumLargeInitial,
+                quality.initiallyRemovable
             );
             if (largeSeed == 64U) {
                 seed64HighQuality = quality;
@@ -1507,7 +1539,15 @@ int main(int argc, char** argv) {
         );
         require(
             minimumLargeComplexTightSelfPasses >= 2,
-            "40x40 fixed seeds contain too few long complex exact tail passes"
+            "40x40 fixed seeds contain too few long complex exact tail "
+            "passes: " +
+                std::to_string(
+                    minimumLargeComplexTightSelfPasses
+                ) +
+                ", initial moves " +
+                std::to_string(minimumLargeInitial) +
+                ".." +
+                std::to_string(maximumLargeInitial)
         );
         const arrow::GeneratorOptions seed64FastOptions{
             40,
@@ -1527,6 +1567,24 @@ int main(int argc, char** argv) {
                 seed64HighQuality.longComplexTightSelfPassArrows >=
                     seed64FastQuality.longComplexTightSelfPassArrows,
             "eight-candidate selection reduced fixed-seed tail-pass quality"
+        );
+
+        const arrow::GeneratorOptions looplessOptions{
+            40,
+            40,
+            2,
+            60,
+            64U,
+            8,
+            false
+        };
+        const Quality looplessQuality = verifyBoard(
+            arrow::generateBoard(looplessOptions),
+            looplessOptions
+        );
+        require(
+            looplessQuality.tightSelfPassArrows == 0,
+            "arrow-loop setting still generated a launch through its own body"
         );
 
         // Regression: score bonuses must not make a candidate below the
@@ -1565,6 +1623,8 @@ int main(int argc, char** argv) {
         std::size_t minimumArrows = std::numeric_limits<std::size_t>::max();
         std::size_t maximumArrows = 0;
         std::size_t maximumInitial = 0;
+        std::size_t minimumInitial =
+            std::numeric_limits<std::size_t>::max();
         std::size_t minimumDirections = 4;
         std::size_t minimumBent = std::numeric_limits<std::size_t>::max();
         std::size_t minimumTurns = std::numeric_limits<std::size_t>::max();
@@ -1611,6 +1671,10 @@ int main(int argc, char** argv) {
             maximumArrows = std::max(maximumArrows, quality.arrowCount);
             maximumInitial = std::max(
                 maximumInitial,
+                quality.initiallyRemovable
+            );
+            minimumInitial = std::min(
+                minimumInitial,
                 quality.initiallyRemovable
             );
             minimumDirections = std::min(
@@ -1704,7 +1768,8 @@ int main(int argc, char** argv) {
             << "Default-board quality across " << defaultSeedCount
             << " seeds: arrows "
             << minimumArrows << ".." << maximumArrows
-            << ", initial moves <= " << maximumInitial
+            << ", initial moves " << minimumInitial
+            << ".." << maximumInitial
             << ", directions >= " << minimumDirections
             << ", bent arrows >= " << minimumBent
             << ", S/M/L >= " << minimumShort
@@ -1724,6 +1789,8 @@ int main(int argc, char** argv) {
             << ", median bbox fill <= " << maximumMedianFill
             << ", rectangular arrows <= " << maximumRectangular
             << ", rich 5x5 blocks >= " << minimumRichMacro
+            << ", 40x40 initial moves "
+            << minimumLargeInitial << ".." << maximumLargeInitial
             << ", 40x40 tight/long-complex tail passes >= "
             << minimumLargeTightSelfPasses
             << "/" << minimumLargeComplexTightSelfPasses
@@ -1739,7 +1806,7 @@ int main(int argc, char** argv) {
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size()) + 3
+                   static_cast<int>(largeBoardSeeds.size()) + 4
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

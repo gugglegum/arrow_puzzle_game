@@ -3,6 +3,7 @@
 #include "arrow/Generator.hpp"
 #include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
+#include "arrow/Persistence.hpp"
 #include "UiFontData.hpp"
 
 #include <raylib.h>
@@ -15,11 +16,13 @@
 #include <cstdlib>
 #include <ctime>
 #include <exception>
+#include <filesystem>
 #include <future>
 #include <limits>
 #include <optional>
 #include <span>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -35,21 +38,22 @@ constexpr int kDefaultCandidateAttempts = 8;
 constexpr float kCellSize = 34.0F;
 constexpr float kBoardPadding = 34.0F;
 constexpr float kHudHeight = 82.0F;
-constexpr float kReturnStepDuration = 0.035F;
+constexpr float kReturnStepDuration = 0.0175F;
 constexpr float kCollisionPause = 0.22F;
 constexpr float kMovingCollisionPause = 0.5F;
-constexpr double kInitialForwardSpeed = 8.0;
-constexpr double kForwardAcceleration = 22.0;
+constexpr double kInitialForwardSpeed = 16.0;
+constexpr double kForwardAcceleration = 88.0;
 constexpr std::size_t kMaxForwardEventsPerFrame = 1024;
 constexpr std::size_t kMaxRecoveryEventsPerFrame = 1024;
-constexpr float kGridDotRadius = 1.9F;
+constexpr float kArrowThickness = 6.4F;
+constexpr float kGridDotRadius = kArrowThickness * 0.5F;
 
 constexpr Color kInk{22, 29, 48, 255};
 constexpr Color kBlue{16, 132, 255, 255};
 constexpr Color kRed{238, 67, 74, 255};
 constexpr Color kSoft{226, 232, 241, 255};
 constexpr Color kMuted{104, 115, 132, 255};
-constexpr Color kGridDot{220, 225, 234, 255};
+constexpr Color kGridDot{195, 202, 214, 255};
 
 struct TextStyle {
     float size;
@@ -66,6 +70,32 @@ constexpr TextStyle kErrorActionText{18.0F, 0.1F};
 constexpr TextStyle kErrorDetailText{15.0F, 0.0F};
 constexpr TextStyle kBannerText{25.0F, 0.1F};
 constexpr TextStyle kHelpText{17.0F, 0.1F};
+constexpr TextStyle kMenuBrandText{34.0F, 1.1F};
+constexpr TextStyle kMenuTitleText{22.0F, 0.6F};
+constexpr TextStyle kMenuButtonText{20.0F, 0.2F};
+constexpr TextStyle kMenuHintText{15.0F, 0.1F};
+
+enum class Screen {
+    MainMenu,
+    NewGameMenu,
+    SettingsMenu,
+    Playing
+};
+
+struct DifficultyPreset {
+    const char* label;
+    int columns;
+    int rows;
+    int maximumLength;
+    int candidateAttempts;
+};
+
+constexpr std::array<DifficultyPreset, 4> kDifficultyPresets{{
+    {"Simple (20 x 20)", 20, 20, 30, 8},
+    {"Middle (40 x 40)", 40, 40, 60, 8},
+    {"Hard (80 x 80)", 80, 80, 120, 8},
+    {"Very Hard (160 x 160)", 160, 160, 960, 1}
+}};
 
 enum class Motion {
     Idle,
@@ -146,6 +176,103 @@ void drawCenteredText(
         {centerX - size.x * 0.5F, y},
         style,
         color
+    );
+}
+
+Rectangle menuButtonRectangle(int index, int count) {
+    constexpr float buttonHeight = 58.0F;
+    constexpr float buttonGap = 16.0F;
+    const float width = std::min(
+        460.0F,
+        static_cast<float>(GetScreenWidth()) - 80.0F
+    );
+    const float totalHeight =
+        static_cast<float>(count) * buttonHeight +
+        static_cast<float>(std::max(0, count - 1)) * buttonGap;
+    const float startY = std::max(
+        205.0F,
+        (static_cast<float>(GetScreenHeight()) - totalHeight) * 0.5F +
+            42.0F
+    );
+    return {
+        (static_cast<float>(GetScreenWidth()) - width) * 0.5F,
+        startY + static_cast<float>(index) * (buttonHeight + buttonGap),
+        width,
+        buttonHeight
+    };
+}
+
+void drawMenuButton(
+    Font font,
+    Rectangle bounds,
+    const char* label,
+    bool enabled,
+    bool focused,
+    bool armed
+) {
+    const bool hovered =
+        enabled && CheckCollisionPointRec(GetMousePosition(), bounds);
+    const bool pressed = hovered && armed;
+    const bool highlighted = enabled && (hovered || focused);
+    const Color fill = !enabled
+        ? Color{244, 246, 249, 255}
+        : pressed
+            ? Color{218, 233, 252, 255}
+            : highlighted
+                ? Color{232, 241, 253, 255}
+                : Color{249, 250, 252, 255};
+    const Color outline = !enabled
+        ? Color{230, 233, 238, 255}
+        : highlighted
+            ? kBlue
+            : kSoft;
+    const Color textColor = !enabled
+        ? Color{172, 179, 190, 255}
+        : highlighted
+            ? kBlue
+            : kInk;
+
+    DrawRectangleRounded(bounds, 0.18F, 8, fill);
+    DrawRectangleRoundedLinesEx(
+        bounds,
+        0.18F,
+        8,
+        highlighted ? 2.0F : 1.5F,
+        outline
+    );
+    const Vector2 textSize = measureText(
+        font,
+        label,
+        kMenuButtonText
+    );
+    drawText(
+        font,
+        label,
+        {
+            bounds.x + (bounds.width - textSize.x) * 0.5F,
+            bounds.y + (bounds.height - textSize.y) * 0.5F
+        },
+        kMenuButtonText,
+        textColor
+    );
+}
+
+void drawMenuHeading(Font font, const char* title) {
+    drawCenteredText(
+        font,
+        "ARROW PUZZLE",
+        static_cast<float>(GetScreenWidth()) * 0.5F,
+        78.0F,
+        kMenuBrandText,
+        kInk
+    );
+    drawCenteredText(
+        font,
+        title,
+        static_cast<float>(GetScreenWidth()) * 0.5F,
+        142.0F,
+        kMenuTitleText,
+        kMuted
     );
 }
 
@@ -320,12 +447,24 @@ void drawArrow(const RuntimeArrow& value) {
         color = kRed;
     }
 
-    constexpr float thickness = 6.4F;
     for (std::size_t index = 1; index < points.size(); ++index) {
-        DrawLineEx(points[index - 1], points[index], thickness, color);
-        DrawCircleV(points[index], thickness * 0.5F, color);
+        DrawLineEx(
+            points[index - 1],
+            points[index],
+            kArrowThickness,
+            color
+        );
+        DrawCircleV(
+            points[index],
+            kArrowThickness * 0.5F,
+            color
+        );
     }
-    DrawCircleV(points.front(), thickness * 0.5F, color);
+    DrawCircleV(
+        points.front(),
+        kArrowThickness * 0.5F,
+        color
+    );
 
     const ArrowHeadTriangle head = arrowHeadTriangle(
         points.front(),
@@ -368,6 +507,29 @@ bool collidesWithSelf(
                proposed.end(),
                proposed.front()
            ) != proposed.end();
+}
+
+std::uint64_t movingContactKey(
+    std::size_t first,
+    std::size_t second
+) {
+    const std::uint64_t low = static_cast<std::uint64_t>(
+        std::min(first, second)
+    );
+    const std::uint64_t high = static_cast<std::uint64_t>(
+        std::max(first, second)
+    );
+    return (low << 32U) | high;
+}
+
+bool movingContactContains(
+    std::uint64_t key,
+    std::size_t arrowIndex
+) {
+    const std::uint64_t index =
+        static_cast<std::uint64_t>(arrowIndex);
+    return (key >> 32U) == index ||
+           (key & 0xFFFFFFFFULL) == index;
 }
 
 void drawHeart(Vector2 center, bool filled) {
@@ -523,26 +685,33 @@ int Game::run() {
         );
     }
 
+    Persistence persistence(Persistence::executableDirectory());
+    Settings settings = persistence.loadSettings();
+    std::optional<SavedGame> savedGame =
+        persistence.loadSavedGame();
+    bool resumeAvailable = savedGame.has_value();
+    Screen screen = Screen::MainMenu;
+    bool activeGame = false;
+
     std::uint32_t seed = unsignedFromEnvironment(
         "ARROWPUZZLE_SEED"
     ).value_or(
         static_cast<std::uint32_t>(std::time(nullptr))
     );
-    const auto generateDefaultBoard = [](std::uint32_t boardSeed) {
-        return generateBoard({
-            kDefaultColumns,
-            kDefaultRows,
-            2,
-            kDefaultMaximumArrowLength,
-            boardSeed,
-            kDefaultCandidateAttempts
-        });
+    GeneratorOptions currentGeneratorOptions{
+        kDefaultColumns,
+        kDefaultRows,
+        2,
+        kDefaultMaximumArrowLength,
+        seed,
+        kDefaultCandidateAttempts,
+        settings.arrowLoops
     };
     // Keep raylib entirely on this thread. The worker only creates value-type
     // board data, which is moved into the live game at a frame boundary.
-    Board board(kDefaultColumns, kDefaultRows, {});
+    Board board(20, 20, {});
     std::vector<RuntimeArrow> arrows;
-    std::vector<std::uint8_t> movingContacts;
+    std::unordered_set<std::uint64_t> movingContacts;
     double movingCollisionPauseRemaining = 0.0;
     double forwardTimeDebt = 0.0;
     double recoveryTimeDebt = 0.0;
@@ -552,10 +721,25 @@ int Game::run() {
     float recoveryStepProgress = 0.0F;
     std::uint64_t recoveryTick = 0;
     std::optional<std::size_t> pressedArrow;
-    auto resetRuntime = [&]() {
+    std::optional<int> pressedMenuButton;
+    int focusedMenuButton = 0;
+    RenderTexture2D staticBoardLayer{};
+    int staticBoardLayerWidth = 0;
+    int staticBoardLayerHeight = 0;
+    bool staticBoardLayerDirty = true;
+    auto resetRuntime = [&](const SavedGame* restored = nullptr) {
         arrows.clear();
         arrows.reserve(board.arrows().size());
-        for (const Arrow& source : board.arrows()) {
+        for (std::size_t index = 0;
+             index < board.arrows().size();
+             ++index) {
+            const Arrow& source = board.arrows()[index];
+            const bool present =
+                restored == nullptr ||
+                restored->present[index];
+            const bool failed =
+                restored != nullptr &&
+                restored->failed[index];
             arrows.push_back({
                 source.cells,
                 {},
@@ -565,12 +749,12 @@ int Game::run() {
                 0.0,
                 0.0,
                 0.0,
-                true,
-                false,
+                present,
+                failed,
                 false
             });
         }
-        movingContacts.assign(arrows.size() * arrows.size(), 0);
+        movingContacts.clear();
         movingCollisionPauseRemaining = 0.0;
         forwardTimeDebt = 0.0;
         recoveryTimeDebt = 0.0;
@@ -580,6 +764,7 @@ int Game::run() {
         recoveryStepProgress = 0.0F;
         recoveryTick = 0;
         pressedArrow.reset();
+        staticBoardLayerDirty = true;
     };
     resetRuntime();
 
@@ -597,6 +782,29 @@ int Game::run() {
             "ARROWPUZZLE_SCREENSHOT_FRAME"
         ).value_or(30)
     ));
+    const std::uint32_t automatedMenuScreen =
+        unsignedFromEnvironment(
+            "ARROWPUZZLE_SCREENSHOT_MENU"
+        ).value_or(0);
+    const std::uint32_t automatedDifficulty =
+        unsignedFromEnvironment(
+            "ARROWPUZZLE_DIFFICULTY"
+        ).value_or(2);
+    const bool automatedResume =
+        unsignedFromEnvironment(
+            "ARROWPUZZLE_RESUME"
+        ).value_or(0) != 0;
+    const bool automatedSaveOnExit =
+        unsignedFromEnvironment(
+            "ARROWPUZZLE_SAVE_ON_EXIT"
+        ).value_or(0) != 0;
+    if (automatedMenuScreen == 1) {
+        screen = Screen::MainMenu;
+    } else if (automatedMenuScreen == 2) {
+        screen = Screen::NewGameMenu;
+    } else if (automatedMenuScreen == 3) {
+        screen = Screen::SettingsMenu;
+    }
     bool automatedInitialSetupPending =
         !automatedScreenshot.empty();
     const auto applyAutomatedInitialSetup = [&]() {
@@ -684,16 +892,51 @@ int Game::run() {
             (GetScreenHeight() - kHudHeight - 50.0F) /
                 boardHeight
         );
+        staticBoardLayerDirty = true;
     };
-    const auto startGeneration = [&](std::uint32_t boardSeed) {
+    const auto optionsForDimensions =
+        [&](int columns, int rows) {
+            for (const DifficultyPreset& preset :
+                 kDifficultyPresets) {
+                if (preset.columns == columns &&
+                    preset.rows == rows) {
+                    return GeneratorOptions{
+                        columns,
+                        rows,
+                        2,
+                        preset.maximumLength,
+                        seed,
+                        preset.candidateAttempts,
+                        settings.arrowLoops
+                    };
+                }
+            }
+            return GeneratorOptions{
+                columns,
+                rows,
+                2,
+                kDefaultMaximumArrowLength,
+                seed,
+                kDefaultCandidateAttempts,
+                settings.arrowLoops
+            };
+        };
+    const auto startGeneration = [&](GeneratorOptions options) {
+        if (generationInProgress) {
+            return;
+        }
+        options.allowArrowLoops = settings.arrowLoops;
+        currentGeneratorOptions = options;
         generationError.clear();
         generationOverlayRendered = false;
         pressedArrow.reset();
+        screen = Screen::Playing;
+        activeGame = false;
         try {
             generationFuture = std::async(
                 std::launch::async,
-                [generateDefaultBoard, boardSeed]() {
-                    return generateDefaultBoard(boardSeed);
+                [options]() {
+                    return generateBoard(options);
                 }
             );
             generationInProgress = true;
@@ -715,7 +958,105 @@ int Game::run() {
             );
         }
     };
-    startGeneration(seed);
+
+    const auto restoreSavedGame =
+        [&](SavedGame restored) {
+            if (!isValidSavedGame(restored)) {
+                return false;
+            }
+            const int restoredLives = restored.lives;
+            const int restoredColumns = restored.columns;
+            const int restoredRows = restored.rows;
+            board = Board(
+                restoredColumns,
+                restoredRows,
+                std::move(restored.arrows)
+            );
+            updateBoardDimensions();
+            resetRuntime(&restored);
+            lives = restoredLives;
+            currentGeneratorOptions =
+                optionsForDimensions(
+                    restoredColumns,
+                    restoredRows
+                );
+            activeGame = true;
+            generationError.clear();
+            screen = Screen::Playing;
+            resetCamera();
+            renderedFrames = 0;
+            return true;
+        };
+
+    const auto persistCurrentGame = [&]() {
+        if (!activeGame || generationInProgress ||
+            board.arrows().empty()) {
+            return false;
+        }
+        const std::size_t remaining =
+            static_cast<std::size_t>(std::ranges::count_if(
+                arrows,
+                [](const RuntimeArrow& value) {
+                    return value.present;
+                }
+            ));
+        if (remaining == 0 || lives <= 0) {
+            const bool removed = persistence.removeSavedGame();
+            if (removed) {
+                resumeAvailable = false;
+                savedGame.reset();
+            }
+            return removed;
+        }
+
+        SavedGame snapshot;
+        snapshot.columns = board.columns();
+        snapshot.rows = board.rows();
+        snapshot.lives = lives;
+        snapshot.arrows = board.arrows();
+        snapshot.present.reserve(arrows.size());
+        snapshot.failed.reserve(arrows.size());
+        for (const RuntimeArrow& value : arrows) {
+            snapshot.present.push_back(value.present);
+            snapshot.failed.push_back(value.failed);
+        }
+        const bool saved = persistence.saveSavedGame(snapshot);
+        if (saved) {
+            resumeAvailable = true;
+            savedGame.reset();
+        }
+        return saved;
+    };
+
+    if (!automatedScreenshot.empty() &&
+        automatedMenuScreen == 0) {
+        if (automatedResume &&
+            savedGame.has_value() &&
+            restoreSavedGame(std::move(*savedGame))) {
+            applyAutomatedInitialSetup();
+        } else {
+            const std::size_t difficultyIndex =
+                static_cast<std::size_t>(std::clamp(
+                    automatedDifficulty,
+                    std::uint32_t{1},
+                    static_cast<std::uint32_t>(
+                        kDifficultyPresets.size()
+                    )
+                ) - 1U);
+            const DifficultyPreset& preset =
+                kDifficultyPresets[difficultyIndex];
+            currentGeneratorOptions = {
+                preset.columns,
+                preset.rows,
+                2,
+                preset.maximumLength,
+                seed++,
+                preset.candidateAttempts,
+                settings.arrowLoops
+            };
+            startGeneration(currentGeneratorOptions);
+        }
+    }
 
     const auto hasForwardMotion = [&arrows]() {
         return std::ranges::any_of(
@@ -735,11 +1076,17 @@ int Game::run() {
         };
 
     const auto clearMovingContactsFor =
-        [&movingContacts, &arrows](std::size_t arrowIndex) {
-            const std::size_t count = arrows.size();
-            for (std::size_t other = 0; other < count; ++other) {
-                movingContacts[arrowIndex * count + other] = 0;
-                movingContacts[other * count + arrowIndex] = 0;
+        [&movingContacts](std::size_t arrowIndex) {
+            for (auto contact = movingContacts.begin();
+                 contact != movingContacts.end();) {
+                if (movingContactContains(
+                        *contact,
+                        arrowIndex
+                    )) {
+                    contact = movingContacts.erase(contact);
+                } else {
+                    ++contact;
+                }
             }
         };
 
@@ -755,6 +1102,7 @@ int Game::run() {
         value.movingCollisionTint = false;
         value.history.clear();
         value.targetCells.clear();
+        staticBoardLayerDirty = true;
     };
 
     const auto prepareForwardTransitions = [&]() {
@@ -811,7 +1159,8 @@ int Game::run() {
         const MotionResolution resolution = resolveMotionStep(
             bodies,
             {},
-            {board.columns(), board.rows()}
+            {board.columns(), board.rows()},
+            false
         );
         const bool hardCollision =
             std::ranges::any_of(
@@ -877,7 +1226,8 @@ int Game::run() {
             const MotionResolution resolution = resolveMotionStep(
                 bodies,
                 {},
-                {board.columns(), board.rows()}
+                {board.columns(), board.rows()},
+                false
             );
             const bool hardCollision =
                 std::ranges::any_of(
@@ -911,7 +1261,13 @@ int Game::run() {
 
     const auto resolveCompletedMovingContacts =
         [&](std::span<const std::uint8_t> completing) {
+            if (!settings.flyingArrowCollisions) {
+                movingContacts.clear();
+                return false;
+            }
+            std::vector<std::size_t> activeIndices;
             std::vector<MotionBodyView> bodies;
+            activeIndices.reserve(arrows.size());
             bodies.reserve(arrows.size());
             for (std::size_t index = 0;
                  index < arrows.size();
@@ -919,50 +1275,75 @@ int Game::run() {
                 const RuntimeArrow& value = arrows[index];
                 const bool activeForward =
                     isActiveForward(value);
+                if (!activeForward) {
+                    continue;
+                }
+                activeIndices.push_back(index);
                 bodies.push_back({
                     value.cells,
-                    activeForward
-                        ? std::span<const Cell>{
-                              value.targetCells
-                          }
-                        : std::span<const Cell>{},
+                    value.targetCells,
                     {},
-                    activeForward,
+                    true,
                     completing[index]
                         ? MotionRole::Advancing
-                        : activeForward
-                            ? MotionRole::Moving
-                            : MotionRole::Static,
+                        : MotionRole::Moving,
                     false
                 });
             }
+            const std::size_t count = bodies.size();
+            std::vector<std::uint8_t> previousContacts(
+                count * count,
+                0
+            );
+            for (std::size_t first = 0;
+                 first < count;
+                 ++first) {
+                for (std::size_t second = first + 1;
+                     second < count;
+                     ++second) {
+                    if (!movingContacts.contains(
+                            movingContactKey(
+                                activeIndices[first],
+                                activeIndices[second]
+                            )
+                        )) {
+                        continue;
+                    }
+                    previousContacts[first * count + second] = 1;
+                    previousContacts[second * count + first] = 1;
+                }
+            }
             MotionResolution resolution = resolveMotionStep(
                 bodies,
-                movingContacts,
+                previousContacts,
                 {board.columns(), board.rows()}
             );
-            if (resolution.hasNewMovingContact) {
-                const std::size_t count = arrows.size();
-                for (std::size_t first = 0;
-                     first < count;
-                     ++first) {
-                    for (std::size_t second = first + 1;
-                         second < count;
-                         ++second) {
-                        const std::size_t pair =
-                            first * count + second;
-                        if (!resolution.movingContacts[pair] ||
-                            movingContacts[pair]) {
-                            continue;
-                        }
-                        arrows[first].movingCollisionTint =
-                            true;
-                        arrows[second].movingCollisionTint =
-                            true;
+            std::unordered_set<std::uint64_t> nextContacts;
+            for (std::size_t first = 0;
+                 first < count;
+                 ++first) {
+                for (std::size_t second = first + 1;
+                     second < count;
+                     ++second) {
+                    const std::size_t pair =
+                        first * count + second;
+                    if (!resolution.movingContacts[pair]) {
+                        continue;
+                    }
+                    const std::uint64_t key = movingContactKey(
+                        activeIndices[first],
+                        activeIndices[second]
+                    );
+                    nextContacts.insert(key);
+                    if (!previousContacts[pair]) {
+                        arrows[activeIndices[first]]
+                            .movingCollisionTint = true;
+                        arrows[activeIndices[second]]
+                            .movingCollisionTint = true;
                     }
                 }
             }
-            movingContacts = resolution.movingContacts;
+            movingContacts = std::move(nextContacts);
             return resolution.hasNewMovingContact;
         };
 
@@ -1018,11 +1399,67 @@ int Game::run() {
         );
     };
 
+    const auto rebuildStaticBoardLayer = [&]() {
+        const int width = std::max(1, GetScreenWidth());
+        const int height = std::max(1, GetScreenHeight());
+        if (staticBoardLayer.id == 0 ||
+            staticBoardLayerWidth != width ||
+            staticBoardLayerHeight != height) {
+            if (staticBoardLayer.id != 0) {
+                UnloadRenderTexture(staticBoardLayer);
+            }
+            staticBoardLayer = LoadRenderTexture(width, height);
+            staticBoardLayerWidth = width;
+            staticBoardLayerHeight = height;
+            staticBoardLayerDirty = true;
+        }
+        if (!staticBoardLayerDirty ||
+            staticBoardLayer.id == 0) {
+            return;
+        }
+
+        BeginTextureMode(staticBoardLayer);
+        ClearBackground(RAYWHITE);
+        BeginMode2D(camera);
+        DrawRectangleRounded(
+            {0.0F, 0.0F, boardWidth, boardHeight},
+            0.035F,
+            8,
+            {248, 250, 253, 255}
+        );
+        for (int y = 0; y < board.rows(); ++y) {
+            for (int x = 0; x < board.columns(); ++x) {
+                DrawCircleV(
+                    cellCenter({x, y}),
+                    kGridDotRadius,
+                    kGridDot
+                );
+            }
+        }
+        DrawRectangleRoundedLinesEx(
+            {0.0F, 0.0F, boardWidth, boardHeight},
+            0.035F,
+            8,
+            2.0F,
+            kSoft
+        );
+        for (const RuntimeArrow& value : arrows) {
+            if (value.present &&
+                value.motion == Motion::Idle) {
+                drawArrow(value);
+            }
+        }
+        EndMode2D();
+        EndTextureMode();
+        staticBoardLayerDirty = false;
+    };
+
     while (!WindowShouldClose() && !closeRequested) {
         const float delta = std::max(GetFrameTime(), 0.0F);
 
         if (generationInProgress &&
-            generationOverlayRendered &&
+            (generationOverlayRendered ||
+             screen != Screen::Playing) &&
             generationFuture.wait_for(
                 std::chrono::seconds{0}
             ) == std::future_status::ready) {
@@ -1033,11 +1470,22 @@ int Game::run() {
                 updateBoardDimensions();
                 resetRuntime();
                 lives = 3;
+                activeGame = true;
+                if (persistence.removeSavedGame()) {
+                    resumeAvailable = false;
+                    savedGame.reset();
+                }
                 resetCamera();
                 renderedFrames = 0;
                 applyAutomatedInitialSetup();
+                if (screen != Screen::Playing) {
+                    (void)persistCurrentGame();
+                }
             } catch (const std::exception& error) {
                 generationError = error.what();
+                if (!automatedScreenshot.empty()) {
+                    automatedInitialSetupPending = false;
+                }
                 TraceLog(
                     LOG_ERROR,
                     "Level generation failed: %s",
@@ -1045,6 +1493,9 @@ int Game::run() {
                 );
             } catch (...) {
                 generationError = "Unknown generation error";
+                if (!automatedScreenshot.empty()) {
+                    automatedInitialSetupPending = false;
+                }
                 TraceLog(
                     LOG_ERROR,
                     "Level generation failed with an unknown error"
@@ -1057,18 +1508,391 @@ int Game::run() {
         if (IsKeyPressed(KEY_F11) ||
             (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))) {
             ToggleFullscreen();
+            staticBoardLayerDirty = true;
         }
         if (IsKeyPressed(KEY_ESCAPE)) {
-            if (!generationError.empty()) {
-                closeRequested = true;
-            } else if (IsWindowFullscreen()) {
+            if (IsWindowFullscreen()) {
                 ToggleFullscreen();
+                staticBoardLayerDirty = true;
+            } else if (screen == Screen::Playing) {
+                (void)persistCurrentGame();
+                generationError.clear();
+                pressedArrow.reset();
+                pressedMenuButton.reset();
+                focusedMenuButton = 0;
+                screen = Screen::MainMenu;
+            } else if (screen != Screen::MainMenu) {
+                pressedMenuButton.reset();
+                focusedMenuButton = 0;
+                screen = Screen::MainMenu;
             } else {
                 closeRequested = true;
             }
         }
         if (IsKeyPressed(KEY_F12)) {
             TakeScreenshot("arrow-puzzle-screenshot.png");
+        }
+
+        if (screen != Screen::Playing) {
+            const Screen menuScreen = screen;
+            const int menuItemCount =
+                menuScreen == Screen::MainMenu
+                ? 4
+                : menuScreen == Screen::NewGameMenu
+                    ? 5
+                    : 3;
+            const auto menuItemEnabled = [&](int index) {
+                if (index < 0 || index >= menuItemCount) {
+                    return false;
+                }
+                if (menuScreen == Screen::MainMenu) {
+                    if (index == 0) {
+                        return !generationInProgress;
+                    }
+                    if (index == 1) {
+                        return resumeAvailable &&
+                               !generationInProgress;
+                    }
+                }
+                return true;
+            };
+            const auto firstEnabledMenuItem = [&]() {
+                for (int index = 0;
+                     index < menuItemCount;
+                     ++index) {
+                    if (menuItemEnabled(index)) {
+                        return index;
+                    }
+                }
+                return 0;
+            };
+            if (focusedMenuButton < 0 ||
+                focusedMenuButton >= menuItemCount ||
+                !menuItemEnabled(focusedMenuButton)) {
+                focusedMenuButton = firstEnabledMenuItem();
+            }
+            const auto moveMenuFocus = [&](int direction) {
+                for (int distance = 1;
+                     distance <= menuItemCount;
+                     ++distance) {
+                    const int candidate =
+                        (focusedMenuButton +
+                         direction * distance +
+                         menuItemCount * menuItemCount) %
+                        menuItemCount;
+                    if (menuItemEnabled(candidate)) {
+                        focusedMenuButton = candidate;
+                        return;
+                    }
+                }
+            };
+
+            const bool keyboardUp = IsKeyPressed(KEY_UP);
+            const bool keyboardDown = IsKeyPressed(KEY_DOWN);
+            if (keyboardUp) {
+                moveMenuFocus(-1);
+                pressedMenuButton.reset();
+            }
+            if (keyboardDown) {
+                moveMenuFocus(1);
+                pressedMenuButton.reset();
+            }
+
+            const bool mouseDown =
+                IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+            const bool mousePressed =
+                IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+            const bool mouseReleased =
+                pressedMenuButton.has_value() &&
+                !mouseDown &&
+                !mousePressed;
+            const auto menuItemAtPoint =
+                [&](Vector2 point) -> std::optional<int> {
+                    for (int index = 0;
+                         index < menuItemCount;
+                         ++index) {
+                        if (menuItemEnabled(index) &&
+                            CheckCollisionPointRec(
+                                point,
+                                menuButtonRectangle(
+                                    index,
+                                    menuItemCount
+                                )
+                            )) {
+                            return index;
+                        }
+                    }
+                    return std::nullopt;
+                };
+
+            std::optional<int> activatedMenuButton;
+            if (!IsWindowFocused()) {
+                pressedMenuButton.reset();
+            } else {
+                if (mousePressed) {
+                    const std::optional<int> hovered =
+                        menuItemAtPoint(GetMousePosition());
+                    if (hovered.has_value()) {
+                        focusedMenuButton = *hovered;
+                        pressedMenuButton =
+                            static_cast<int>(menuScreen) * 16 +
+                            *hovered;
+                    } else {
+                        pressedMenuButton.reset();
+                    }
+                }
+                if (mouseReleased) {
+                    const std::optional<int> hovered =
+                        menuItemAtPoint(GetMousePosition());
+                    if (hovered.has_value() &&
+                        pressedMenuButton ==
+                            static_cast<int>(menuScreen) * 16 +
+                                *hovered) {
+                        activatedMenuButton = *hovered;
+                    }
+                    pressedMenuButton.reset();
+                }
+
+                const bool altDown =
+                    IsKeyDown(KEY_LEFT_ALT) ||
+                    IsKeyDown(KEY_RIGHT_ALT);
+                const bool enterPressed =
+                    !altDown &&
+                    (IsKeyPressed(KEY_ENTER) ||
+                     IsKeyPressed(KEY_KP_ENTER));
+                const bool spacePressed =
+                    IsKeyPressed(KEY_SPACE);
+                if (enterPressed &&
+                    menuItemEnabled(focusedMenuButton)) {
+                    activatedMenuButton =
+                        focusedMenuButton;
+                    pressedMenuButton.reset();
+                } else if (
+                    spacePressed &&
+                    menuScreen == Screen::SettingsMenu &&
+                    focusedMenuButton <= 1) {
+                    activatedMenuButton =
+                        focusedMenuButton;
+                    pressedMenuButton.reset();
+                }
+            }
+            const auto menuButton = [&](
+                int index,
+                Rectangle bounds,
+                const char* label,
+                bool enabled = true
+            ) {
+                const int id =
+                    static_cast<int>(menuScreen) * 16 + index;
+                drawMenuButton(
+                    uiFont,
+                    bounds,
+                    label,
+                    enabled,
+                    enabled &&
+                        focusedMenuButton == index,
+                    pressedMenuButton == id
+                );
+                return enabled &&
+                       activatedMenuButton == index;
+            };
+
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawRectangleGradientV(
+                0,
+                0,
+                GetScreenWidth(),
+                GetScreenHeight(),
+                RAYWHITE,
+                Color{247, 249, 252, 255}
+            );
+
+            if (screen == Screen::MainMenu) {
+                drawMenuHeading(uiFont, "MAIN MENU");
+                constexpr int buttonCount = 4;
+                if (menuButton(
+                        0,
+                        menuButtonRectangle(0, buttonCount),
+                        "New game",
+                        !generationInProgress
+                    )) {
+                    screen = Screen::NewGameMenu;
+                }
+                if (menuButton(
+                        1,
+                        menuButtonRectangle(1, buttonCount),
+                        "Resume game",
+                        resumeAvailable &&
+                            !generationInProgress
+                    )) {
+                    std::optional<SavedGame> restored =
+                        persistence.loadSavedGame();
+                    if (!restored.has_value() ||
+                        !restoreSavedGame(
+                            std::move(*restored)
+                        )) {
+                        resumeAvailable = false;
+                        savedGame.reset();
+                    }
+                }
+                if (menuButton(
+                        2,
+                        menuButtonRectangle(2, buttonCount),
+                        "Settings"
+                    )) {
+                    screen = Screen::SettingsMenu;
+                }
+                if (menuButton(
+                        3,
+                        menuButtonRectangle(3, buttonCount),
+                        "Exit"
+                    )) {
+                    (void)persistCurrentGame();
+                    closeRequested = true;
+                }
+                if (generationInProgress) {
+                    drawCenteredText(
+                        uiFont,
+                        "Level generation is finishing in the background",
+                        static_cast<float>(GetScreenWidth()) * 0.5F,
+                        static_cast<float>(GetScreenHeight()) - 54.0F,
+                        kMenuHintText,
+                        kMuted
+                    );
+                } else {
+                    drawCenteredText(
+                        uiFont,
+                        "Up / Down navigate    Enter select",
+                        static_cast<float>(GetScreenWidth()) * 0.5F,
+                        static_cast<float>(GetScreenHeight()) - 54.0F,
+                        kMenuHintText,
+                        kMuted
+                    );
+                }
+            } else if (screen == Screen::NewGameMenu) {
+                drawMenuHeading(uiFont, "NEW GAME");
+                constexpr int buttonCount = 5;
+                for (int index = 0;
+                     index <
+                         static_cast<int>(
+                             kDifficultyPresets.size()
+                         );
+                     ++index) {
+                    const DifficultyPreset& preset =
+                        kDifficultyPresets[
+                            static_cast<std::size_t>(index)
+                        ];
+                    if (!menuButton(
+                            index,
+                            menuButtonRectangle(
+                                index,
+                                buttonCount
+                            ),
+                            preset.label
+                        )) {
+                        continue;
+                    }
+                    GeneratorOptions options{
+                        preset.columns,
+                        preset.rows,
+                        2,
+                        preset.maximumLength,
+                        seed++,
+                        preset.candidateAttempts,
+                        settings.arrowLoops
+                    };
+                    startGeneration(options);
+                }
+                if (menuButton(
+                        4,
+                        menuButtonRectangle(4, buttonCount),
+                        "Back"
+                    )) {
+                    screen = Screen::MainMenu;
+                }
+                drawCenteredText(
+                    uiFont,
+                    "Up / Down navigate    Enter select    Esc back",
+                    static_cast<float>(GetScreenWidth()) * 0.5F,
+                    static_cast<float>(GetScreenHeight()) - 54.0F,
+                    kMenuHintText,
+                    kMuted
+                );
+            } else if (screen == Screen::SettingsMenu) {
+                drawMenuHeading(uiFont, "SETTINGS");
+                constexpr int buttonCount = 3;
+                const std::string loopsLabel =
+                    std::string{"Arrow loops  ["} +
+                    (settings.arrowLoops ? "ON" : "OFF") +
+                    "]";
+                if (menuButton(
+                        0,
+                        menuButtonRectangle(0, buttonCount),
+                        loopsLabel.c_str()
+                    )) {
+                    if (!persistence.setArrowLoops(
+                            settings,
+                            !settings.arrowLoops
+                        )) {
+                        TraceLog(
+                            LOG_WARNING,
+                            "Could not save arrow loop setting"
+                        );
+                    }
+                }
+                const std::string collisionLabel =
+                    std::string{"Flying arrow collisions  ["} +
+                    (settings.flyingArrowCollisions
+                         ? "ON"
+                         : "OFF") +
+                    "]";
+                if (menuButton(
+                        1,
+                        menuButtonRectangle(1, buttonCount),
+                        collisionLabel.c_str()
+                    )) {
+                    if (!persistence.setFlyingArrowCollisions(
+                            settings,
+                            !settings.flyingArrowCollisions
+                        )) {
+                        TraceLog(
+                            LOG_WARNING,
+                            "Could not save flying collision setting"
+                        );
+                    }
+                }
+                if (menuButton(
+                        2,
+                        menuButtonRectangle(2, buttonCount),
+                        "Back"
+                    )) {
+                    screen = Screen::MainMenu;
+                }
+                drawCenteredText(
+                    uiFont,
+                    "Up / Down navigate    Enter / Space toggle"
+                    "    Saved automatically",
+                    static_cast<float>(GetScreenWidth()) * 0.5F,
+                    static_cast<float>(GetScreenHeight()) - 54.0F,
+                    kMenuHintText,
+                    kMuted
+                );
+            }
+
+            if (screen != menuScreen) {
+                pressedMenuButton.reset();
+                focusedMenuButton = 0;
+            }
+            EndDrawing();
+            ++renderedFrames;
+            if (!automatedScreenshot.empty() &&
+                automatedMenuScreen != 0 &&
+                renderedFrames >= automatedScreenshotFrame) {
+                TakeScreenshot(automatedScreenshot.c_str());
+                closeRequested = true;
+            }
+            continue;
         }
 
         camera.offset = {
@@ -1089,6 +1913,7 @@ int Game::run() {
             const Vector2 after = GetScreenToWorld2D(mouse, camera);
             camera.target.x += before.x - after.x;
             camera.target.y += before.y - after.y;
+            staticBoardLayerDirty = true;
         }
 
         if (!generationBlocksInput &&
@@ -1096,6 +1921,7 @@ int Game::run() {
             const Vector2 movement = GetMouseDelta();
             camera.target.x -= movement.x / camera.zoom;
             camera.target.y -= movement.y / camera.zoom;
+            staticBoardLayerDirty = true;
         }
 
         const bool anyArrowInMotion = std::ranges::any_of(
@@ -1115,8 +1941,10 @@ int Game::run() {
         if (IsKeyPressed(KEY_R) &&
             !anyArrowInMotion &&
             !generationInProgress) {
-            ++seed;
-            startGeneration(seed);
+            currentGeneratorOptions.seed = seed++;
+            currentGeneratorOptions.allowArrowLoops =
+                settings.arrowLoops;
+            startGeneration(currentGeneratorOptions);
         }
 
         if (!automatedScreenshot.empty() &&
@@ -1227,6 +2055,7 @@ int Game::run() {
                     if (value.history.empty()) {
                         value.motion = Motion::Idle;
                         value.progress = 0.0F;
+                        staticBoardLayerDirty = true;
                     } else {
                         value.motion = Motion::Returning;
                         value.progress = 0.0F;
@@ -1359,6 +2188,7 @@ int Game::run() {
                 value.history.pop_back();
                 if (value.history.empty()) {
                     value.motion = Motion::Idle;
+                    staticBoardLayerDirty = true;
                 }
             }
             if (recoveryTick > 0) {
@@ -1395,10 +2225,7 @@ int Game::run() {
         bool hasForward = hasForwardMotion();
         if (!hasForward) {
             forwardTimeDebt = 0.0;
-            std::ranges::fill(
-                movingContacts,
-                std::uint8_t{0}
-            );
+            movingContacts.clear();
         } else if (movingCollisionPauseRemaining <= 0.0) {
             // Debt is simulated before this frame's time. New arrows carry
             // the same amount as launchDelay, so they cannot age retroactively.
@@ -1577,10 +2404,7 @@ int Game::run() {
             hasForward = hasForwardMotion();
             if (!hasForward) {
                 forwardTimeDebt = 0.0;
-                std::ranges::fill(
-                    movingContacts,
-                    std::uint8_t{0}
-                );
+                movingContacts.clear();
             }
         }
 
@@ -1588,9 +2412,31 @@ int Game::run() {
             arrows,
             [](const RuntimeArrow& value) { return value.present; }
         ));
+        if (activeGame &&
+            (remaining == 0 || lives <= 0) &&
+            resumeAvailable &&
+            persistence.removeSavedGame()) {
+            resumeAvailable = false;
+            savedGame.reset();
+        }
+
+        rebuildStaticBoardLayer();
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
+        if (staticBoardLayer.id != 0) {
+            DrawTextureRec(
+                staticBoardLayer.texture,
+                {
+                    0.0F,
+                    0.0F,
+                    static_cast<float>(staticBoardLayerWidth),
+                    -static_cast<float>(staticBoardLayerHeight)
+                },
+                {0.0F, 0.0F},
+                WHITE
+            );
+        }
 
         DrawRectangle(0, 0, GetScreenWidth(), static_cast<int>(kHudHeight), RAYWHITE);
         DrawLine(
@@ -1648,30 +2494,9 @@ int Game::run() {
         }
 
         BeginMode2D(camera);
-        DrawRectangleRounded(
-            {0.0F, 0.0F, boardWidth, boardHeight},
-            0.035F,
-            8,
-            {248, 250, 253, 255}
-        );
-        for (int y = 0; y < board.rows(); ++y) {
-            for (int x = 0; x < board.columns(); ++x) {
-                DrawCircleV(
-                    cellCenter({x, y}),
-                    kGridDotRadius,
-                    kGridDot
-                );
-            }
-        }
-        DrawRectangleRoundedLinesEx(
-            {0.0F, 0.0F, boardWidth, boardHeight},
-            0.035F,
-            8,
-            2.0F,
-            kSoft
-        );
         for (const RuntimeArrow& value : arrows) {
-            if (value.present) {
+            if (value.present &&
+                value.motion != Motion::Idle) {
                 drawArrow(value);
             }
         }
@@ -1749,7 +2574,7 @@ int Game::run() {
                 kRed
             );
             const char* retry =
-                "Press R to try another level  /  Esc to quit";
+                "Press R to try another level  /  Esc for menu";
             drawCenteredText(
                 uiFont,
                 retry,
@@ -1773,7 +2598,8 @@ int Game::run() {
                 kMuted
             );
         } else if (remaining == 0) {
-            const char* text = "FIELD CLEARED!  Press R for a new puzzle";
+            const char* text =
+                "FIELD CLEARED!  Press R for a new puzzle or Esc for menu";
             const Vector2 textSize = measureText(
                 uiFont,
                 text,
@@ -1812,7 +2638,7 @@ int Game::run() {
             );
         } else {
             const char* help =
-                "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   R new";
+                "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   Esc menu";
             drawCenteredText(
                 uiFont,
                 help,
@@ -1829,26 +2655,79 @@ int Game::run() {
         if (!automatedScreenshot.empty() &&
             !automatedInitialSetupPending &&
             !generationInProgress &&
-            generationError.empty() &&
             renderedFrames >= automatedScreenshotFrame) {
             TakeScreenshot(automatedScreenshot.c_str());
             closeRequested = true;
         }
     }
 
-    if (ownsUiFont) {
-        UnloadFont(uiFont);
+    if (automatedScreenshot.empty() ||
+        automatedSaveOnExit) {
+        (void)persistCurrentGame();
     }
-    CloseWindow();
     if (generationFuture.valid()) {
-        generationFuture.wait();
+        while (generationFuture.wait_for(
+                   std::chrono::milliseconds{16}
+               ) != std::future_status::ready) {
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawRectangleGradientV(
+                0,
+                0,
+                GetScreenWidth(),
+                GetScreenHeight(),
+                RAYWHITE,
+                Color{247, 249, 252, 255}
+            );
+            const Vector2 spinnerCenter{
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(GetScreenHeight()) * 0.5F -
+                    42.0F
+            };
+            const float spinnerAngle = static_cast<float>(
+                std::fmod(GetTime() * 210.0, 360.0)
+            );
+            DrawRing(
+                spinnerCenter,
+                17.0F,
+                23.0F,
+                spinnerAngle,
+                spinnerAngle + 275.0F,
+                48,
+                kBlue
+            );
+            drawCenteredText(
+                uiFont,
+                "FINISHING LEVEL GENERATION",
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                spinnerCenter.y + 43.0F,
+                kOverlayTitleText,
+                kInk
+            );
+            drawCenteredText(
+                uiFont,
+                "The game will close automatically...",
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                spinnerCenter.y + 79.0F,
+                kOverlayDetailText,
+                kMuted
+            );
+            EndDrawing();
+        }
         try {
             static_cast<void>(generationFuture.get());
         } catch (...) {
-            // The window is already closing; generation errors are irrelevant
-            // here, but consuming the future keeps shutdown deterministic.
+            // Generation errors no longer matter during shutdown, but
+            // consuming the future keeps the worker lifetime deterministic.
         }
     }
+    if (ownsUiFont) {
+        UnloadFont(uiFont);
+    }
+    if (staticBoardLayer.id != 0) {
+        UnloadRenderTexture(staticBoardLayer);
+    }
+    CloseWindow();
     return 0;
 }
 

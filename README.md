@@ -5,9 +5,9 @@
 Arrow Puzzle is a minimalist desktop puzzle game about untangling a board of
 arrows. It is written in C++20 with raylib and currently targets Windows.
 
-The project is an early but fully playable prototype. It starts directly on a
-generated 40 x 40 board; menus, difficulty selection, saving, and loading are
-planned but not implemented yet.
+The project is an early but fully playable prototype. Its start menu offers
+20 x 20, 40 x 40, 80 x 80, and experimental 160 x 160 generated boards.
+Settings and unfinished games are saved beside the executable.
 
 ## Download
 
@@ -57,13 +57,19 @@ another arrow's speed.
 
 ## Current features
 
-- Completely filled 40 x 40 generated boards
-- Usually about 180 arrows on the default board
-- A deliberate mix of short, medium, and long arrows from 2 to 60 cells
+- Start menu with 20 x 20, 40 x 40, 80 x 80, and 160 x 160 difficulty presets
+- Completely filled generated boards
+- Usually about 180 arrows on a 40 x 40 board
+- A deliberate mix of short, medium, and long arrows with difficulty-specific
+  length limits
 - Constructive generation with a stored valid solution order
-- Eight-candidate quality selection with a responsive generation indicator
+- Several spatially distributed opening moves, with more starting fronts on
+  larger boards
+- Up to eight-candidate quality selection with a responsive generation indicator
 - Extra preference for complex arrows whose head follows the vacating tail
 - Dynamic self-collision and simultaneous moving-arrow collisions
+- Optional arrow loops and flying-arrow collision penalties
+- Automatic settings and unfinished-game persistence beside the executable
 - Three lives with animated collision recovery
 - Persistent light-grey grid dots revealed as arrows leave
 - Independent, continuously accelerating motion without a speed cap
@@ -81,13 +87,44 @@ another arrow's speed.
 | Left mouse button | Launch an idle arrow |
 | Mouse wheel | Zoom at the pointer |
 | Middle mouse button + drag | Pan the board |
+| Up / Down | Move the keyboard focus through menu items |
+| Enter | Activate the focused menu item |
+| Space | Toggle the focused on/off setting |
 | F11 or Left Alt+Enter | Toggle fullscreen |
-| Escape | Leave fullscreen, or quit in windowed mode |
+| Escape | Leave fullscreen, return to the menu, or close the main menu |
 | R | Generate a new board when no arrow is moving |
 | F12 | Save `arrow-puzzle-screenshot.png` in the working directory |
 
 New arrows may be launched while other arrows are moving forward. Input is
 temporarily locked while collided arrows are paused or rewinding.
+
+## Menus, settings, and saves
+
+The New game menu provides four board sizes:
+
+- Simple: 20 x 20
+- Middle: 40 x 40
+- Hard: 80 x 80
+- Very Hard: 160 x 160
+
+Very Hard is experimental. It evaluates one generated candidate instead of
+eight, but generation can still take tens of seconds. The animated generation
+overlay remains responsive while the worker searches.
+
+The Settings menu can prevent newly generated levels from using dynamic arrow
+loops and can disable life penalties for collisions between flying arrows.
+Existing saved geometry is never rewritten by a settings change. Stationary
+obstacles remain active in both collision modes. Changes are written
+immediately to `settings.txt`. Disabling arrow loops makes generation more
+restrictive; the experimental Very Hard preset can reject a seed and offer a
+retry instead of falling back to a simpler board.
+
+When the game returns to the menu or exits with an uncleared board and at
+least one life remaining, it writes `savegame.txt`. The save contains the
+complete geometry, remaining and failed-arrow flags, and life count; it does
+not depend on a seed or the current generator implementation. Resume game is
+disabled when there is no valid unfinished game. Both text files are stored
+in the same directory as `ArrowPuzzle.exe`.
 
 ## Building on Windows
 
@@ -118,7 +155,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 The helper configures the project, builds it, and runs the complete test suite.
-The generator stress test creates 1,311 boards and can take several minutes.
+The generator stress test creates 1,312 boards and can take several minutes.
 
 The resulting executable is:
 
@@ -185,6 +222,8 @@ $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
 
 Additional screenshot-only hooks are available:
 
+- `ARROWPUZZLE_DIFFICULTY` selects preset `1` through `4`
+- `ARROWPUZZLE_SCREENSHOT_MENU` captures main/new-game/settings menu `1..3`
 - `ARROWPUZZLE_SCREENSHOT_FRAME` selects the captured frame (default: `30`)
 - `ARROWPUZZLE_SCREENSHOT_REMOVE` hides the first N arrows before capture
 - `ARROWPUZZLE_SCREENSHOT_LAUNCH` launches one arrow by zero-based index
@@ -201,8 +240,9 @@ src/Board.cpp        Board state, movement rules, and solution checks
 src/Generator.cpp    Constructive level generator and candidate scoring
 src/MotionKinematics.cpp  Independent accelerated movement calculations
 src/MotionResolver.cpp  Moving/static collision classification
+src/Persistence.cpp  Versioned settings and unfinished-game storage
 src/Game.cpp         raylib rendering, input, and animation
-tests/               Board and generator tests
+tests/               Board, generator, and persistence tests
 tools/               Windows build helper
 ```
 
@@ -219,7 +259,8 @@ constructive solution order.
 
 Multiple candidates are scored for inter-arrow contact, spatial mixing,
 direction diversity, turns, dependency structure, and length distribution.
-The default game compares eight candidates, including on 40 x 40 boards.
+The three smaller presets compare eight candidates. The experimental
+160 x 160 preset currently accepts the first valid candidate to limit waiting.
 `GeneratorOptions::candidateAttempts` is the internal quality/time control that
 can later be exposed as a menu setting.
 
@@ -242,10 +283,9 @@ The automated suite verifies complete coverage, geometry, requested length
 limits, constructive solvability, dynamic self-collision, and statistical
 quality across many deterministic seeds.
 
-Seeds are development and reproduction aids, not a planned save format.
-Future saves should contain the complete arrow geometry and current gameplay
-state so partially solved levels remain stable across generator versions and
-platforms.
+Seeds are development and reproduction aids, not the save format. Saved games
+contain the complete arrow geometry and current gameplay state, so partially
+solved levels remain stable across generator versions and platforms.
 
 ## Portability
 

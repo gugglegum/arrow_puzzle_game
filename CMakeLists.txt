@@ -32,6 +32,7 @@ add_library(arrow_core STATIC
     src/Generator.cpp
     src/MotionKinematics.cpp
     src/MotionResolver.cpp
+    src/Persistence.cpp
 )
 
 target_include_directories(arrow_core PUBLIC include)
@@ -93,4 +94,27 @@ if(ARROWPUZZLE_BUILD_TESTS)
     endif()
 
     add_test(NAME arrow_tests COMMAND arrow_tests)
+
+    add_executable(
+        arrow_persistence_tests
+        tests/PersistenceTests.cpp
+    )
+    target_link_libraries(arrow_persistence_tests PRIVATE arrow_core)
+
+    if(MSVC)
+        target_compile_options(
+            arrow_persistence_tests
+            PRIVATE /W4 /permissive- /utf-8
+        )
+    else()
+        target_compile_options(
+            arrow_persistence_tests
+            PRIVATE -Wall -Wextra -Wpedantic
+        )
+    endif()
+
+    add_test(
+        NAME arrow_persistence_tests
+        COMMAND arrow_persistence_tests
+    )
 endif()

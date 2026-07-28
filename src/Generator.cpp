@@ -124,6 +124,20 @@ bool pointsOutside(Cell head, Cell neck, int columns, int rows) {
            !isInside(head + direction, columns, rows);
 }
 
+int desiredInitialChoices(int columns, int rows) {
+    const int maximumDimension = std::max(columns, rows);
+    if (maximumDimension <= 20) {
+        return 2;
+    }
+    if (maximumDimension <= 40) {
+        return 3;
+    }
+    if (maximumDimension <= 80) {
+        return 5;
+    }
+    return std::clamp(maximumDimension / 20 + 1, 6, 12);
+}
+
 void addEdge(std::vector<std::vector<int>>& adjacency, int lhs, int rhs) {
     adjacency[static_cast<std::size_t>(lhs)].push_back(rhs);
     adjacency[static_cast<std::size_t>(rhs)].push_back(lhs);
@@ -357,6 +371,20 @@ bool clearsOwnBodyInTime(
     return true;
 }
 
+bool launchRayCrossesOwnBody(
+    const RayInfo& ray,
+    int start,
+    int end
+) {
+    return std::ranges::any_of(
+        ray.cells,
+        [start, end](const auto& entry) {
+            const int position = entry.first;
+            return position >= start && position <= end;
+        }
+    );
+}
+
 int minimumOwnBodyClearance(
     const RayInfo& ray,
     int start,
@@ -379,7 +407,8 @@ std::vector<std::uint64_t> reachableArrowCounts(
     const std::vector<RayInfo>& rays,
     int minimumLength,
     int maximumLength,
-    int maximumCount
+    int maximumCount,
+    bool allowArrowLoops
 ) {
     const int area = static_cast<int>(rays.size());
     const std::size_t wordCount =
@@ -399,9 +428,7 @@ std::vector<std::uint64_t> reachableArrowCounts(
                 hasReachableCount ||
                 reachable[sourceOffset + word] != 0U;
         }
-        if (!hasReachableCount ||
-            (start > 0 &&
-             !rays[static_cast<std::size_t>(start)].hasEarlierBlocker)) {
+        if (!hasReachableCount) {
             continue;
         }
 
@@ -415,7 +442,9 @@ std::vector<std::uint64_t> reachableArrowCounts(
             start + maximumLength - 1
         );
         for (int end = minimumEnd; end <= maximumEnd; ++end) {
-            if (!clearsOwnBodyInTime(ray, start, end)) {
+            if (!clearsOwnBodyInTime(ray, start, end) ||
+                (!allowArrowLoops &&
+                 launchRayCrossesOwnBody(ray, start, end))) {
                 continue;
             }
 
@@ -447,7 +476,22 @@ bool containsArrowCount(
     const std::size_t word = index / 64U;
     return word < reachableCounts.size() &&
            (reachableCounts[word] &
-            (std::uint64_t{1} << (index % 64U))) != 0U;
+           (std::uint64_t{1} << (index % 64U))) != 0U;
+}
+
+int highestReachableArrowCount(
+    const std::vector<std::uint64_t>& reachableCounts,
+    int minimumCount,
+    int maximumCount
+) {
+    for (int count = maximumCount;
+         count >= minimumCount;
+         --count) {
+        if (containsArrowCount(reachableCounts, count)) {
+            return count;
+        }
+    }
+    return 0;
 }
 
 bool usesMixedLengthProfile(
@@ -580,6 +624,7 @@ bool findIntervalsForCount(
     int minimumLength,
     int maximumLength,
     int arrowCount,
+    bool allowArrowLoops,
     std::mt19937& random,
     std::vector<Interval>& result
 ) {
@@ -626,6 +671,11 @@ bool findIntervalsForCount(
             cellIndex(path[static_cast<std::size_t>(index)], columns)
         )] = index;
     }
+    std::vector<std::uint8_t> preferredInitialFront(
+        static_cast<std::size_t>(area),
+        0U
+    );
+    preferredInitialFront[0] = 1U;
     const int lengthStride = maximumLength + 1;
     std::vector<int> intervalScores(
         static_cast<std::size_t>(area * lengthStride),
@@ -638,7 +688,8 @@ bool findIntervalsForCount(
     constexpr int tightSelfPassBonus = 2'500;
     constexpr int tightSelfPassLengthBonus = 10;
     constexpr int tightSelfPassTurnBonus = 50;
-    constexpr int longComplexTightSelfPassBonus = 2'000;
+    constexpr int longComplexTightSelfPassBonus = 4'000;
+    constexpr int preferredInitialFrontBonus = 8'000;
     std::uniform_int_distribution<int> tieBreaker(0, 7);
     for (int start = 0; start < area; ++start) {
         int minimumX = path[static_cast<std::size_t>(start)].x;
@@ -705,7 +756,10 @@ bool findIntervalsForCount(
             const bool clearsOwnBody =
                 clearsOwnBodyInTime(ray, start, end);
             const bool valid =
-                ray.requiredEnd <= end && clearsOwnBody;
+                ray.requiredEnd <= end &&
+                clearsOwnBody &&
+                (allowArrowLoops ||
+                 !launchRayCrossesOwnBody(ray, start, end));
             const int minimumClearance = valid
                 ? minimumOwnBodyClearance(ray, start, end)
                 : std::numeric_limits<int>::max();
@@ -742,6 +796,74 @@ bool findIntervalsForCount(
         }
     }
 
+    const int initialChoiceTarget =
+        desiredInitialChoices(columns, rows);
+    for (int choice = 1;
+         choice < initialChoiceTarget;
+         ++choice) {
+        const int target = choice * area / initialChoiceTarget;
+        int bestStart = -1;
+        int bestDistance = area;
+        for (int start = 1; start + 1 < area; ++start) {
+            if (rays[static_cast<std::size_t>(start)]
+                    .hasEarlierBlocker ||
+                preferredInitialFront[
+                    static_cast<std::size_t>(start)
+                ] != 0U) {
+                continue;
+            }
+            const int base =
+                start * lengthStride;
+            bool hasValidInterval = false;
+            for (int length = minimumLength;
+                 length <= maximumLength;
+                 ++length) {
+                if (validIntervals[
+                        static_cast<std::size_t>(base + length)
+                    ] != 0U) {
+                    hasValidInterval = true;
+                    break;
+                }
+            }
+            if (!hasValidInterval) {
+                continue;
+            }
+            const int distance = std::abs(start - target);
+            if (distance < bestDistance) {
+                bestStart = start;
+                bestDistance = distance;
+            }
+        }
+        if (bestStart >= 0) {
+            preferredInitialFront[
+                static_cast<std::size_t>(bestStart)
+            ] = 1U;
+        }
+    }
+    for (int start = 0; start < area; ++start) {
+        if (rays[static_cast<std::size_t>(start)]
+                .hasEarlierBlocker) {
+            continue;
+        }
+        const bool preferred =
+            preferredInitialFront[
+                static_cast<std::size_t>(start)
+            ] != 0U;
+        const int base = start * lengthStride;
+        for (int length = minimumLength;
+             length <= maximumLength;
+             ++length) {
+            const std::size_t interval =
+                static_cast<std::size_t>(base + length);
+            if (!preferred) {
+                validIntervals[interval] = 0U;
+            } else if (validIntervals[interval] != 0U) {
+                intervalScores[interval] +=
+                    preferredInitialFrontBonus;
+            }
+        }
+    }
+
     constexpr int kUnknown = std::numeric_limits<int>::min();
     constexpr int kImpossible = std::numeric_limits<int>::min() / 2;
     const int stride = arrowCount + 1;
@@ -768,11 +890,6 @@ bool findIntervalsForCount(
             start + 1 >= area) {
             return kImpossible;
         }
-        if (start > 0 &&
-            !rays[static_cast<std::size_t>(start)].hasEarlierBlocker) {
-            return kImpossible;
-        }
-
         const std::size_t state = static_cast<std::size_t>(
             start * stride + remaining
         );
@@ -881,18 +998,19 @@ std::vector<int> preferredArrowCounts(
     );
 
     std::vector<int> result;
-    for (int distance = 0;
-         static_cast<int>(result.size()) <= maximumCount - minimumCount;
+    const int count = maximumCount - minimumCount + 1;
+    result.reserve(static_cast<std::size_t>(count));
+    result.push_back(preferred);
+    for (int distance = 1;
+         static_cast<int>(result.size()) < count;
          ++distance) {
-        const std::array values{
-            preferred - distance,
-            preferred + distance
-        };
-        for (int value : values) {
-            if (value >= minimumCount && value <= maximumCount &&
-                std::ranges::find(result, value) == result.end()) {
-                result.push_back(value);
-            }
+        const int shorterArrows = preferred + distance;
+        const int longerArrows = preferred - distance;
+        if (longerArrows >= minimumCount) {
+            result.push_back(longerArrows);
+        }
+        if (shorterArrows <= maximumCount) {
+            result.push_back(shorterArrows);
         }
     }
     return result;
@@ -1216,7 +1334,8 @@ bool meetsDefaultQualityFloor(
     return
         arrowCount >= 48 &&
         arrowCount <= 54 &&
-        metrics.initiallyRemovable == 1 &&
+        metrics.initiallyRemovable >= 2 &&
+        metrics.initiallyRemovable <= 5 &&
         metrics.directionCount >= 3 &&
         metrics.shortArrows >= minimumShort &&
         metrics.mediumArrows >= minimumMedium &&
@@ -1237,7 +1356,11 @@ bool meetsDefaultQualityFloor(
         metrics.choiceExcess <= arrowCount * 6;
 }
 
-int scoreCandidate(const TangleMetrics& metrics, int arrowCount) {
+int scoreCandidate(
+    const TangleMetrics& metrics,
+    int arrowCount,
+    int desiredInitial
+) {
     const int desiredChoiceExcess = std::max(2, arrowCount * 2 / 3);
     const int desiredShort = arrowCount * 40 / 100;
     const int desiredLong = std::max(1, arrowCount * 14 / 100);
@@ -1271,7 +1394,9 @@ int scoreCandidate(const TangleMetrics& metrics, int arrowCount) {
         std::max(0, 3 - metrics.veryLongArrows) * 20'000 -
         std::abs(metrics.choiceExcess - desiredChoiceExcess) * 220 -
         std::max(0, metrics.maximumChoices - 5) * 2'000 -
-        std::max(0, metrics.initiallyRemovable - 1) * 20'000;
+        std::abs(
+            metrics.initiallyRemovable - desiredInitial
+        ) * 20'000;
 }
 
 } // namespace
@@ -1357,8 +1482,8 @@ Board generateBoard(const GeneratorOptions& options) {
                     options.rows
                 );
                 std::vector<std::uint64_t> reachableCounts;
+                int maximumAttemptedCount = 0;
                 if (useLargeBoardFastPath) {
-                    int maximumAttemptedCount = 0;
                     for (std::size_t countIndex = 0;
                          countIndex < countAttemptLimit;
                          ++countIndex) {
@@ -1371,14 +1496,41 @@ Board generateBoard(const GeneratorOptions& options) {
                         rays,
                         minimumLength,
                         maximumLength,
-                        maximumAttemptedCount
+                        maximumAttemptedCount,
+                        options.allowArrowLoops
                     );
                 }
 
-                for (std::size_t countIndex = 0;
-                     countIndex < countAttemptLimit;
-                     ++countIndex) {
-                    const int count = counts[countIndex];
+                std::vector<int> countsForOpening(
+                    counts.begin(),
+                    counts.begin() +
+                        static_cast<std::ptrdiff_t>(
+                            countAttemptLimit
+                        )
+                );
+                if (useLargeBoardFastPath &&
+                    std::ranges::none_of(
+                        countsForOpening,
+                        [&](int count) {
+                            return containsArrowCount(
+                                reachableCounts,
+                                count
+                            );
+                        }
+                    )) {
+                    const int fallbackCount =
+                        highestReachableArrowCount(
+                            reachableCounts,
+                            (area + maximumLength - 1) /
+                                maximumLength,
+                            maximumAttemptedCount
+                        );
+                    if (fallbackCount > 0) {
+                        countsForOpening.push_back(fallbackCount);
+                    }
+                }
+
+                for (int count : countsForOpening) {
                     if (useLargeBoardFastPath &&
                         !containsArrowCount(reachableCounts, count)) {
                         continue;
@@ -1392,6 +1544,7 @@ Board generateBoard(const GeneratorOptions& options) {
                         minimumLength,
                         maximumLength,
                         count,
+                        options.allowArrowLoops,
                         random,
                         intervals
                     );
@@ -1410,7 +1563,11 @@ Board generateBoard(const GeneratorOptions& options) {
                     );
                     const int score = scoreCandidate(
                         metrics,
-                        static_cast<int>(arrows.size())
+                        static_cast<int>(arrows.size()),
+                        desiredInitialChoices(
+                            options.columns,
+                            options.rows
+                        )
                     );
                     const bool meetsRequiredQuality =
                         !enforceDefaultQuality ||

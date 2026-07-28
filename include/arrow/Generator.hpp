@@ -13,6 +13,7 @@ struct GeneratorOptions {
     int maximumLength{30};
     std::uint32_t seed{0};
     int candidateAttempts{8};
+    bool allowArrowLoops{true};
 };
 
 [[nodiscard]] Board generateBoard(const GeneratorOptions& options);

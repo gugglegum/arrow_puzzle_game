@@ -30,6 +30,39 @@ bool cellsOverlap(
     });
 }
 
+bool hasUsableGrid(MotionBounds bounds) {
+    return bounds.columns > 0 && bounds.rows > 0;
+}
+
+std::size_t cellIndex(Cell cell, MotionBounds bounds) {
+    return static_cast<std::size_t>(cell.y) *
+               static_cast<std::size_t>(bounds.columns) +
+           static_cast<std::size_t>(cell.x);
+}
+
+void markCells(
+    std::vector<std::uint8_t>& occupancy,
+    std::span<const Cell> cells,
+    MotionBounds bounds
+) {
+    for (Cell cell : cells) {
+        if (cellIsRelevant(cell, bounds)) {
+            occupancy[cellIndex(cell, bounds)] = 1;
+        }
+    }
+}
+
+bool overlapsOccupancy(
+    std::span<const Cell> cells,
+    std::span<const std::uint8_t> occupancy,
+    MotionBounds bounds
+) {
+    return std::ranges::any_of(cells, [&](Cell cell) {
+        return cellIsRelevant(cell, bounds) &&
+               occupancy[cellIndex(cell, bounds)] != 0;
+    });
+}
+
 std::size_t pairIndex(
     std::size_t first,
     std::size_t second,
@@ -43,14 +76,18 @@ std::size_t pairIndex(
 MotionResolution resolveMotionStep(
     std::span<const MotionBodyView> bodies,
     std::span<const std::uint8_t> previousMovingContacts,
-    MotionBounds bounds
+    MotionBounds bounds,
+    bool trackMovingContacts
 ) {
     const std::size_t count = bodies.size();
     const bool hasPreviousMatrix =
+        trackMovingContacts &&
         previousMovingContacts.size() == count * count;
     MotionResolution result{
         std::vector<std::uint8_t>(count, 0),
-        hasPreviousMatrix
+        !trackMovingContacts
+            ? std::vector<std::uint8_t>{}
+            : hasPreviousMatrix
             ? std::vector<std::uint8_t>(
                   previousMovingContacts.begin(),
                   previousMovingContacts.end()
@@ -69,31 +106,70 @@ MotionResolution resolveMotionStep(
             body.selfBlocked || body.proposal.empty();
     }
 
-    for (std::size_t moving = 0; moving < count; ++moving) {
-        const MotionBodyView& body = bodies[moving];
-        if (!body.present ||
-            body.role != MotionRole::Advancing ||
-            result.hardFailures[moving]) {
-            continue;
-        }
-        for (std::size_t obstacle = 0; obstacle < count; ++obstacle) {
-            const MotionBodyView& other = bodies[obstacle];
-            if (obstacle == moving || !other.present ||
-                other.role != MotionRole::Static) {
+    if (hasUsableGrid(bounds)) {
+        std::vector<std::uint8_t> staticOccupancy(
+            static_cast<std::size_t>(bounds.columns) *
+                static_cast<std::size_t>(bounds.rows),
+            0
+        );
+        for (const MotionBodyView& body : bodies) {
+            if (!body.present ||
+                body.role != MotionRole::Static) {
                 continue;
             }
-            if (cellsOverlap(
+            markCells(staticOccupancy, body.cells, bounds);
+            markCells(
+                staticOccupancy,
+                body.reservedTarget,
+                bounds
+            );
+        }
+        for (std::size_t moving = 0;
+             moving < count;
+             ++moving) {
+            const MotionBodyView& body = bodies[moving];
+            if (!body.present ||
+                body.role != MotionRole::Advancing ||
+                result.hardFailures[moving]) {
+                continue;
+            }
+            if (overlapsOccupancy(
                     body.proposal,
-                    other.cells,
-                    bounds
-                ) ||
-                cellsOverlap(
-                    body.proposal,
-                    other.reservedTarget,
+                    staticOccupancy,
                     bounds
                 )) {
                 result.hardFailures[moving] = 1;
-                break;
+            }
+        }
+    } else {
+        for (std::size_t moving = 0; moving < count; ++moving) {
+            const MotionBodyView& body = bodies[moving];
+            if (!body.present ||
+                body.role != MotionRole::Advancing ||
+                result.hardFailures[moving]) {
+                continue;
+            }
+            for (std::size_t obstacle = 0;
+                 obstacle < count;
+                 ++obstacle) {
+                const MotionBodyView& other = bodies[obstacle];
+                if (obstacle == moving || !other.present ||
+                    other.role != MotionRole::Static) {
+                    continue;
+                }
+                if (cellsOverlap(
+                        body.proposal,
+                        other.cells,
+                        bounds
+                    ) ||
+                    cellsOverlap(
+                        body.proposal,
+                        other.reservedTarget,
+                        bounds
+                    )) {
+                    result.hardFailures[moving] = 1;
+                    break;
+                }
             }
         }
     }
@@ -101,11 +177,44 @@ MotionResolution resolveMotionStep(
     bool expanded = true;
     while (expanded) {
         expanded = false;
+        std::vector<std::uint8_t> failedOccupancy;
+        if (hasUsableGrid(bounds)) {
+            failedOccupancy.assign(
+                static_cast<std::size_t>(bounds.columns) *
+                    static_cast<std::size_t>(bounds.rows),
+                0
+            );
+            for (std::size_t failed = 0;
+                 failed < count;
+                 ++failed) {
+                const MotionBodyView& body = bodies[failed];
+                if (body.present &&
+                    body.role == MotionRole::Advancing &&
+                    result.hardFailures[failed]) {
+                    markCells(
+                        failedOccupancy,
+                        body.cells,
+                        bounds
+                    );
+                }
+            }
+        }
         for (std::size_t moving = 0; moving < count; ++moving) {
             const MotionBodyView& body = bodies[moving];
             if (!body.present ||
                 body.role != MotionRole::Advancing ||
                 result.hardFailures[moving]) {
+                continue;
+            }
+            if (!failedOccupancy.empty()) {
+                if (overlapsOccupancy(
+                        body.proposal,
+                        failedOccupancy,
+                        bounds
+                    )) {
+                    result.hardFailures[moving] = 1;
+                    expanded = true;
+                }
                 continue;
             }
             for (std::size_t failed = 0; failed < count; ++failed) {
@@ -126,6 +235,10 @@ MotionResolution resolveMotionStep(
                 }
             }
         }
+    }
+
+    if (!trackMovingContacts) {
+        return result;
     }
 
     for (std::size_t first = 0; first < count; ++first) {
