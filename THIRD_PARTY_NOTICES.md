@@ -10,8 +10,9 @@ Inter 4.1 release.
 - Copyright: Copyright (c) 2016 The Inter Project Authors
 - License: SIL Open Font License, Version 1.1
 
-The complete license is included at
-[`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt).
+The complete license is included in the source tree at
+[`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt) and as
+`INTER-OFL.txt` in binary release archives.
 
 ## raylib 5.5
 
@@ -42,12 +43,65 @@ The following notice is reproduced from the raylib 5.5 `LICENSE` file:
 >    misrepresented as being the original software.
 > 3. This notice may not be removed or altered from any source distribution.
 
-raylib contains third-party single-file libraries for platform access and file
-formats. Their notices are retained in the raylib source downloaded by CMake.
-The upstream project maintains the dependency license list in the
-[raylib wiki](https://github.com/raysan5/raylib/wiki/raylib-dependencies).
+### Components embedded by the Windows build
 
-This file documents the project's direct dependency. Before publishing a
-binary release, the release package should also include the notices for every
-raylib embedded dependency enabled in that build, taken from the exact fetched
-raylib source revision.
+The Windows build uses raylib 5.5 source revision
+`c1ab645ca298a2801097931d1079b10ff7eb9df8`. Its linked core, texture, and text
+modules embed the following permissively licensed components:
+
+| Component | Copyright / authors | License |
+| --- | --- | --- |
+| GLFW 3.4 | Marcus Geelnard; Camilla Löwy and contributors | zlib/libpng |
+| msf_gif 2.2 | Copyright (c) 2021 Miles Fogle | MIT or public domain |
+| sdefl and sinfl 1.0 | Copyright (c) 2020-2023 Micha Mettke | MIT or public domain |
+| rprand 1.0 | Copyright (c) 2023 Ramon Santamaria | zlib/libpng |
+| dirent for Win32 | Copyright Kevlin Henney, 1997, 2003 | Custom permissive license |
+| stb_image 2.30 | Copyright (c) 2017 Sean Barrett | MIT or public domain |
+| stb_image_write 1.16 | Copyright (c) 2017 Sean Barrett | MIT or public domain |
+| stb_image_resize2 2.18 | Copyright (c) 2017 Sean Barrett | MIT or public domain |
+| stb_perlin 0.5 | Copyright (c) 2017 Sean Barrett | MIT or public domain |
+| stb_truetype 1.26 | Copyright (c) 2017 Sean Barrett | MIT or public domain |
+| stb_rect_pack 1.01 | Copyright (c) 2017 Sean Barrett | MIT or public domain |
+| QOI | Copyright (c) 2021 Dominic Szablewski | MIT |
+| rl_gputex 1.0 | Copyright (c) 2013-2022 Ramon Santamaria | zlib/libpng |
+
+The upstream raylib project documents its dependency set in the
+[raylib dependency list](https://github.com/raysan5/raylib/wiki/raylib-dependencies).
+The versions above were verified against the exact 5.5 source fetched by this
+project.
+
+#### MIT-licensed embedded components
+
+Arrow Puzzle uses the MIT option for msf_gif, sdefl, sinfl, the stb libraries,
+and QOI.
+
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to
+> deal in the Software without restriction, including without limitation the
+> rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+> sell copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in
+> all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+> THE SOFTWARE.
+
+#### zlib/libpng-licensed embedded components
+
+GLFW, rprand, and rl_gputex use the same zlib/libpng terms reproduced above
+for raylib, with their respective copyright notices from the table.
+
+#### dirent for Win32
+
+> Permission to use, copy, modify, and distribute this software and its
+> documentation for any purpose is hereby granted without fee, provided that
+> this copyright and permissions notice appear in all copies and derivatives.
+>
+> This software is supplied "as is" without express or implied warranty.
