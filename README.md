@@ -6,7 +6,7 @@ Arrow Puzzle is a minimalist desktop puzzle game about untangling a board of
 arrows. It is written in C++20 with raylib and currently targets Windows.
 
 The project is an early but fully playable prototype. It starts directly on a
-generated 20 x 20 board; menus, difficulty selection, saving, and loading are
+generated 40 x 40 board; menus, difficulty selection, saving, and loading are
 planned but not implemented yet.
 
 ## Gameplay
@@ -46,9 +46,9 @@ another arrow's speed.
 
 ## Current features
 
-- Completely filled 20 x 20 generated boards
-- Usually 48 to 54 arrows per board
-- A deliberate mix of short, medium, and long arrows from 2 to 30 cells
+- Completely filled 40 x 40 generated boards
+- Usually about 180 arrows on the default board
+- A deliberate mix of short, medium, and long arrows from 2 to 60 cells
 - Constructive generation with a stored valid solution order
 - Dynamic self-collision and simultaneous moving-arrow collisions
 - Three lives with animated collision recovery

@@ -24,6 +24,9 @@ namespace {
 
 constexpr int kInitialWidth = 1100;
 constexpr int kInitialHeight = 900;
+constexpr int kDefaultColumns = 40;
+constexpr int kDefaultRows = 40;
+constexpr int kDefaultMaximumArrowLength = 60;
 constexpr float kCellSize = 34.0F;
 constexpr float kBoardPadding = 34.0F;
 constexpr float kHudHeight = 82.0F;
@@ -426,7 +429,13 @@ int Game::run() {
         static_cast<std::uint32_t>(std::time(nullptr))
     );
     const auto generateDefaultBoard = [](std::uint32_t boardSeed) {
-        return generateBoard({20, 20, 2, 30, boardSeed});
+        return generateBoard({
+            kDefaultColumns,
+            kDefaultRows,
+            2,
+            kDefaultMaximumArrowLength,
+            boardSeed
+        });
     };
     Board board = generateDefaultBoard(seed);
     std::vector<RuntimeArrow> arrows;

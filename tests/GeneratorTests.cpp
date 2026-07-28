@@ -1111,9 +1111,28 @@ Quality verifyBoard(
         "generator created a one-cell arrow"
     );
 
-    Quality quality;
+    Quality quality = analyze(board);
+    const std::size_t effectiveMinimumLength =
+        static_cast<std::size_t>(std::clamp(
+            options.minimumLength,
+            2,
+            options.columns * options.rows
+        ));
+    const std::size_t effectiveMaximumLength =
+        static_cast<std::size_t>(std::clamp(
+            std::max(
+                static_cast<int>(effectiveMinimumLength),
+                options.maximumLength
+            ),
+            static_cast<int>(effectiveMinimumLength),
+            options.columns * options.rows
+        ));
+    require(
+        quality.shortestArrow >= effectiveMinimumLength &&
+            quality.longestArrow <= effectiveMaximumLength,
+        "generator ignored the requested arrow length range"
+    );
     if (options.columns == 20 && options.rows == 20) {
-        quality = analyze(board);
         require(
             quality.initiallyRemovable == 1,
             "default board does not have exactly one initial move"
@@ -1246,6 +1265,48 @@ int main(int argc, char** argv) {
         verifyMotionResolution();
         verifyHighSpeedCollisionSweep();
         verifyDynamicSelfCollision();
+
+        constexpr std::array<std::uint32_t, 8> largeBoardSeeds{
+            0U,
+            1U,
+            2U,
+            7U,
+            64U,
+            747U,
+            23'000U,
+            4'000'000'000U
+        };
+        for (std::uint32_t largeSeed : largeBoardSeeds) {
+            const arrow::GeneratorOptions largeBoardOptions{
+                40,
+                40,
+                2,
+                60,
+                largeSeed
+            };
+            const Quality quality = verifyBoard(
+                arrow::generateBoard(largeBoardOptions),
+                largeBoardOptions
+            );
+            require(
+                quality.arrowCount >= 160 &&
+                    quality.arrowCount <= 220,
+                "40x40 board does not contain a dense arrow mix"
+            );
+            require(
+                quality.shortArrows * 4 >=
+                        quality.arrowCount &&
+                    quality.mediumArrows * 4 >=
+                        quality.arrowCount &&
+                    quality.longArrows >= 5,
+                "40x40 board lost its short/medium/long mix"
+            );
+            require(
+                quality.initiallyRemovable == 1 &&
+                    quality.directionCount >= 3,
+                "40x40 board has a weak dependency structure"
+            );
+        }
 
         int defaultSeedCount = 1000;
         if (argc >= 2) {
@@ -1424,7 +1485,8 @@ int main(int argc, char** argv) {
             << ", rich 5x5 blocks >= " << minimumRichMacro
             << ".\n"
             << "All generator tests passed ("
-            << defaultSeedCount + alternateSeedCount * 3
+            << defaultSeedCount + alternateSeedCount * 3 +
+                   static_cast<int>(largeBoardSeeds.size())
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
