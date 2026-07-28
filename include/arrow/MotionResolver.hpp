@@ -8,12 +8,23 @@
 
 namespace arrow {
 
+enum class MotionRole : std::uint8_t {
+    Static,
+    Moving,
+    Advancing
+};
+
+struct MotionBounds {
+    int columns{};
+    int rows{};
+};
+
 struct MotionBodyView {
     std::span<const Cell> cells;
     std::span<const Cell> proposal;
     std::span<const Cell> reservedTarget;
     bool present{};
-    bool moving{};
+    MotionRole role{MotionRole::Static};
     bool selfBlocked{};
 };
 
@@ -25,7 +36,8 @@ struct MotionResolution {
 
 [[nodiscard]] MotionResolution resolveMotionStep(
     std::span<const MotionBodyView> bodies,
-    std::span<const std::uint8_t> previousMovingContacts
+    std::span<const std::uint8_t> previousMovingContacts,
+    MotionBounds bounds = {}
 );
 
 } // namespace arrow

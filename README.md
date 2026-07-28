@@ -28,13 +28,21 @@ but it may not pass through any other part of its body.
 
 Several arrows can move simultaneously. If two moving arrows touch, the batch
 costs one life, but both arrows pass through each other and continue forward
-instead of rewinding. A half-second hit-stop makes the contact and lost life
-clearly visible before movement resumes. Timing is therefore part of the
+instead of rewinding. Both turn red before a half-second hit-stop and remain
+red for the rest of their flight, making the contact and lost life clearly
+visible before and after movement resumes. Timing is therefore part of the
 puzzle.
 
-Movement and collision occupancy are resolved at synchronized cell boundaries,
-while rendering is continuous at pixel resolution. Corners remain orthogonal:
-the line grows at the head and retracts at the tail without diagonal warping.
+Every arrow has an independent speed and movement clock. A frame is resolved
+chronologically at every cell boundary crossed by any arrow, so even an arrow
+that covers several cells in one rendered frame cannot tunnel through an
+obstacle. Rendering remains continuous at pixel resolution. Corners stay
+orthogonal: the line grows at the head and retracts at the tail without
+diagonal warping. A per-frame event budget keeps very large or unusually fast
+boards responsive; unfinished simulation time is carried forward, never
+replaced by skipped collision checks. A newly clicked arrow is timestamped
+after any older queued simulation time, so backlog can never make it inherit
+another arrow's speed.
 
 ## Current features
 
@@ -45,7 +53,8 @@ the line grows at the head and retracts at the tail without diagonal warping.
 - Dynamic self-collision and simultaneous moving-arrow collisions
 - Three lives with animated collision recovery
 - Persistent light-grey grid dots revealed as arrows leave
-- Smooth, continuously accelerating forward motion
+- Independent, continuously accelerating motion without a speed cap
+- Event-driven cell collision checks that prevent high-speed tunnelling
 - Windowed and fullscreen modes
 - Pointer-centred zoom and middle-button panning
 - Deterministic seeds and extensive generator tests
@@ -162,6 +171,8 @@ Additional screenshot-only hooks are available:
 - `ARROWPUZZLE_SCREENSHOT_FRAME` selects the captured frame (default: `30`)
 - `ARROWPUZZLE_SCREENSHOT_REMOVE` hides the first N arrows before capture
 - `ARROWPUZZLE_SCREENSHOT_LAUNCH` launches one arrow by zero-based index
+- `ARROWPUZZLE_SCREENSHOT_LAUNCH_2` launches a second arrow later
+- `ARROWPUZZLE_SCREENSHOT_LAUNCH_2_FRAME` selects that launch frame
 
 ## Project structure
 
@@ -169,6 +180,7 @@ Additional screenshot-only hooks are available:
 include/arrow/       Public C++ headers
 src/Board.cpp        Board state, movement rules, and solution checks
 src/Generator.cpp    Constructive level generator and candidate scoring
+src/MotionKinematics.cpp  Independent accelerated movement calculations
 src/MotionResolver.cpp  Moving/static collision classification
 src/Game.cpp         raylib rendering, input, and animation
 tests/               Board and generator tests

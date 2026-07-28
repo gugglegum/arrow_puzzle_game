@@ -1,4 +1,5 @@
 #include "arrow/Generator.hpp"
+#include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
 
 #include <algorithm>
@@ -302,13 +303,14 @@ struct OwnedMotionBody {
     std::vector<arrow::Cell> proposal;
     std::vector<arrow::Cell> reservedTarget;
     bool present{true};
-    bool moving{true};
+    arrow::MotionRole role{arrow::MotionRole::Advancing};
     bool selfBlocked{};
 };
 
 arrow::MotionResolution resolveOwnedMotion(
     const std::vector<OwnedMotionBody>& bodies,
-    const std::vector<std::uint8_t>& previousContacts = {}
+    const std::vector<std::uint8_t>& previousContacts = {},
+    arrow::MotionBounds bounds = {}
 ) {
     std::vector<arrow::MotionBodyView> views;
     views.reserve(bodies.size());
@@ -318,11 +320,15 @@ arrow::MotionResolution resolveOwnedMotion(
             body.proposal,
             body.reservedTarget,
             body.present,
-            body.moving,
+            body.role,
             body.selfBlocked
         });
     }
-    return arrow::resolveMotionStep(views, previousContacts);
+    return arrow::resolveMotionStep(
+        views,
+        previousContacts,
+        bounds
+    );
 }
 
 void verifyMotionResolution() {
@@ -359,6 +365,23 @@ void verifyMotionResolution() {
     require(
         !continuedContact.hasNewMovingContact,
         "continuous moving overlap charged a second event"
+    );
+
+    std::vector<OwnedMotionBody> fractionalContactBodies =
+        softBodies;
+    for (OwnedMotionBody& body : fractionalContactBodies) {
+        body.role = arrow::MotionRole::Moving;
+    }
+    const arrow::MotionResolution fractionalContact =
+        resolveOwnedMotion(
+            fractionalContactBodies,
+            firstContact.movingContacts
+        );
+    require(
+        !fractionalContact.hasNewMovingContact &&
+            fractionalContact.movingContacts ==
+                firstContact.movingContacts,
+        "fractional phase lost or repeated an active contact"
     );
 
     const std::vector clearBodies{
@@ -407,7 +430,7 @@ void verifyMotionResolution() {
         {},
         {},
         true,
-        false,
+        arrow::MotionRole::Static,
         false
     };
     const arrow::MotionResolution hardHit =
@@ -419,6 +442,22 @@ void verifyMotionResolution() {
     require(
         !hardHit.hasNewMovingContact,
         "stationary obstacle was reported as a moving contact"
+    );
+
+    const OwnedMotionBody reservedObstacle{
+        {{3, 0}},
+        {},
+        {{2, 0}},
+        true,
+        arrow::MotionRole::Static,
+        false
+    };
+    require(
+        resolveOwnedMotion({
+            OwnedMotionBody{{{1, 0}}, {{2, 0}}},
+            reservedObstacle
+        }).hardFailures[0] != 0,
+        "stationary reserved target did not block a transition"
     );
 
     const OwnedMotionBody cascadeFirst{
@@ -434,7 +473,7 @@ void verifyMotionResolution() {
         {},
         {},
         true,
-        false,
+        arrow::MotionRole::Static,
         false
     };
     const arrow::MotionResolution cascade = resolveOwnedMotion({
@@ -470,6 +509,475 @@ void verifyMotionResolution() {
     require(
         resolveOwnedMotion({selfBlocked}).hardFailures[0] != 0,
         "self-collision was not treated as a hard failure"
+    );
+
+    OwnedMotionBody fractionalMover = selfBlocked;
+    fractionalMover.role = arrow::MotionRole::Moving;
+    require(
+        resolveOwnedMotion({fractionalMover}).hardFailures[0] == 0,
+        "fractional mover was incorrectly resolved a second time"
+    );
+
+    OwnedMotionBody movingObstacle{
+        {{1, 0}},
+        {{2, 0}}
+    };
+    movingObstacle.role = arrow::MotionRole::Moving;
+    const arrow::MotionResolution asynchronousContact =
+        resolveOwnedMotion({
+            OwnedMotionBody{{{0, 0}}, {{1, 0}}},
+            movingObstacle
+        });
+    require(
+        asynchronousContact.hardFailures ==
+            std::vector<std::uint8_t>({0, 0}) &&
+            asynchronousContact.hasNewMovingContact,
+        "fractional moving arrow was treated as a hard obstacle"
+    );
+
+    const OwnedMotionBody staleTargetAttempt{
+        {{2, 1}},
+        {{2, 0}}
+    };
+    const OwnedMotionBody crossingMover{
+        {{1, 0}},
+        {{2, 0}},
+        {},
+        true,
+        arrow::MotionRole::Moving,
+        false
+    };
+    require(
+        resolveOwnedMotion({
+            staleTargetAttempt,
+            crossingMover
+        }).hardFailures[0] == 0,
+        "moving arrow prematurely blocked an accepted transition"
+    );
+    const OwnedMotionBody newlyStaticObstacle{
+        {{2, 0}},
+        {},
+        {},
+        true,
+        arrow::MotionRole::Static,
+        false
+    };
+    require(
+        resolveOwnedMotion({
+            staleTargetAttempt,
+            newlyStaticObstacle
+        }).hardFailures[0] != 0,
+        "commit-time revalidation missed a newly static obstacle"
+    );
+
+    const OwnedMotionBody outsideObstacle{
+        {{5, 0}},
+        {},
+        {},
+        true,
+        arrow::MotionRole::Static,
+        false
+    };
+    const OwnedMotionBody leavingBoard{
+        {{4, 0}},
+        {{5, 0}}
+    };
+    require(
+        resolveOwnedMotion(
+            {leavingBoard, outsideObstacle},
+            {},
+            {5, 5}
+        ).hardFailures[0] == 0,
+        "collision entirely outside the board blocked an exit"
+    );
+    const OwnedMotionBody outsideReservedObstacle{
+        {{4, 1}},
+        {},
+        {{5, 0}},
+        true,
+        arrow::MotionRole::Static,
+        false
+    };
+    require(
+        resolveOwnedMotion(
+            {leavingBoard, outsideReservedObstacle},
+            {},
+            {5, 5}
+        ).hardFailures[0] == 0,
+        "reserved target outside the board blocked an exit"
+    );
+
+    const arrow::MotionResolution outsideHeadSwap =
+        resolveOwnedMotion(
+            {
+                OwnedMotionBody{{{5, 0}}, {{6, 0}}},
+                OwnedMotionBody{{{6, 0}}, {{5, 0}}}
+            },
+            {},
+            {5, 5}
+        );
+    require(
+        !outsideHeadSwap.hasNewMovingContact,
+        "head swap outside the board cost a life"
+    );
+
+    const std::vector boundarySwapBodies{
+        OwnedMotionBody{{{4, 0}}, {{5, 0}}},
+        OwnedMotionBody{{{5, 0}}, {{4, 0}}}
+    };
+    const arrow::MotionResolution boundaryHeadSwap =
+        resolveOwnedMotion(
+            boundarySwapBodies,
+            {},
+            {5, 5}
+        );
+    const arrow::MotionResolution reversedBoundaryHeadSwap =
+        resolveOwnedMotion(
+            {
+                boundarySwapBodies[1],
+                boundarySwapBodies[0]
+            },
+            {},
+            {5, 5}
+        );
+    require(
+        boundaryHeadSwap.hasNewMovingContact &&
+            reversedBoundaryHeadSwap.hasNewMovingContact,
+        "boundary head swap depends on body ordering"
+    );
+}
+
+void verifyMotionKinematics() {
+    constexpr double acceleration = 22.0;
+    constexpr double initialSpeed = 8.0;
+    constexpr double firstPart = 0.017;
+    constexpr double secondPart = 0.033;
+    const double wholeDistance = arrow::acceleratedDistance(
+        initialSpeed,
+        acceleration,
+        firstPart + secondPart
+    );
+    const double splitDistance =
+        arrow::acceleratedDistance(
+            initialSpeed,
+            acceleration,
+            firstPart
+        ) +
+        arrow::acceleratedDistance(
+            initialSpeed + acceleration * firstPart,
+            acceleration,
+            secondPart
+        );
+    require(
+        std::abs(wholeDistance - splitDistance) < 1.0e-12,
+        "accelerated motion depends on frame partitioning"
+    );
+
+    const double targetDistance = 37.25;
+    const double travelTime = arrow::timeToCoverDistance(
+        targetDistance,
+        140.0,
+        acceleration
+    );
+    require(
+        std::abs(
+            arrow::acceleratedDistance(
+                140.0,
+                acceleration,
+                travelTime
+            ) -
+            targetDistance
+        ) < 1.0e-10,
+        "time-to-boundary inversion is inaccurate at high speed"
+    );
+
+    double progress = 0.2;
+    double speed = 10.0;
+    double remainingTime = 0.35;
+    int crossings = 0;
+    while (remainingTime > 1.0e-12) {
+        const double boundaryTime =
+            arrow::timeToCoverDistance(
+                1.0 - progress,
+                speed,
+                0.0
+            );
+        const double step = std::min(
+            boundaryTime,
+            remainingTime
+        );
+        progress += arrow::acceleratedDistance(
+            speed,
+            0.0,
+            step
+        );
+        remainingTime -= step;
+        if (boundaryTime <= step + 1.0e-12) {
+            progress = 0.0;
+            ++crossings;
+        }
+    }
+    require(
+        crossings == 3 &&
+            std::abs(progress - 0.7) < 1.0e-12,
+        "multiple cell boundaries were skipped in one frame"
+    );
+
+    struct TestMover {
+        double progress{};
+        double speed{};
+        int crossings{};
+    };
+    const auto advanceMover =
+        [acceleration](TestMover& mover, double time) {
+            constexpr double epsilon = 1.0e-12;
+            while (time > epsilon) {
+                const double boundaryTime =
+                    arrow::timeToCoverDistance(
+                        1.0 - mover.progress,
+                        mover.speed,
+                        acceleration
+                    );
+                const double step = std::min(
+                    boundaryTime,
+                    time
+                );
+                mover.progress +=
+                    arrow::acceleratedDistance(
+                        mover.speed,
+                        acceleration,
+                        step
+                    );
+                mover.speed += acceleration * step;
+                time -= step;
+                if (boundaryTime <= step + epsilon) {
+                    mover.progress = 0.0;
+                    ++mover.crossings;
+                }
+            }
+        };
+
+    TestMover earlierArrow{0.0, initialSpeed, 0};
+    advanceMover(earlierArrow, 0.2);
+    TestMover laterArrow{0.0, initialSpeed, 0};
+    advanceMover(earlierArrow, 0.08);
+    advanceMover(laterArrow, 0.08);
+    require(
+        earlierArrow.crossings == 3 &&
+            std::abs(earlierArrow.progress - 0.1024) <
+                1.0e-10 &&
+            std::abs(earlierArrow.speed - 14.16) <
+                1.0e-10 &&
+            laterArrow.crossings == 0 &&
+            std::abs(laterArrow.progress - 0.7104) <
+                1.0e-10 &&
+            std::abs(laterArrow.speed - 9.76) <
+                1.0e-10,
+        "later launch inherited another arrow's speed or progress"
+    );
+
+    const double maximumFiniteSpeed =
+        std::numeric_limits<double>::max();
+    const double maximumSpeedBoundaryTime =
+        arrow::timeToCoverDistance(
+            1.0,
+            maximumFiniteSpeed,
+            acceleration
+        );
+    require(
+        maximumSpeedBoundaryTime > 0.0 &&
+            std::isfinite(maximumSpeedBoundaryTime) &&
+            std::abs(
+                maximumFiniteSpeed *
+                    maximumSpeedBoundaryTime -
+                1.0
+            ) < 1.0e-12 &&
+        arrow::acceleratedDistance(
+            std::numeric_limits<double>::infinity(),
+            acceleration,
+            0.0
+        ) == 0.0 &&
+            arrow::timeToCoverDistance(
+                1.0,
+                std::numeric_limits<double>::infinity(),
+                acceleration
+            ) == 0.0,
+        "uncapped speed produced an invalid zero-time boundary event"
+    );
+    require(
+        arrow::eventTimesCoincide(
+            maximumSpeedBoundaryTime,
+            std::nextafter(
+                maximumSpeedBoundaryTime,
+                std::numeric_limits<double>::infinity()
+            )
+        ),
+        "adjacent subnormal boundary times were not simultaneous"
+    );
+
+    const double extremelyFast =
+        arrow::timeToCoverDistance(
+            1.0,
+            1.0e12,
+            acceleration
+        );
+    const double merelyFast =
+        arrow::timeToCoverDistance(
+            1.0,
+            1.0e8,
+            acceleration
+        );
+    require(
+        !arrow::eventTimesCoincide(
+            extremelyFast,
+            merelyFast
+        ),
+        "different high-speed boundaries were grouped as simultaneous"
+    );
+    require(
+        arrow::eventTimesCoincide(
+            extremelyFast,
+            std::nextafter(
+                extremelyFast,
+                std::numeric_limits<double>::infinity()
+            )
+        ),
+        "one-ULP boundary difference was not grouped as simultaneous"
+    );
+
+    const auto nextUlps =
+        [](double value, int count) {
+            for (int step = 0; step < count; ++step) {
+                value = std::nextafter(
+                    value,
+                    std::numeric_limits<double>::infinity()
+                );
+            }
+            return value;
+        };
+    require(
+        arrow::eventTimesCoincide(
+            1.0,
+            nextUlps(1.0, 64)
+        ) &&
+            !arrow::eventTimesCoincide(
+                1.0,
+                nextUlps(1.0, 65)
+            ),
+        "normal event-time ULP threshold is inconsistent"
+    );
+    const double smallestTime =
+        std::numeric_limits<double>::denorm_min();
+    require(
+        arrow::eventTimesCoincide(
+            smallestTime,
+            nextUlps(smallestTime, 64)
+        ) &&
+            !arrow::eventTimesCoincide(
+                smallestTime,
+                nextUlps(smallestTime, 65)
+            ),
+        "subnormal event-time ULP threshold is inconsistent"
+    );
+    require(
+        !arrow::eventTimesCoincide(
+            std::numeric_limits<double>::infinity(),
+            std::numeric_limits<double>::infinity()
+        ) &&
+            !arrow::eventTimesCoincide(
+                std::numeric_limits<double>::quiet_NaN(),
+                std::numeric_limits<double>::quiet_NaN()
+            ),
+        "non-finite event times were grouped as simultaneous"
+    );
+
+    constexpr double priorDebt = 0.4;
+    constexpr double currentFrame = 0.1;
+    double lateLaunchDelay = priorDebt;
+    TestMover debtProtectedArrow{0.0, initialSpeed, 0};
+    const double preLaunchTime = std::min(
+        priorDebt + currentFrame,
+        lateLaunchDelay
+    );
+    lateLaunchDelay -= preLaunchTime;
+    advanceMover(
+        debtProtectedArrow,
+        priorDebt + currentFrame - preLaunchTime
+    );
+    require(
+        lateLaunchDelay == 0.0 &&
+            debtProtectedArrow.crossings == 0 &&
+            std::abs(
+                debtProtectedArrow.progress - 0.91
+            ) < 1.0e-12 &&
+            std::abs(
+                debtProtectedArrow.speed - 10.2
+            ) < 1.0e-12,
+        "late launch consumed simulation debt from before its launch"
+    );
+}
+
+void verifyHighSpeedCollisionSweep() {
+    std::vector<arrow::Cell> cells{{0, 0}};
+    const std::vector<arrow::Cell> obstacle{{7, 0}};
+    constexpr arrow::Cell direction{1, 0};
+    double speed = 200.0;
+    double progress = 0.0;
+    double remainingTime = 0.05;
+    int committedCells = 0;
+    bool hardCollision = false;
+
+    while (remainingTime > 1.0e-12) {
+        std::vector<arrow::Cell> proposal = cells;
+        proposal.front() = proposal.front() + direction;
+        const arrow::MotionResolution resolution =
+            resolveOwnedMotion(
+                {
+                    OwnedMotionBody{cells, proposal},
+                    OwnedMotionBody{
+                        obstacle,
+                        {},
+                        {},
+                        true,
+                        arrow::MotionRole::Static,
+                        false
+                    }
+                },
+                {},
+                {20, 1}
+            );
+        if (resolution.hardFailures[0]) {
+            hardCollision = true;
+            break;
+        }
+
+        const double boundaryTime =
+            arrow::timeToCoverDistance(
+                1.0 - progress,
+                speed,
+                0.0
+            );
+        if (boundaryTime > remainingTime) {
+            progress += arrow::acceleratedDistance(
+                speed,
+                0.0,
+                remainingTime
+            );
+            remainingTime = 0.0;
+            break;
+        }
+
+        remainingTime -= boundaryTime;
+        cells = std::move(proposal);
+        progress = 0.0;
+        ++committedCells;
+    }
+
+    require(
+        hardCollision &&
+            committedCells == 6 &&
+            cells.front() == arrow::Cell{6, 0},
+        "high-speed arrow tunnelled through a cell obstacle"
     );
 }
 
@@ -734,7 +1242,9 @@ Quality verifyBoard(
 
 int main(int argc, char** argv) {
     try {
+        verifyMotionKinematics();
         verifyMotionResolution();
+        verifyHighSpeedCollisionSweep();
         verifyDynamicSelfCollision();
 
         int defaultSeedCount = 1000;

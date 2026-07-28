@@ -1,6 +1,7 @@
 #include "arrow/Game.hpp"
 
 #include "arrow/Generator.hpp"
+#include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
 
 #include <raylib.h>
@@ -29,8 +30,10 @@ constexpr float kHudHeight = 82.0F;
 constexpr float kReturnStepDuration = 0.035F;
 constexpr float kCollisionPause = 0.22F;
 constexpr float kMovingCollisionPause = 0.5F;
-constexpr float kInitialForwardSpeed = 2.25F;
-constexpr float kForwardAcceleration = 22.0F;
+constexpr double kInitialForwardSpeed = 8.0;
+constexpr double kForwardAcceleration = 22.0;
+constexpr std::size_t kMaxForwardEventsPerFrame = 1024;
+constexpr std::size_t kMaxRecoveryEventsPerFrame = 1024;
 constexpr float kGridDotRadius = 1.9F;
 
 constexpr Color kInk{22, 29, 48, 255};
@@ -58,9 +61,14 @@ struct RuntimeArrow {
     std::vector<HistoryState> history;
     Cell direction{};
     Motion motion{Motion::Idle};
-    float progress{};
+    double progress{};
+    double speed{};
+    // Keeps a click at its real simulation timestamp when older event-budget
+    // debt still has to be resolved first.
+    double launchDelay{};
     bool present{true};
     bool failed{};
+    bool movingCollisionTint{};
 };
 
 struct ArrowHeadTriangle {
@@ -178,14 +186,14 @@ std::vector<Vector2> displayPoints(const RuntimeArrow& value) {
         return forwardPolyline(
             value.cells,
             value.direction,
-            value.progress
+            static_cast<float>(value.progress)
         );
     }
     if (value.motion == Motion::Returning && interpolating) {
         return forwardPolyline(
             value.targetCells,
             value.direction,
-            1.0F - value.progress
+            1.0F - static_cast<float>(value.progress)
         );
     }
 
@@ -228,8 +236,11 @@ void drawArrow(const RuntimeArrow& value) {
     }
 
     Color color = value.failed ? kRed : kInk;
-    if (value.motion == Motion::Forward) {
-        color = kBlue;
+    if (value.motion == Motion::Forward &&
+        value.launchDelay <= 0.0) {
+        color = value.movingCollisionTint
+            ? kRed
+            : kBlue;
     } else if (
         value.motion == Motion::CollisionPause ||
         value.motion == Motion::Returning
@@ -420,12 +431,9 @@ int Game::run() {
     Board board = generateDefaultBoard(seed);
     std::vector<RuntimeArrow> arrows;
     std::vector<std::uint8_t> movingContacts;
-    bool forwardStepActive = false;
-    float forwardStepProgress = 0.0F;
-    bool forwardMovingContactPending = false;
-    bool forwardSoftPenaltyPending = false;
-    float movingCollisionPauseRemaining = 0.0F;
-    float forwardSpeed = 0.0F;
+    double movingCollisionPauseRemaining = 0.0;
+    double forwardTimeDebt = 0.0;
+    double recoveryTimeDebt = 0.0;
     std::uint64_t forwardTick = 0;
     bool recoveryClockActive = false;
     bool recoveryStepActive = false;
@@ -441,18 +449,18 @@ int Game::run() {
                 {},
                 source.direction,
                 Motion::Idle,
-                0.0F,
+                0.0,
+                0.0,
+                0.0,
                 true,
+                false,
                 false
             });
         }
         movingContacts.assign(arrows.size() * arrows.size(), 0);
-        forwardStepActive = false;
-        forwardStepProgress = 0.0F;
-        forwardMovingContactPending = false;
-        forwardSoftPenaltyPending = false;
-        movingCollisionPauseRemaining = 0.0F;
-        forwardSpeed = 0.0F;
+        movingCollisionPauseRemaining = 0.0;
+        forwardTimeDebt = 0.0;
+        recoveryTimeDebt = 0.0;
         forwardTick = 0;
         recoveryClockActive = false;
         recoveryStepActive = false;
@@ -490,9 +498,26 @@ int Game::run() {
         if (autoLaunch.has_value() &&
             *autoLaunch < arrows.size() &&
             arrows[*autoLaunch].present) {
-            arrows[*autoLaunch].motion = Motion::Forward;
+            RuntimeArrow& value = arrows[*autoLaunch];
+            value.motion = Motion::Forward;
+            value.progress = 0.0;
+            value.speed = kInitialForwardSpeed;
+            value.launchDelay = 0.0;
+            value.movingCollisionTint = false;
+            value.targetCells.clear();
         }
     }
+    const std::optional<std::uint32_t> automatedSecondLaunch =
+        unsignedFromEnvironment(
+            "ARROWPUZZLE_SCREENSHOT_LAUNCH_2"
+        );
+    const int automatedSecondLaunchFrame =
+        static_cast<int>(
+            unsignedFromEnvironment(
+                "ARROWPUZZLE_SCREENSHOT_LAUNCH_2_FRAME"
+            ).value_or(10)
+        );
+    bool automatedSecondLaunchDone = false;
     int renderedFrames = 0;
 
     const float boardWidth =
@@ -523,64 +548,57 @@ int Game::run() {
         );
     };
 
-    const auto setForwardProgress = [&arrows](float progress) {
-        for (RuntimeArrow& value : arrows) {
-            if (value.motion == Motion::Forward &&
-                !value.targetCells.empty()) {
-                value.progress = progress;
-            }
-        }
-    };
+    const auto isActiveForward =
+        [](const RuntimeArrow& value) {
+            return value.present &&
+                   value.motion == Motion::Forward &&
+                   value.launchDelay <= 0.0;
+        };
 
-    const auto commitForwardStep = [&]() {
-        bool committed = false;
-        for (RuntimeArrow& value : arrows) {
-            if (value.motion != Motion::Forward ||
-                value.targetCells.empty()) {
-                continue;
+    const auto clearMovingContactsFor =
+        [&movingContacts, &arrows](std::size_t arrowIndex) {
+            const std::size_t count = arrows.size();
+            for (std::size_t other = 0; other < count; ++other) {
+                movingContacts[arrowIndex * count + other] = 0;
+                movingContacts[other * count + arrowIndex] = 0;
             }
-            value.cells = std::move(value.targetCells);
-            value.targetCells.clear();
-            value.progress = 0.0F;
-            committed = true;
+        };
 
-            if (allOutside(value, board)) {
-                value.present = false;
-                value.history.clear();
-                value.motion = Motion::Idle;
-            }
-        }
-        if (committed) {
-            ++forwardTick;
-        }
-        forwardStepActive = false;
-        forwardStepProgress = 0.0F;
-    };
-
-    const auto prepareForwardStep = [&]() {
+    const auto prepareForwardTransitions = [&]() {
         std::vector<std::vector<Cell>> proposals(arrows.size());
-        std::vector<std::uint8_t> moving(arrows.size(), 0);
+        std::vector<std::uint8_t> attempting(arrows.size(), 0);
         std::vector<MotionBodyView> bodies;
         bodies.reserve(arrows.size());
-        bool hasMovingArrow = false;
+        bool hasForwardCandidate = false;
 
         for (std::size_t index = 0; index < arrows.size(); ++index) {
             const RuntimeArrow& value = arrows[index];
-            if (!value.present || value.motion != Motion::Forward) {
+            if (!isActiveForward(value)) {
                 continue;
             }
-            moving[index] = 1;
-            hasMovingArrow = true;
+            hasForwardCandidate = true;
+            if (!value.targetCells.empty()) {
+                continue;
+            }
+            attempting[index] = 1;
             proposals[index] = advancedCells(value);
+        }
+        if (!hasForwardCandidate) {
+            return false;
         }
 
         for (std::size_t index = 0; index < arrows.size(); ++index) {
             const RuntimeArrow& value = arrows[index];
-            const bool isMoving = moving[index] != 0;
-            const std::span<const Cell> proposal = isMoving
+            const bool activeForward =
+                isActiveForward(value);
+            const bool isAttempting = attempting[index] != 0;
+            const std::span<const Cell> proposal = isAttempting
                 ? std::span<const Cell>{proposals[index]}
-                : std::span<const Cell>{};
-            const std::span<const Cell> reservedTarget = !isMoving
+                : activeForward
+                    ? std::span<const Cell>{value.targetCells}
+                    : std::span<const Cell>{};
+            const std::span<const Cell> reservedTarget =
+                !activeForward
                 ? std::span<const Cell>{value.targetCells}
                 : std::span<const Cell>{};
             bodies.push_back({
@@ -588,8 +606,10 @@ int Game::run() {
                 proposal,
                 reservedTarget,
                 value.present,
-                isMoving,
-                isMoving &&
+                activeForward
+                    ? MotionRole::Advancing
+                    : MotionRole::Static,
+                isAttempting &&
                     (proposals[index].empty() ||
                      collidesWithSelf(proposals[index]))
             });
@@ -597,59 +617,216 @@ int Game::run() {
 
         const MotionResolution resolution = resolveMotionStep(
             bodies,
-            movingContacts
+            {},
+            {board.columns(), board.rows()}
         );
-        movingContacts = resolution.movingContacts;
         const bool hardCollision =
             std::ranges::any_of(
                 resolution.hardFailures,
                 [](std::uint8_t value) { return value != 0; }
             );
-        forwardMovingContactPending =
-            resolution.hasNewMovingContact;
-        if (hardCollision) {
-            lives = std::max(0, lives - 1);
-            // A logical step costs at most one life even when an unrelated
-            // pair of moving arrows also meets during that step.
-            forwardSoftPenaltyPending = false;
-        } else {
-            // Moving arrows are allowed to pass through one another. Apply
-            // the penalty when this contacting logical step is committed,
-            // rather than removing a heart before any visible movement.
-            forwardSoftPenaltyPending =
-                forwardMovingContactPending;
-        }
 
-        forwardStepActive = false;
-        if (hasMovingArrow) {
+        for (std::size_t index = 0;
+             index < arrows.size();
+             ++index) {
+            RuntimeArrow& value = arrows[index];
+            if (resolution.hardFailures[index]) {
+                value.failed = true;
+                value.motion = Motion::CollisionPause;
+                value.progress = 0.0;
+                value.speed = 0.0;
+                value.launchDelay = 0.0;
+                value.targetCells.clear();
+                clearMovingContactsFor(index);
+            } else if (attempting[index]) {
+                value.targetCells = std::move(proposals[index]);
+                value.progress = 0.0;
+            }
+        }
+        return hardCollision;
+    };
+
+    const auto revalidateCompletedTransitions =
+        [&](std::span<std::uint8_t> completing) {
+            std::vector<MotionBodyView> bodies;
+            bodies.reserve(arrows.size());
             for (std::size_t index = 0;
                  index < arrows.size();
                  ++index) {
-                if (!moving[index]) {
+                const RuntimeArrow& value = arrows[index];
+                const bool activeForward =
+                    isActiveForward(value);
+                const bool isCompleting =
+                    activeForward &&
+                    completing[index] != 0;
+                bodies.push_back({
+                    value.cells,
+                    activeForward
+                        ? std::span<const Cell>{
+                              value.targetCells
+                          }
+                        : std::span<const Cell>{},
+                    !activeForward
+                        ? std::span<const Cell>{
+                              value.targetCells
+                          }
+                        : std::span<const Cell>{},
+                    value.present,
+                    isCompleting
+                        ? MotionRole::Advancing
+                        : activeForward
+                            ? MotionRole::Moving
+                            : MotionRole::Static,
+                    false
+                });
+            }
+
+            const MotionResolution resolution = resolveMotionStep(
+                bodies,
+                {},
+                {board.columns(), board.rows()}
+            );
+            const bool hardCollision =
+                std::ranges::any_of(
+                    resolution.hardFailures,
+                    [](std::uint8_t value) {
+                        return value != 0;
+                    }
+                );
+            if (!hardCollision) {
+                return false;
+            }
+
+            for (std::size_t index = 0;
+                 index < arrows.size();
+                 ++index) {
+                if (!resolution.hardFailures[index]) {
+                    continue;
+                }
+                completing[index] = 0;
+                RuntimeArrow& value = arrows[index];
+                value.failed = true;
+                value.motion = Motion::CollisionPause;
+                value.progress = 0.0;
+                value.speed = 0.0;
+                value.launchDelay = 0.0;
+                value.targetCells.clear();
+                clearMovingContactsFor(index);
+            }
+            return true;
+        };
+
+    const auto resolveCompletedMovingContacts =
+        [&](std::span<const std::uint8_t> completing) {
+            std::vector<MotionBodyView> bodies;
+            bodies.reserve(arrows.size());
+            for (std::size_t index = 0;
+                 index < arrows.size();
+                 ++index) {
+                const RuntimeArrow& value = arrows[index];
+                const bool activeForward =
+                    isActiveForward(value);
+                bodies.push_back({
+                    value.cells,
+                    activeForward
+                        ? std::span<const Cell>{
+                              value.targetCells
+                          }
+                        : std::span<const Cell>{},
+                    {},
+                    activeForward,
+                    completing[index]
+                        ? MotionRole::Advancing
+                        : activeForward
+                            ? MotionRole::Moving
+                            : MotionRole::Static,
+                    false
+                });
+            }
+            MotionResolution resolution = resolveMotionStep(
+                bodies,
+                movingContacts,
+                {board.columns(), board.rows()}
+            );
+            if (resolution.hasNewMovingContact) {
+                const std::size_t count = arrows.size();
+                for (std::size_t first = 0;
+                     first < count;
+                     ++first) {
+                    for (std::size_t second = first + 1;
+                         second < count;
+                         ++second) {
+                        const std::size_t pair =
+                            first * count + second;
+                        if (!resolution.movingContacts[pair] ||
+                            movingContacts[pair]) {
+                            continue;
+                        }
+                        arrows[first].movingCollisionTint =
+                            true;
+                        arrows[second].movingCollisionTint =
+                            true;
+                    }
+                }
+            }
+            movingContacts = resolution.movingContacts;
+            return resolution.hasNewMovingContact;
+        };
+
+    const auto commitCompletedTransitions =
+        [&](std::span<const std::uint8_t> completing) {
+            bool committed = false;
+            for (std::size_t index = 0;
+                 index < arrows.size();
+                 ++index) {
+                if (!completing[index]) {
                     continue;
                 }
                 RuntimeArrow& value = arrows[index];
-                if (resolution.hardFailures[index]) {
-                    value.failed = true;
-                    value.motion = Motion::CollisionPause;
-                    value.progress = 0.0F;
-                    value.targetCells.clear();
-                    continue;
-                }
                 value.history.push_back({
                     forwardTick,
                     value.cells
                 });
-                value.targetCells = std::move(proposals[index]);
-                value.progress = 0.0F;
-                forwardStepActive = true;
+                value.cells = std::move(value.targetCells);
+                value.targetCells.clear();
+                value.progress = 0.0;
+                committed = true;
+
+                if (allOutside(value, board)) {
+                    value.present = false;
+                    value.history.clear();
+                    value.motion = Motion::Idle;
+                    value.speed = 0.0;
+                    value.launchDelay = 0.0;
+                    clearMovingContactsFor(index);
+                }
+            }
+            if (committed) {
+                ++forwardTick;
+            }
+        };
+
+    const auto forwardEventBudget = [&]() {
+        const std::size_t maximumDimension =
+            static_cast<std::size_t>(
+                std::max(board.columns(), board.rows())
+            );
+        std::size_t budget = 1;
+        for (const RuntimeArrow& value : arrows) {
+            if (value.present &&
+                value.motion == Motion::Forward) {
+                budget += maximumDimension +
+                          value.cells.size() + 2;
             }
         }
-        return forwardStepActive;
+        return std::min(
+            budget,
+            kMaxForwardEventsPerFrame
+        );
     };
 
     while (!WindowShouldClose() && !closeRequested) {
-        const float delta = std::min(GetFrameTime(), 0.05F);
+        const float delta = std::max(GetFrameTime(), 0.0F);
 
         if (IsKeyPressed(KEY_F11) ||
             (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))) {
@@ -713,6 +890,27 @@ int Game::run() {
             lives = 3;
         }
 
+        if (!automatedScreenshot.empty() &&
+            !automatedSecondLaunchDone &&
+            automatedSecondLaunch.has_value() &&
+            renderedFrames >= automatedSecondLaunchFrame) {
+            automatedSecondLaunchDone = true;
+            if (*automatedSecondLaunch < arrows.size()) {
+                RuntimeArrow& value =
+                    arrows[*automatedSecondLaunch];
+                if (value.present &&
+                    value.motion == Motion::Idle) {
+                    value.motion = Motion::Forward;
+                    value.progress = 0.0;
+                    value.speed = kInitialForwardSpeed;
+                    value.launchDelay = forwardTimeDebt;
+                    value.movingCollisionTint = false;
+                    value.history.clear();
+                    value.targetCells.clear();
+                }
+            }
+        }
+
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
             lives > 0 &&
             !anyArrowRecovering &&
@@ -726,9 +924,26 @@ int Game::run() {
             if (launched.has_value()) {
                 RuntimeArrow& value = arrows[*launched];
                 value.motion = Motion::Forward;
-                value.progress = 0.0F;
+                value.progress = 0.0;
+                value.speed = kInitialForwardSpeed;
+                value.launchDelay = forwardTimeDebt;
+                value.movingCollisionTint = false;
                 value.history.clear();
                 value.targetCells.clear();
+            }
+        }
+
+        double simulationDelta = static_cast<double>(delta);
+        if (movingCollisionPauseRemaining > 0.0) {
+            const double pausedTime = std::min(
+                simulationDelta,
+                movingCollisionPauseRemaining
+            );
+            movingCollisionPauseRemaining -= pausedTime;
+            simulationDelta -= pausedTime;
+            if (movingCollisionPauseRemaining <
+                std::numeric_limits<double>::epsilon()) {
+                movingCollisionPauseRemaining = 0.0;
             }
         }
 
@@ -740,7 +955,7 @@ int Game::run() {
         // This preserves safe tail-following without allowing red animations
         // to change occupancy in the middle of a blue step.
         bool enteredRecoveryThisFrame = false;
-        float recoveryTimeAfterPause = delta;
+        double recoveryTimeAfterPause = simulationDelta;
         for (RuntimeArrow& value : arrows) {
             if (!value.present) {
                 continue;
@@ -750,14 +965,18 @@ int Game::run() {
                     value.progress = 0.0F;
                     continue;
                 }
-                const float pauseTimeRemaining =
+                const double pauseTimeRemaining =
                     std::max(
-                        0.0F,
-                        (1.0F - value.progress) *
-                            kCollisionPause
+                        0.0,
+                        (1.0 - value.progress) *
+                            static_cast<double>(
+                                kCollisionPause
+                            )
                     );
-                value.progress += delta / kCollisionPause;
-                if (pauseTimeRemaining <= delta) {
+                value.progress +=
+                    simulationDelta /
+                    static_cast<double>(kCollisionPause);
+                if (pauseTimeRemaining <= simulationDelta) {
                     if (value.history.empty()) {
                         value.motion = Motion::Idle;
                         value.progress = 0.0F;
@@ -765,8 +984,9 @@ int Game::run() {
                         value.motion = Motion::Returning;
                         value.progress = 0.0F;
                         value.targetCells.clear();
-                        const float remainder =
-                            delta - pauseTimeRemaining;
+                        const double remainder =
+                            simulationDelta -
+                            pauseTimeRemaining;
                         recoveryTimeAfterPause =
                             enteredRecoveryThisFrame
                             ? std::min(
@@ -795,34 +1015,46 @@ int Game::run() {
             recoveryTick = forwardTick;
         }
 
-        float remainingRecoveryProgress =
-            (recoveryClockStartedThisFrame &&
-                     enteredRecoveryThisFrame
-                 ? recoveryTimeAfterPause
-                 : delta) /
-            kReturnStepDuration;
-        int recoveredSteps = 0;
-        constexpr float recoveryEpsilon = 0.0001F;
+        double remainingRecoveryProgress =
+            ((recoveryClockStartedThisFrame &&
+                      enteredRecoveryThisFrame
+                  ? recoveryTimeAfterPause
+                  : simulationDelta) +
+             recoveryTimeDebt) /
+            static_cast<double>(kReturnStepDuration);
+        recoveryTimeDebt = 0.0;
+        std::size_t recoveredSteps = 0;
+        constexpr double recoveryEpsilon = 0.0001;
         while (recoveryClockActive &&
                remainingRecoveryProgress > recoveryEpsilon &&
-               recoveredSteps < 64) {
+               recoveredSteps <
+                   kMaxRecoveryEventsPerFrame) {
             if (!recoveryStepActive) {
                 bool scheduled = false;
-                while (!scheduled && recoveryTick > 0) {
-                    const std::uint64_t targetTick = recoveryTick - 1;
+                std::optional<std::uint64_t> targetTick;
+                for (const RuntimeArrow& value : arrows) {
+                    if (value.motion != Motion::Returning ||
+                        value.history.empty()) {
+                        continue;
+                    }
+                    targetTick = std::max(
+                        targetTick.value_or(0),
+                        value.history.back().tick
+                    );
+                }
+                if (targetTick.has_value()) {
+                    recoveryTick = *targetTick + 1;
                     for (RuntimeArrow& value : arrows) {
                         if (value.motion != Motion::Returning ||
                             value.history.empty() ||
-                            value.history.back().tick != targetTick) {
+                            value.history.back().tick !=
+                                *targetTick) {
                             continue;
                         }
                         value.targetCells =
                             value.history.back().cells;
                         value.progress = 0.0F;
                         scheduled = true;
-                    }
-                    if (!scheduled) {
-                        --recoveryTick;
                     }
                 }
                 recoveryStepActive = scheduled;
@@ -847,13 +1079,15 @@ int Game::run() {
                 }
             }
 
-            const float toBoundary =
-                1.0F - recoveryStepProgress;
-            const float advance = std::min(
+            const double toBoundary =
+                1.0 -
+                static_cast<double>(recoveryStepProgress);
+            const double advance = std::min(
                 remainingRecoveryProgress,
                 toBoundary
             );
-            recoveryStepProgress += advance;
+            recoveryStepProgress +=
+                static_cast<float>(advance);
             remainingRecoveryProgress -= advance;
             for (RuntimeArrow& value : arrows) {
                 if (value.motion == Motion::Returning &&
@@ -888,6 +1122,15 @@ int Game::run() {
             ++recoveredSteps;
         }
         if (recoveryClockActive &&
+            recoveredSteps >=
+                kMaxRecoveryEventsPerFrame &&
+            remainingRecoveryProgress >
+                recoveryEpsilon) {
+            recoveryTimeDebt =
+                remainingRecoveryProgress *
+                static_cast<double>(kReturnStepDuration);
+        }
+        if (recoveryClockActive &&
             std::ranges::none_of(
                 arrows,
                 [](const RuntimeArrow& value) {
@@ -899,95 +1142,194 @@ int Game::run() {
             recoveryStepActive = false;
             recoveryStepProgress = 0.0F;
             recoveryTick = 0;
+            recoveryTimeDebt = 0.0;
         }
 
         bool hasForward = hasForwardMotion();
         if (!hasForward) {
-            forwardStepActive = false;
-            forwardStepProgress = 0.0F;
-            forwardMovingContactPending = false;
-            forwardSoftPenaltyPending = false;
-            movingCollisionPauseRemaining = 0.0F;
-            forwardSpeed = 0.0F;
+            forwardTimeDebt = 0.0;
             std::ranges::fill(
                 movingContacts,
                 std::uint8_t{0}
             );
-        } else {
-            float forwardDelta = delta;
-            if (movingCollisionPauseRemaining > 0.0F) {
-                const float pausedTime = std::min(
-                    forwardDelta,
-                    movingCollisionPauseRemaining
-                );
-                movingCollisionPauseRemaining -= pausedTime;
-                forwardDelta -= pausedTime;
-            }
+        } else if (movingCollisionPauseRemaining <= 0.0) {
+            // Debt is simulated before this frame's time. New arrows carry
+            // the same amount as launchDelay, so they cannot age retroactively.
+            double priorDebtRemaining = forwardTimeDebt;
+            double remainingForwardTime =
+                simulationDelta +
+                forwardTimeDebt;
+            forwardTimeDebt = 0.0;
+            std::size_t processedEvents = 0;
+            const std::size_t eventBudget =
+                forwardEventBudget();
 
-            if (forwardDelta > 0.0F && !forwardStepActive) {
-                forwardStepProgress = 0.0F;
-                prepareForwardStep();
-            }
-
-            if (forwardDelta > 0.0F && forwardStepActive) {
-                if (forwardSpeed <= 0.0F) {
-                    forwardSpeed = kInitialForwardSpeed;
+            while (remainingForwardTime > 0.0 &&
+                   hasForwardMotion()) {
+                const bool preparationCollision =
+                    prepareForwardTransitions();
+                if (preparationCollision) {
+                    lives = std::max(0, lives - 1);
                 }
-                float remainingDistance =
-                    forwardSpeed * forwardDelta +
-                    0.5F * kForwardAcceleration *
-                        forwardDelta * forwardDelta;
-                forwardSpeed +=
-                    kForwardAcceleration * forwardDelta;
+                if (!hasForwardMotion()) {
+                    break;
+                }
+                if (processedEvents >= eventBudget) {
+                    forwardTimeDebt = remainingForwardTime;
+                    break;
+                }
 
-                constexpr float epsilon = 0.0001F;
-                int crossedCells = 0;
-                while (forwardStepActive &&
-                       remainingDistance > epsilon &&
-                       crossedCells < 64) {
-                    const float toBoundary =
-                        1.0F - forwardStepProgress;
-                    if (remainingDistance < toBoundary) {
-                        forwardStepProgress += remainingDistance;
-                        setForwardProgress(forwardStepProgress);
-                        remainingDistance = 0.0F;
-                        break;
+                std::vector<double> boundaryTimes(
+                    arrows.size(),
+                    std::numeric_limits<double>::infinity()
+                );
+                double earliestBoundary =
+                    std::numeric_limits<double>::infinity();
+                double earliestActivation =
+                    std::numeric_limits<double>::infinity();
+                for (std::size_t index = 0;
+                     index < arrows.size();
+                     ++index) {
+                    RuntimeArrow& value = arrows[index];
+                    if (!value.present ||
+                        value.motion != Motion::Forward) {
+                        continue;
                     }
+                    if (value.launchDelay > 0.0) {
+                        earliestActivation = std::min(
+                            earliestActivation,
+                            value.launchDelay
+                        );
+                        continue;
+                    }
+                    if (value.targetCells.empty()) {
+                        continue;
+                    }
+                    if (value.speed <= 0.0) {
+                        value.speed = kInitialForwardSpeed;
+                    }
+                    boundaryTimes[index] =
+                        timeToCoverDistance(
+                            std::max(
+                                0.0,
+                                1.0 - value.progress
+                            ),
+                            value.speed,
+                            kForwardAcceleration
+                        );
+                    earliestBoundary = std::min(
+                        earliestBoundary,
+                        boundaryTimes[index]
+                    );
+                }
+                const double earliestEvent = std::min(
+                    earliestBoundary,
+                    earliestActivation
+                );
+                if (!std::isfinite(earliestEvent)) {
+                    forwardTimeDebt = remainingForwardTime;
+                    break;
+                }
 
-                    forwardStepProgress = 1.0F;
-                    setForwardProgress(1.0F);
-                    const bool movingCollision =
-                        forwardMovingContactPending;
-                    if (forwardSoftPenaltyPending) {
-                        lives = std::max(0, lives - 1);
+                const bool reachesEvent =
+                    earliestEvent <= remainingForwardTime;
+                const double advanceTime = reachesEvent
+                    ? earliestEvent
+                    : remainingForwardTime;
+                for (RuntimeArrow& value : arrows) {
+                    if (!value.present ||
+                        value.motion != Motion::Forward ||
+                        value.launchDelay > 0.0 ||
+                        value.targetCells.empty()) {
+                        continue;
                     }
-                    forwardMovingContactPending = false;
-                    forwardSoftPenaltyPending = false;
-                    remainingDistance -= toBoundary;
-                    commitForwardStep();
-                    ++crossedCells;
+                    value.progress += acceleratedDistance(
+                        value.speed,
+                        kForwardAcceleration,
+                        advanceTime
+                    );
+                    value.speed +=
+                        kForwardAcceleration * advanceTime;
+                    value.progress = std::min(
+                        value.progress,
+                        1.0
+                    );
+                }
+                for (RuntimeArrow& value : arrows) {
+                    if (!value.present ||
+                        value.motion != Motion::Forward ||
+                        value.launchDelay <= 0.0) {
+                        continue;
+                    }
+                    value.launchDelay = std::max(
+                        0.0,
+                        value.launchDelay - advanceTime
+                    );
+                }
+                remainingForwardTime -= advanceTime;
+                priorDebtRemaining = std::max(
+                    0.0,
+                    priorDebtRemaining - advanceTime
+                );
+                if (!reachesEvent) {
+                    break;
+                }
 
-                    if (movingCollision &&
-                        hasForwardMotion()) {
-                        movingCollisionPauseRemaining =
-                            kMovingCollisionPause;
-                        break;
+                const bool boundaryEvent =
+                    std::isfinite(earliestBoundary) &&
+                    eventTimesCoincide(
+                        earliestEvent,
+                        earliestBoundary
+                    );
+                if (!boundaryEvent) {
+                    ++processedEvents;
+                    continue;
+                }
+
+                std::vector<std::uint8_t> completing(
+                    arrows.size(),
+                    0
+                );
+                for (std::size_t index = 0;
+                     index < arrows.size();
+                     ++index) {
+                    if (eventTimesCoincide(
+                            boundaryTimes[index],
+                            earliestEvent
+                        )) {
+                        completing[index] = 1;
+                        arrows[index].progress = 1.0;
                     }
-                    if (!hasForwardMotion()) {
-                        break;
-                    }
-                    prepareForwardStep();
+                }
+
+                const bool completionHardCollision =
+                    revalidateCompletedTransitions(completing);
+                const bool movingCollision =
+                    resolveCompletedMovingContacts(completing);
+                commitCompletedTransitions(completing);
+                const bool nextHardCollision =
+                    prepareForwardTransitions();
+                if (completionHardCollision ||
+                    movingCollision ||
+                    nextHardCollision) {
+                    lives = std::max(0, lives - 1);
+                }
+                ++processedEvents;
+
+                if (movingCollision) {
+                    movingCollisionPauseRemaining =
+                        static_cast<double>(
+                            kMovingCollisionPause
+                        );
+                    forwardTimeDebt =
+                        priorDebtRemaining;
+                    break;
                 }
             }
 
             hasForward = hasForwardMotion();
             if (!hasForward) {
-                forwardStepActive = false;
-                forwardStepProgress = 0.0F;
-                forwardMovingContactPending = false;
-                forwardSoftPenaltyPending = false;
-                movingCollisionPauseRemaining = 0.0F;
-                forwardSpeed = 0.0F;
+                forwardTimeDebt = 0.0;
                 std::ranges::fill(
                     movingContacts,
                     std::uint8_t{0}
