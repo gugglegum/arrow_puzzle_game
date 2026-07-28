@@ -124,18 +124,21 @@ bool pointsOutside(Cell head, Cell neck, int columns, int rows) {
            !isInside(head + direction, columns, rows);
 }
 
-int desiredInitialChoices(int columns, int rows) {
+std::pair<int, int> initialChoiceRange(int columns, int rows) {
     const int maximumDimension = std::max(columns, rows);
     if (maximumDimension <= 20) {
-        return 2;
+        return {2, 4};
     }
     if (maximumDimension <= 40) {
-        return 3;
+        return {2, 5};
     }
     if (maximumDimension <= 80) {
-        return 5;
+        return {3, 7};
     }
-    return std::clamp(maximumDimension / 20 + 1, 6, 12);
+    return {
+        std::clamp(maximumDimension / 40 + 2, 4, 8),
+        std::clamp(maximumDimension / 16, 6, 12)
+    };
 }
 
 void addEdge(std::vector<std::vector<int>>& adjacency, int lhs, int rhs) {
@@ -624,6 +627,7 @@ bool findIntervalsForCount(
     int minimumLength,
     int maximumLength,
     int arrowCount,
+    int initialChoiceTarget,
     bool allowArrowLoops,
     std::mt19937& random,
     std::vector<Interval>& result
@@ -796,8 +800,6 @@ bool findIntervalsForCount(
         }
     }
 
-    const int initialChoiceTarget =
-        desiredInitialChoices(columns, rows);
     for (int choice = 1;
          choice < initialChoiceTarget;
          ++choice) {
@@ -1433,6 +1435,13 @@ Board generateBoard(const GeneratorOptions& options) {
         0xC10BBE2U
     };
     std::mt19937 random(seed);
+    const auto [minimumInitialChoices, maximumInitialChoices] =
+        initialChoiceRange(options.columns, options.rows);
+    const int initialChoiceTarget =
+        std::uniform_int_distribution<int>(
+            minimumInitialChoices,
+            maximumInitialChoices
+        )(random);
     const int candidateAttempts = std::max(
         1,
         options.candidateAttempts
@@ -1448,14 +1457,22 @@ Board generateBoard(const GeneratorOptions& options) {
         area / minimumLength >= 3;
 
     if (supportsLabyrinth) {
-        const bool useLargeBoardFastPath = area >= 1024;
+        const bool useReachabilityPruning = area >= 256;
         const std::vector<int> counts = preferredArrowCounts(
             area,
             minimumLength,
             maximumLength
         );
-        const std::size_t countAttemptLimit = useLargeBoardFastPath
-            ? std::min<std::size_t>(17, counts.size())
+        const std::size_t preferredCountAttempts =
+            area >= 4096 && area < 16384
+            ? 33U
+            : 17U;
+        const std::size_t countAttemptLimit =
+            useReachabilityPruning
+            ? std::min(
+                  preferredCountAttempts,
+                  counts.size()
+              )
             : counts.size();
 
         for (int attempt = 0;
@@ -1483,7 +1500,7 @@ Board generateBoard(const GeneratorOptions& options) {
                 );
                 std::vector<std::uint64_t> reachableCounts;
                 int maximumAttemptedCount = 0;
-                if (useLargeBoardFastPath) {
+                if (useReachabilityPruning) {
                     for (std::size_t countIndex = 0;
                          countIndex < countAttemptLimit;
                          ++countIndex) {
@@ -1508,7 +1525,7 @@ Board generateBoard(const GeneratorOptions& options) {
                             countAttemptLimit
                         )
                 );
-                if (useLargeBoardFastPath &&
+                if (useReachabilityPruning &&
                     std::ranges::none_of(
                         countsForOpening,
                         [&](int count) {
@@ -1531,7 +1548,7 @@ Board generateBoard(const GeneratorOptions& options) {
                 }
 
                 for (int count : countsForOpening) {
-                    if (useLargeBoardFastPath &&
+                    if (useReachabilityPruning &&
                         !containsArrowCount(reachableCounts, count)) {
                         continue;
                     }
@@ -1544,6 +1561,7 @@ Board generateBoard(const GeneratorOptions& options) {
                         minimumLength,
                         maximumLength,
                         count,
+                        initialChoiceTarget,
                         options.allowArrowLoops,
                         random,
                         intervals
@@ -1564,10 +1582,7 @@ Board generateBoard(const GeneratorOptions& options) {
                     const int score = scoreCandidate(
                         metrics,
                         static_cast<int>(arrows.size()),
-                        desiredInitialChoices(
-                            options.columns,
-                            options.rows
-                        )
+                        initialChoiceTarget
                     );
                     const bool meetsRequiredQuality =
                         !enforceDefaultQuality ||

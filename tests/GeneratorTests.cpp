@@ -1534,6 +1534,12 @@ int main(int argc, char** argv) {
             }
         }
         require(
+            minimumLargeInitial >= 2 &&
+                maximumLargeInitial <= 6 &&
+                minimumLargeInitial < maximumLargeInitial,
+            "40x40 fixed seeds do not vary their initial move count"
+        );
+        require(
             minimumLargeTightSelfPasses >= 6,
             "40x40 fixed seeds contain too few exact tail-pass arrows"
         );
@@ -1562,11 +1568,31 @@ int main(int argc, char** argv) {
             seed64FastOptions
         );
         require(
-            seed64HighQuality.tightSelfPassArrows >=
-                    seed64FastQuality.tightSelfPassArrows &&
-                seed64HighQuality.longComplexTightSelfPassArrows >=
-                    seed64FastQuality.longComplexTightSelfPassArrows,
-            "eight-candidate selection reduced fixed-seed tail-pass quality"
+            seed64HighQuality.longComplexTightSelfPassArrows >=
+                    seed64FastQuality.longComplexTightSelfPassArrows &&
+                seed64HighQuality.tightSelfPassArrows +
+                        seed64HighQuality.longComplexTightSelfPassArrows *
+                            2 >=
+                    seed64FastQuality.tightSelfPassArrows +
+                        seed64FastQuality.longComplexTightSelfPassArrows *
+                            2,
+            "eight-candidate selection reduced fixed-seed tail-pass "
+            "quality: one candidate " +
+                std::to_string(
+                    seed64FastQuality.tightSelfPassArrows
+                ) +
+                "/" +
+                std::to_string(
+                    seed64FastQuality.longComplexTightSelfPassArrows
+                ) +
+                ", eight candidates " +
+                std::to_string(
+                    seed64HighQuality.tightSelfPassArrows
+                ) +
+                "/" +
+                std::to_string(
+                    seed64HighQuality.longComplexTightSelfPassArrows
+                )
         );
 
         const arrow::GeneratorOptions looplessOptions{

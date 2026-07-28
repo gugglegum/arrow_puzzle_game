@@ -63,8 +63,8 @@ another arrow's speed.
 - A deliberate mix of short, medium, and long arrows with difficulty-specific
   length limits
 - Constructive generation with a stored valid solution order
-- Several spatially distributed opening moves, with more starting fronts on
-  larger boards
+- A seed-dependent number of spatially distributed opening moves, with wider
+  ranges on larger boards
 - Up to eight-candidate quality selection with a responsive generation indicator
 - Extra preference for complex arrows whose head follows the vacating tail
 - Dynamic self-collision and simultaneous moving-arrow collisions

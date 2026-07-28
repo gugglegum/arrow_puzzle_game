@@ -21,6 +21,7 @@
 #include <limits>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -935,8 +936,27 @@ int Game::run() {
         try {
             generationFuture = std::async(
                 std::launch::async,
-                [options]() {
-                    return generateBoard(options);
+                [options]() mutable {
+                    const bool hardPreset =
+                        options.columns == 80 &&
+                        options.rows == 80;
+                    const int seedAttempts =
+                        hardPreset ? 3 : 1;
+                    for (int attempt = 0;
+                         attempt < seedAttempts;
+                         ++attempt) {
+                        try {
+                            return generateBoard(options);
+                        } catch (const std::runtime_error&) {
+                            if (attempt + 1 >= seedAttempts) {
+                                throw;
+                            }
+                            options.seed += 0x9E3779B9U;
+                        }
+                    }
+                    throw std::runtime_error(
+                        "Level generation exhausted its retries"
+                    );
                 }
             );
             generationInProgress = true;
