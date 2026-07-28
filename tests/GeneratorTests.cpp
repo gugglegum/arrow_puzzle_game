@@ -1529,6 +1529,20 @@ int main(int argc, char** argv) {
             "eight-candidate selection reduced fixed-seed tail-pass quality"
         );
 
+        // Regression: tail-pass bonuses must not make a candidate below the
+        // verified short/medium/long composition floor win.
+        const arrow::GeneratorOptions seed206CompositionOptions{
+            20,
+            20,
+            2,
+            30,
+            206U
+        };
+        static_cast<void>(verifyBoard(
+            arrow::generateBoard(seed206CompositionOptions),
+            seed206CompositionOptions
+        ));
+
         int defaultSeedCount = 1000;
         if (argc >= 2) {
             defaultSeedCount = std::max(1, std::stoi(argv[1]));
@@ -1719,7 +1733,7 @@ int main(int argc, char** argv) {
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size()) + 1
+                   static_cast<int>(largeBoardSeeds.size()) + 2
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
