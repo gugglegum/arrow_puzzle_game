@@ -535,14 +535,85 @@ bool movingContactContains(
 
 void drawHeart(Vector2 center, bool filled) {
     const Color color = filled ? kRed : kSoft;
-    DrawCircleV({center.x - 7.0F, center.y - 3.0F}, 8.0F, color);
-    DrawCircleV({center.x + 7.0F, center.y - 3.0F}, 8.0F, color);
-    DrawTriangle(
-        {center.x - 14.0F, center.y},
-        {center.x, center.y + 18.0F},
-        {center.x + 14.0F, center.y},
-        color
-    );
+    constexpr std::size_t segmentCount = 6;
+    constexpr std::size_t pointsPerSegment = 8;
+    constexpr std::size_t pointCount = 48;
+    static const std::array<Vector2, pointCount> outline = [] {
+        constexpr std::array<Vector2, segmentCount + 1> anchors{{
+            {0.0F, -5.0F},
+            {15.0F, -8.0F},
+            {11.0F, 9.0F},
+            {0.0F, 17.0F},
+            {-11.0F, 9.0F},
+            {-15.0F, -8.0F},
+            {0.0F, -5.0F}
+        }};
+        constexpr std::array<Vector2, segmentCount> firstControls{{
+            {4.0F, -11.0F},
+            {19.0F, -2.0F},
+            {8.0F, 12.0F},
+            {-4.0F, 17.0F},
+            {-16.0F, 5.0F},
+            {-10.0F, -13.0F}
+        }};
+        constexpr std::array<Vector2, segmentCount> secondControls{{
+            {10.0F, -13.0F},
+            {16.0F, 5.0F},
+            {4.0F, 17.0F},
+            {-8.0F, 12.0F},
+            {-19.0F, -2.0F},
+            {-4.0F, -11.0F}
+        }};
+
+        std::array<Vector2, pointCount> points{};
+        for (std::size_t segment = 0;
+             segment < segmentCount;
+             ++segment) {
+            for (std::size_t step = 0;
+                 step < pointsPerSegment;
+                 ++step) {
+                const float t =
+                    static_cast<float>(step) /
+                    static_cast<float>(pointsPerSegment);
+                const float oneMinusT = 1.0F - t;
+                const float anchorWeight =
+                    oneMinusT * oneMinusT * oneMinusT;
+                const float firstControlWeight =
+                    3.0F * oneMinusT * oneMinusT * t;
+                const float secondControlWeight =
+                    3.0F * oneMinusT * t * t;
+                const float endWeight = t * t * t;
+                points[segment * pointsPerSegment + step] = {
+                    anchors[segment].x * anchorWeight +
+                        firstControls[segment].x *
+                            firstControlWeight +
+                        secondControls[segment].x *
+                            secondControlWeight +
+                        anchors[segment + 1].x * endWeight,
+                    anchors[segment].y * anchorWeight +
+                        firstControls[segment].y *
+                            firstControlWeight +
+                        secondControls[segment].y *
+                            secondControlWeight +
+                        anchors[segment + 1].y * endWeight
+                };
+            }
+        }
+        return points;
+    }();
+
+    const Vector2 fillCenter{center.x, center.y + 2.0F};
+    for (std::size_t index = 0; index < pointCount; ++index) {
+        const Vector2 first{
+            center.x + outline[index].x,
+            center.y + outline[index].y
+        };
+        const Vector2 second{
+            center.x + outline[(index + 1) % pointCount].x,
+            center.y + outline[(index + 1) % pointCount].y
+        };
+        DrawTriangle(fillCenter, second, first, color);
+    }
 }
 
 std::optional<std::size_t> hitTest(
