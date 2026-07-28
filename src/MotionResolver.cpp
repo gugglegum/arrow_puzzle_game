@@ -180,8 +180,25 @@ MotionResolution resolveMotionStep(
                 headSwap ||
                 cellsOverlap(lhsAfter, rhsAfter, bounds);
             if (!contact) {
-                result.movingContacts[forward] = 0;
-                result.movingContacts[reverse] = 0;
+                // Rear-end contacts alternate between two boundary events:
+                // the leader advances, then the follower enters the cell it
+                // vacated. Preserve an existing episode while both accepted
+                // next states still overlap, but do not use this look-ahead
+                // to report a collision before the bodies actually meet.
+                const bool remainsFollowing =
+                    hasPreviousMatrix &&
+                    previousMovingContacts[forward] != 0 &&
+                    !lhs.proposal.empty() &&
+                    !rhs.proposal.empty() &&
+                    cellsOverlap(
+                        lhs.proposal,
+                        rhs.proposal,
+                        bounds
+                    );
+                if (!remainsFollowing) {
+                    result.movingContacts[forward] = 0;
+                    result.movingContacts[reverse] = 0;
+                }
                 continue;
             }
 

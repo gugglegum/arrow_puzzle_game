@@ -367,6 +367,54 @@ void verifyMotionResolution() {
         "continuous moving overlap charged a second event"
     );
 
+    OwnedMotionBody rearArrow{
+        {{0, 0}, {-1, 0}},
+        {{1, 0}, {0, 0}}
+    };
+    OwnedMotionBody leadingArrow{
+        {{2, 0}, {1, 0}},
+        {{3, 0}, {2, 0}}
+    };
+    leadingArrow.role = arrow::MotionRole::Moving;
+    const arrow::MotionResolution rearEndContact =
+        resolveOwnedMotion({rearArrow, leadingArrow});
+    require(
+        rearEndContact.hasNewMovingContact,
+        "rear-end moving-arrow contact was not reported"
+    );
+
+    rearArrow.cells = {{1, 0}, {0, 0}};
+    rearArrow.proposal = {{2, 0}, {1, 0}};
+    rearArrow.role = arrow::MotionRole::Moving;
+    leadingArrow.role = arrow::MotionRole::Advancing;
+    const arrow::MotionResolution alternatingGap =
+        resolveOwnedMotion(
+            {rearArrow, leadingArrow},
+            rearEndContact.movingContacts
+        );
+    require(
+        !alternatingGap.hasNewMovingContact &&
+            alternatingGap.movingContacts ==
+                rearEndContact.movingContacts,
+        "rear-end contact latch was lost between cell events"
+    );
+
+    rearArrow.role = arrow::MotionRole::Advancing;
+    leadingArrow.cells = {{3, 0}, {2, 0}};
+    leadingArrow.proposal = {{4, 0}, {3, 0}};
+    leadingArrow.role = arrow::MotionRole::Moving;
+    const arrow::MotionResolution repeatedRearOverlap =
+        resolveOwnedMotion(
+            {rearArrow, leadingArrow},
+            alternatingGap.movingContacts
+        );
+    require(
+        !repeatedRearOverlap.hasNewMovingContact &&
+            repeatedRearOverlap.movingContacts ==
+                rearEndContact.movingContacts,
+        "one rear-end collision was charged more than once"
+    );
+
     std::vector<OwnedMotionBody> fractionalContactBodies =
         softBodies;
     for (OwnedMotionBody& body : fractionalContactBodies) {
@@ -394,14 +442,14 @@ void verifyMotionResolution() {
             {{5, 0}, {4, 0}}
         }
     };
-    const arrow::MotionResolution clearedContact =
+    const arrow::MotionResolution separatedContact =
         resolveOwnedMotion(
             clearBodies,
             continuedContact.movingContacts
         );
     require(
         std::ranges::none_of(
-            clearedContact.movingContacts,
+            separatedContact.movingContacts,
             [](std::uint8_t value) { return value != 0; }
         ),
         "separated moving arrows kept a stale contact"
@@ -409,7 +457,7 @@ void verifyMotionResolution() {
     require(
         resolveOwnedMotion(
             softBodies,
-            clearedContact.movingContacts
+            separatedContact.movingContacts
         ).hasNewMovingContact,
         "moving-arrow recontact was not reported"
     );

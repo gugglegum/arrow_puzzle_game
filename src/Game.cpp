@@ -909,6 +909,9 @@ int Game::run() {
                     arrows[*automatedSecondLaunch];
                 if (value.present &&
                     value.motion == Motion::Idle) {
+                    clearMovingContactsFor(
+                        *automatedSecondLaunch
+                    );
                     value.motion = Motion::Forward;
                     value.progress = 0.0;
                     value.speed = kInitialForwardSpeed;
@@ -932,6 +935,7 @@ int Game::run() {
                 hitTest(world, arrows);
             if (launched.has_value()) {
                 RuntimeArrow& value = arrows[*launched];
+                clearMovingContactsFor(*launched);
                 value.motion = Motion::Forward;
                 value.progress = 0.0;
                 value.speed = kInitialForwardSpeed;
