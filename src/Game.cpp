@@ -95,7 +95,7 @@ constexpr std::array<DifficultyPreset, 4> kDifficultyPresets{{
     {"Simple (20 x 20)", 20, 20, 30, 8},
     {"Middle (40 x 40)", 40, 40, 60, 8},
     {"Hard (80 x 80)", 80, 80, 120, 8},
-    {"Very Hard (160 x 160)", 160, 160, 960, 1}
+    {"Very Hard (160 x 160)", 160, 160, 960, 8}
 }};
 
 enum class Motion {

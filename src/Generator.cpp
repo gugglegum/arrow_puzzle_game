@@ -6,11 +6,13 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <future>
 #include <limits>
 #include <numeric>
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -73,7 +75,30 @@ struct Interval {
     int end{};
 };
 
+struct LengthProfile {
+    std::vector<int> targets;
+    std::vector<int> minimums;
+    std::vector<int> maximums;
+};
+
+enum IntervalFlag : std::uint8_t {
+    IntervalValid = 1U << 0U,
+    IntervalTightSelfPass = 1U << 1U
+};
+
+struct IntervalFacts {
+    int lengthStride{};
+    std::vector<std::uint8_t> flags;
+
+    [[nodiscard]] std::uint8_t at(int start, int length) const {
+        return flags[static_cast<std::size_t>(
+            start * lengthStride + length
+        )];
+    }
+};
+
 struct TangleMetrics {
+    bool intendedOrderValid{};
     int interArrowEdges{};
     int horizontalInterArrowEdges{};
     int verticalInterArrowEdges{};
@@ -354,66 +379,85 @@ std::vector<RayInfo> analyzeRays(
     return result;
 }
 
-bool clearsOwnBodyInTime(
-    const RayInfo& ray,
-    int start,
-    int end
-) {
-    for (const auto [position, distance] : ray.cells) {
-        if (position < start || position > end) {
-            continue;
-        }
-
-        // At distance t, original body cell k has already reached the tail
-        // exactly when t >= length-k. Equality is safe: the tail vacates on
-        // the same tick on which the head enters the cell.
-        if (distance < end - position + 1) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool launchRayCrossesOwnBody(
-    const RayInfo& ray,
-    int start,
-    int end
-) {
-    return std::ranges::any_of(
-        ray.cells,
-        [start, end](const auto& entry) {
-            const int position = entry.first;
-            return position >= start && position <= end;
-        }
-    );
-}
-
-int minimumOwnBodyClearance(
-    const RayInfo& ray,
-    int start,
-    int end
-) {
-    int minimumClearance = std::numeric_limits<int>::max();
-    for (const auto [position, distance] : ray.cells) {
-        if (position < start || position > end) {
-            continue;
-        }
-        minimumClearance = std::min(
-            minimumClearance,
-            distance - (end - position + 1)
-        );
-    }
-    return minimumClearance;
-}
-
-std::vector<std::uint64_t> reachableArrowCounts(
+IntervalFacts buildIntervalFacts(
     const std::vector<RayInfo>& rays,
     int minimumLength,
     int maximumLength,
-    int maximumCount,
     bool allowArrowLoops
 ) {
     const int area = static_cast<int>(rays.size());
+    IntervalFacts result{
+        maximumLength + 1,
+        std::vector<std::uint8_t>(
+            static_cast<std::size_t>(
+                area * (maximumLength + 1)
+            ),
+            0U
+        )
+    };
+    std::vector<std::pair<int, int>> bodyHits;
+
+    for (int start = 0; start < area; ++start) {
+        const RayInfo& ray = rays[static_cast<std::size_t>(start)];
+        bodyHits.clear();
+        for (const auto [position, distance] : ray.cells) {
+            if (position >= start) {
+                bodyHits.emplace_back(position, distance);
+            }
+        }
+        std::ranges::sort(bodyHits);
+
+        std::size_t nextHit = 0;
+        int earliestDeadline = std::numeric_limits<int>::max();
+        const int finalEnd = std::min(
+            area - 1,
+            start + maximumLength - 1
+        );
+        for (int end = start; end <= finalEnd; ++end) {
+            while (nextHit < bodyHits.size() &&
+                   bodyHits[nextHit].first <= end) {
+                const auto [position, distance] =
+                    bodyHits[nextHit++];
+                earliestDeadline = std::min(
+                    earliestDeadline,
+                    position + distance - 1
+                );
+            }
+
+            const int length = end - start + 1;
+            if (length < minimumLength) {
+                continue;
+            }
+            const bool crossesOwnBody = nextHit != 0;
+            const bool clearsOwnBody =
+                earliestDeadline >= end;
+            const bool valid =
+                ray.requiredEnd <= end &&
+                clearsOwnBody &&
+                (allowArrowLoops || !crossesOwnBody);
+            std::uint8_t flags = valid ? IntervalValid : 0U;
+            if (valid && crossesOwnBody &&
+                earliestDeadline == end) {
+                flags |= IntervalTightSelfPass;
+            }
+            result.flags[static_cast<std::size_t>(
+                start * result.lengthStride + length
+            )] = flags;
+        }
+    }
+    return result;
+}
+
+std::vector<std::uint64_t> reachableArrowCounts(
+    const IntervalFacts& intervalFacts,
+    int minimumLength,
+    int maximumLength,
+    int maximumCount
+) {
+    const int area = static_cast<int>(
+        intervalFacts.flags.size() /
+        static_cast<std::size_t>(intervalFacts.lengthStride)
+    );
     const std::size_t wordCount =
         (static_cast<std::size_t>(maximumCount) + 64U) / 64U;
     std::vector<std::uint64_t> reachable(
@@ -435,19 +479,15 @@ std::vector<std::uint64_t> reachableArrowCounts(
             continue;
         }
 
-        const RayInfo& ray = rays[static_cast<std::size_t>(start)];
-        const int minimumEnd = std::max(
-            start + minimumLength - 1,
-            ray.requiredEnd
-        );
+        const int minimumEnd = start + minimumLength - 1;
         const int maximumEnd = std::min(
             area - 1,
             start + maximumLength - 1
         );
         for (int end = minimumEnd; end <= maximumEnd; ++end) {
-            if (!clearsOwnBodyInTime(ray, start, end) ||
-                (!allowArrowLoops &&
-                 launchRayCrossesOwnBody(ray, start, end))) {
+            const int length = end - start + 1;
+            if ((intervalFacts.at(start, length) &
+                 IntervalValid) == 0U) {
                 continue;
             }
 
@@ -469,6 +509,94 @@ std::vector<std::uint64_t> reachableArrowCounts(
             static_cast<std::size_t>(area) * wordCount
         );
     return {finalBegin, finalBegin + static_cast<std::ptrdiff_t>(wordCount)};
+}
+
+std::vector<std::uint64_t> reachableArrowCountsByRanges(
+    const IntervalFacts& intervalFacts,
+    int minimumLength,
+    int maximumLength,
+    int maximumCount
+) {
+    const int area = static_cast<int>(
+        intervalFacts.flags.size() /
+        static_cast<std::size_t>(intervalFacts.lengthStride)
+    );
+    std::vector<int> firstEnds(static_cast<std::size_t>(area), -1);
+    std::vector<int> lastEnds(static_cast<std::size_t>(area), -1);
+    for (int start = 0; start < area; ++start) {
+        const int finalEnd = std::min(
+            area - 1,
+            start + maximumLength - 1
+        );
+        for (int end = start + minimumLength - 1;
+             end <= finalEnd;
+             ++end) {
+            const int length = end - start + 1;
+            if ((intervalFacts.at(start, length) &
+                 IntervalValid) == 0U) {
+                continue;
+            }
+            if (firstEnds[static_cast<std::size_t>(start)] < 0) {
+                firstEnds[static_cast<std::size_t>(start)] = end;
+            }
+            lastEnds[static_cast<std::size_t>(start)] = end;
+        }
+    }
+
+    const std::size_t countWordCount =
+        (static_cast<std::size_t>(maximumCount) + 64U) / 64U;
+    std::vector<std::uint64_t> result(countWordCount, 0U);
+    std::vector<std::uint8_t> current(
+        static_cast<std::size_t>(area + 1),
+        0U
+    );
+    std::vector<std::uint8_t> next(
+        static_cast<std::size_t>(area + 1),
+        0U
+    );
+    std::vector<int> differences(
+        static_cast<std::size_t>(area + 2),
+        0
+    );
+    current[0] = 1U;
+
+    for (int count = 1; count <= maximumCount; ++count) {
+        for (int start = 0; start < area; ++start) {
+            if (current[static_cast<std::size_t>(start)] == 0U) {
+                continue;
+            }
+            const int first = firstEnds[static_cast<std::size_t>(start)];
+            if (first < 0) {
+                continue;
+            }
+            ++differences[static_cast<std::size_t>(first + 1)];
+            --differences[static_cast<std::size_t>(
+                lastEnds[static_cast<std::size_t>(start)] + 2
+            )];
+        }
+
+        int active = 0;
+        bool hasNext = false;
+        for (int position = 0; position <= area; ++position) {
+            const std::size_t index =
+                static_cast<std::size_t>(position);
+            active += differences[index];
+            differences[index] = 0;
+            next[index] = active > 0 ? 1U : 0U;
+            hasNext = hasNext || next[index] != 0U;
+        }
+        differences[static_cast<std::size_t>(area + 1)] = 0;
+        if (next[static_cast<std::size_t>(area)] != 0U) {
+            const std::size_t index = static_cast<std::size_t>(count);
+            result[index / 64U] |=
+                std::uint64_t{1} << (index % 64U);
+        }
+        if (!hasNext) {
+            break;
+        }
+        current.swap(next);
+    }
+    return result;
 }
 
 bool containsArrowCount(
@@ -507,7 +635,7 @@ bool usesMixedLengthProfile(
            arrowCount >= 20;
 }
 
-std::vector<int> makeTargetLengths(
+LengthProfile makeLengthProfile(
     int area,
     int arrowCount,
     int minimumLength,
@@ -527,10 +655,20 @@ std::vector<int> makeTargetLengths(
             maximumLength,
             arrowCount
         )) {
-        return std::vector<int>(
-            static_cast<std::size_t>(arrowCount),
-            average
-        );
+        return {
+            std::vector<int>(
+                static_cast<std::size_t>(arrowCount),
+                average
+            ),
+            std::vector<int>(
+                static_cast<std::size_t>(arrowCount),
+                minimumLength
+            ),
+            std::vector<int>(
+                static_cast<std::size_t>(arrowCount),
+                maximumLength
+            )
+        };
     }
 
     const int shortCount = std::max(1, arrowCount * 40 / 100);
@@ -615,25 +753,46 @@ std::vector<int> makeTargetLengths(
             break;
         }
     }
-    std::ranges::shuffle(targets, random);
-    return targets;
+    for (std::size_t index = 0; index < targets.size(); ++index) {
+        lowerBounds[index] = std::min(
+            lowerBounds[index],
+            targets[index]
+        );
+        upperBounds[index] = std::max(
+            upperBounds[index],
+            targets[index]
+        );
+    }
+
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::ranges::shuffle(order, random);
+    LengthProfile result;
+    result.targets.reserve(targets.size());
+    result.minimums.reserve(targets.size());
+    result.maximums.reserve(targets.size());
+    for (std::size_t index : order) {
+        result.targets.push_back(targets[index]);
+        result.minimums.push_back(lowerBounds[index]);
+        result.maximums.push_back(upperBounds[index]);
+    }
+    return result;
 }
 
 bool findIntervalsForCount(
     const std::vector<Cell>& path,
     const std::vector<RayInfo>& rays,
+    const IntervalFacts& intervalFacts,
     int columns,
     int rows,
     int minimumLength,
     int maximumLength,
     int arrowCount,
     int initialChoiceTarget,
-    bool allowArrowLoops,
     std::mt19937& random,
     std::vector<Interval>& result
 ) {
     const int area = static_cast<int>(path.size());
-    const std::vector<int> targetLengths = makeTargetLengths(
+    const LengthProfile lengthProfile = makeLengthProfile(
         area,
         arrowCount,
         minimumLength,
@@ -645,30 +804,12 @@ bool findIntervalsForCount(
         maximumLength,
         arrowCount
     );
-    std::vector<int> targetMinimums(
-        static_cast<std::size_t>(arrowCount),
-        minimumLength
-    );
-    std::vector<int> targetMaximums(
-        static_cast<std::size_t>(arrowCount),
-        maximumLength
-    );
-    std::vector<int> suffixMinimums(
-        static_cast<std::size_t>(arrowCount + 1),
-        0
-    );
-    std::vector<int> suffixMaximums(
-        static_cast<std::size_t>(arrowCount + 1),
-        0
-    );
-    for (int ordinal = arrowCount - 1; ordinal >= 0; --ordinal) {
-        suffixMinimums[static_cast<std::size_t>(ordinal)] =
-            suffixMinimums[static_cast<std::size_t>(ordinal + 1)] +
-            targetMinimums[static_cast<std::size_t>(ordinal)];
-        suffixMaximums[static_cast<std::size_t>(ordinal)] =
-            suffixMaximums[static_cast<std::size_t>(ordinal + 1)] +
-            targetMaximums[static_cast<std::size_t>(ordinal)];
-    }
+    const std::vector<int>& targetLengths =
+        lengthProfile.targets;
+    std::vector<int> targetMinimums =
+        lengthProfile.minimums;
+    std::vector<int> targetMaximums =
+        lengthProfile.maximums;
     std::vector<int> positions(static_cast<std::size_t>(area), -1);
     for (int index = 0; index < area; ++index) {
         positions[static_cast<std::size_t>(
@@ -685,15 +826,13 @@ bool findIntervalsForCount(
         static_cast<std::size_t>(area * lengthStride),
         0
     );
-    std::vector<std::uint8_t> validIntervals(
-        static_cast<std::size_t>(area * lengthStride),
-        0U
-    );
     constexpr int tightSelfPassBonus = 2'500;
     constexpr int tightSelfPassLengthBonus = 10;
     constexpr int tightSelfPassTurnBonus = 50;
     constexpr int longComplexTightSelfPassBonus = 4'000;
     constexpr int preferredInitialFrontBonus = 8'000;
+    constexpr int largePreferredInitialFrontBonus = 1'000'000;
+    constexpr int unpreferredInitialFrontPenalty = 1'000'000;
     std::uniform_int_distribution<int> tieBreaker(0, 7);
     for (int start = 0; start < area; ++start) {
         int minimumX = path[static_cast<std::size_t>(start)].x;
@@ -755,24 +894,16 @@ bool findIntervalsForCount(
                 0,
                 adjacentEdges - (length - 1)
             );
-            const RayInfo& ray =
-                rays[static_cast<std::size_t>(start)];
-            const bool clearsOwnBody =
-                clearsOwnBodyInTime(ray, start, end);
-            const bool valid =
-                ray.requiredEnd <= end &&
-                clearsOwnBody &&
-                (allowArrowLoops ||
-                 !launchRayCrossesOwnBody(ray, start, end));
-            const int minimumClearance = valid
-                ? minimumOwnBodyClearance(ray, start, end)
-                : std::numeric_limits<int>::max();
+            const std::uint8_t facts =
+                intervalFacts.at(start, length);
+            const bool tightSelfPass =
+                (facts & IntervalTightSelfPass) != 0U;
             const bool rectangularThread =
                 length > 12 && length * 10 > boundingArea * 9;
             const bool complexThread =
                 turns >= 2 && boundingArea - length >= 3;
             int dynamicSelfPassBonus = 0;
-            if (minimumClearance == 0 && !rectangularThread) {
+            if (tightSelfPass && !rectangularThread) {
                 dynamicSelfPassBonus =
                     tightSelfPassBonus +
                     std::min(length, 40) *
@@ -794,9 +925,6 @@ bool findIntervalsForCount(
                 extraSelfContacts * 800 -
                 tieBreaker(random) +
                 dynamicSelfPassBonus;
-            validIntervals[static_cast<std::size_t>(
-                start * lengthStride + length
-            )] = valid ? 1U : 0U;
         }
     }
 
@@ -814,15 +942,12 @@ bool findIntervalsForCount(
                 ] != 0U) {
                 continue;
             }
-            const int base =
-                start * lengthStride;
             bool hasValidInterval = false;
             for (int length = minimumLength;
                  length <= maximumLength;
                  ++length) {
-                if (validIntervals[
-                        static_cast<std::size_t>(base + length)
-                    ] != 0U) {
+                if ((intervalFacts.at(start, length) &
+                     IntervalValid) != 0U) {
                     hasValidInterval = true;
                     break;
                 }
@@ -843,137 +968,410 @@ bool findIntervalsForCount(
         }
     }
     for (int start = 0; start < area; ++start) {
-        if (rays[static_cast<std::size_t>(start)]
-                .hasEarlierBlocker) {
-            continue;
-        }
-        const bool preferred =
-            preferredInitialFront[
-                static_cast<std::size_t>(start)
-            ] != 0U;
-        const int base = start * lengthStride;
-        for (int length = minimumLength;
-             length <= maximumLength;
-             ++length) {
-            const std::size_t interval =
-                static_cast<std::size_t>(base + length);
-            if (!preferred) {
-                validIntervals[interval] = 0U;
-            } else if (validIntervals[interval] != 0U) {
-                intervalScores[interval] +=
-                    preferredInitialFrontBonus;
+        if (!rays[static_cast<std::size_t>(start)]
+                 .hasEarlierBlocker) {
+            const bool preferred =
+                preferredInitialFront[
+                    static_cast<std::size_t>(start)
+                ] != 0U;
+            const int base = start * lengthStride;
+            for (int length = minimumLength;
+                 length <= maximumLength;
+                 ++length) {
+                if ((intervalFacts.at(start, length) &
+                     IntervalValid) != 0U) {
+                    intervalScores[static_cast<std::size_t>(
+                        base + length
+                    )] += preferred
+                        ? area >= 4096
+                            ? largePreferredInitialFrontBonus
+                            : preferredInitialFrontBonus
+                        : area >= 4096
+                            ? -unpreferredInitialFrontPenalty
+                            : 0;
+                }
             }
         }
     }
 
-    constexpr int kUnknown = std::numeric_limits<int>::min();
-    constexpr int kImpossible = std::numeric_limits<int>::min() / 2;
-    const int stride = arrowCount + 1;
-    std::vector<int> memo(
-        static_cast<std::size_t>((area + 1) * stride),
-        kUnknown
-    );
-    std::vector<int> selectedEnd(
-        static_cast<std::size_t>((area + 1) * stride),
-        -1
-    );
-    result.clear();
-
-    const auto search = [&](auto&& self, int start, int remaining) -> int {
-        if (remaining == 0) {
-            return start == area ? 0 : kImpossible;
-        }
-        const int ordinal = arrowCount - remaining;
-        const int cellsLeft = area - start;
-        if (cellsLeft <
-                suffixMinimums[static_cast<std::size_t>(ordinal)] ||
-            cellsLeft >
-                suffixMaximums[static_cast<std::size_t>(ordinal)] ||
-            start + 1 >= area) {
-            return kImpossible;
-        }
-        const std::size_t state = static_cast<std::size_t>(
-            start * stride + remaining
+    const auto tryBounds = [&]() {
+        constexpr int kImpossible =
+            std::numeric_limits<int>::min() / 2;
+        struct MemoState {
+            int score{};
+            std::uint32_t selectedLength{};
+        };
+        std::vector<int> suffixMinimums(
+            static_cast<std::size_t>(arrowCount + 1),
+            0
         );
-        if (memo[state] != kUnknown) {
-            return memo[state];
+        std::vector<int> suffixMaximums(
+            static_cast<std::size_t>(arrowCount + 1),
+            0
+        );
+        for (int ordinal = arrowCount - 1; ordinal >= 0; --ordinal) {
+            suffixMinimums[static_cast<std::size_t>(ordinal)] =
+                suffixMinimums[static_cast<std::size_t>(ordinal + 1)] +
+                targetMinimums[static_cast<std::size_t>(ordinal)];
+            suffixMaximums[static_cast<std::size_t>(ordinal)] =
+                suffixMaximums[static_cast<std::size_t>(ordinal + 1)] +
+                targetMaximums[static_cast<std::size_t>(ordinal)];
         }
 
-        int bestScore = kImpossible;
-        int bestEnd = -1;
-        const int minimumEnd =
-            start +
-            targetMinimums[static_cast<std::size_t>(ordinal)] -
-            1;
-        const int maximumEnd = std::min(
-            area - 1,
-            start +
-                targetMaximums[static_cast<std::size_t>(ordinal)] -
-                1
-        );
-        for (int end = minimumEnd; end <= maximumEnd; ++end) {
-            const int length = end - start + 1;
-            if (validIntervals[static_cast<std::size_t>(
-                    start * lengthStride + length
-                )] == 0U) {
-                continue;
+        if (area >= 4096) {
+            std::vector<int> firstEnds(
+                static_cast<std::size_t>(area),
+                -1
+            );
+            std::vector<int> lastEnds(
+                static_cast<std::size_t>(area),
+                -1
+            );
+            for (int start = 0; start < area; ++start) {
+                if (area >= 16384 &&
+                    !rays[static_cast<std::size_t>(start)]
+                         .hasEarlierBlocker &&
+                    preferredInitialFront[
+                        static_cast<std::size_t>(start)
+                    ] == 0U) {
+                    continue;
+                }
+                const int finalEnd = std::min(
+                    area - 1,
+                    start + maximumLength - 1
+                );
+                for (int end = start + minimumLength - 1;
+                     end <= finalEnd;
+                     ++end) {
+                    const int length = end - start + 1;
+                    if ((intervalFacts.at(start, length) &
+                         IntervalValid) == 0U) {
+                        continue;
+                    }
+                    if (firstEnds[static_cast<std::size_t>(start)] < 0) {
+                        firstEnds[static_cast<std::size_t>(start)] =
+                            end;
+                    }
+                    lastEnds[static_cast<std::size_t>(start)] = end;
+                }
             }
-            const int after = area - end - 1;
-            if (after <
+
+            const std::size_t positionWordCount =
+                (static_cast<std::size_t>(area) + 64U) / 64U;
+            std::vector<std::uint64_t> reachable(
+                static_cast<std::size_t>(arrowCount + 1) *
+                    positionWordCount,
+                0U
+            );
+            reachable[0] = 1U;
+            std::vector<int> differences(
+                static_cast<std::size_t>(area + 2),
+                0
+            );
+            for (int ordinal = 0;
+                 ordinal < arrowCount;
+                 ++ordinal) {
+                const std::size_t currentOffset =
+                    static_cast<std::size_t>(ordinal) *
+                    positionWordCount;
+                for (int start = 0; start < area; ++start) {
+                    const std::size_t position =
+                        static_cast<std::size_t>(start);
+                    if ((reachable[
+                            currentOffset + position / 64U
+                        ] &
+                         (std::uint64_t{1} <<
+                          (position % 64U))) == 0U) {
+                        continue;
+                    }
+                    const int first =
+                        firstEnds[position];
+                    if (first < 0) {
+                        continue;
+                    }
+                    ++differences[static_cast<std::size_t>(first + 1)];
+                    --differences[static_cast<std::size_t>(
+                        lastEnds[position] + 2
+                    )];
+                }
+
+                const std::size_t nextOffset =
+                    static_cast<std::size_t>(ordinal + 1) *
+                    positionWordCount;
+                int active = 0;
+                bool hasNext = false;
+                for (int position = 0; position <= area; ++position) {
+                    active += differences[
+                        static_cast<std::size_t>(position)
+                    ];
+                    differences[
+                        static_cast<std::size_t>(position)
+                    ] = 0;
+                    if (active <= 0) {
+                        continue;
+                    }
+                    const std::size_t index =
+                        static_cast<std::size_t>(position);
+                    reachable[nextOffset + index / 64U] |=
+                        std::uint64_t{1} << (index % 64U);
+                    hasNext = true;
+                }
+                differences[static_cast<std::size_t>(area + 1)] = 0;
+                if (!hasNext) {
+                    return false;
+                }
+            }
+
+            const std::size_t finalOffset =
+                static_cast<std::size_t>(arrowCount) *
+                positionWordCount;
+            const std::size_t finalPosition =
+                static_cast<std::size_t>(area);
+            if ((reachable[
+                    finalOffset + finalPosition / 64U
+                ] &
+                 (std::uint64_t{1} <<
+                  (finalPosition % 64U))) == 0U) {
+                return false;
+            }
+
+            result.resize(static_cast<std::size_t>(arrowCount));
+            int position = area;
+            for (int ordinal = arrowCount - 1;
+                 ordinal >= 0;
+                 --ordinal) {
+                const std::size_t previousOffset =
+                    static_cast<std::size_t>(ordinal) *
+                    positionWordCount;
+                const int earliestStart = std::max(
+                    0,
+                    position - maximumLength
+                );
+                const int latestStart =
+                    position - minimumLength;
+                int bestStart = -1;
+                int bestScore = kImpossible;
+                for (int start = earliestStart;
+                     start <= latestStart;
+                     ++start) {
+                    const std::size_t startIndex =
+                        static_cast<std::size_t>(start);
+                    if ((reachable[
+                            previousOffset + startIndex / 64U
+                        ] &
+                         (std::uint64_t{1} <<
+                          (startIndex % 64U))) == 0U ||
+                        firstEnds[startIndex] < 0 ||
+                        position - 1 < firstEnds[startIndex] ||
+                        position - 1 > lastEnds[startIndex]) {
+                        continue;
+                    }
+                    const int length = position - start;
+                    if ((intervalFacts.at(start, length) &
+                         IntervalValid) == 0U) {
+                        continue;
+                    }
+                    const int lengthPenalty =
+                        std::abs(
+                            length -
+                            targetLengths[
+                                static_cast<std::size_t>(ordinal)
+                            ]
+                        ) * (mixedLengths ? 70 : 12);
+                    const int score =
+                        intervalScores[static_cast<std::size_t>(
+                            start * lengthStride + length
+                        )] -
+                        lengthPenalty;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestStart = start;
+                    }
+                }
+                if (bestStart < 0) {
+                    return false;
+                }
+                result[static_cast<std::size_t>(ordinal)] = {
+                    bestStart,
+                    position - 1
+                };
+                position = bestStart;
+            }
+            return position == 0;
+        }
+
+        std::unordered_map<std::uint64_t, MemoState> memo;
+        memo.reserve(std::min<std::size_t>(
+            static_cast<std::size_t>(area) * 8U,
+            1'000'000U
+        ));
+        const auto stateKey = [area](int start, int ordinal) {
+            return
+                static_cast<std::uint64_t>(ordinal) *
+                    static_cast<std::uint64_t>(area + 1) +
+                static_cast<std::uint64_t>(start);
+        };
+
+        const auto search =
+            [&](auto&& self, int start, int ordinal) -> int {
+            if (ordinal == arrowCount) {
+                return start == area ? 0 : kImpossible;
+            }
+            const int cellsLeft = area - start;
+            if (cellsLeft <
                     suffixMinimums[
-                        static_cast<std::size_t>(ordinal + 1)
+                        static_cast<std::size_t>(ordinal)
                     ] ||
-                after >
+                cellsLeft >
                     suffixMaximums[
-                        static_cast<std::size_t>(ordinal + 1)
-                    ]) {
-                continue;
+                        static_cast<std::size_t>(ordinal)
+                    ] ||
+                start + 1 >= area) {
+                return kImpossible;
             }
-            const int suffix = self(self, end + 1, remaining - 1);
-            if (suffix == kImpossible) {
-                continue;
+            const std::uint64_t key = stateKey(start, ordinal);
+            if (const auto found = memo.find(key);
+                found != memo.end()) {
+                return found->second.score;
             }
-            const int lengthPenalty =
-                std::abs(
-                    length -
-                    targetLengths[static_cast<std::size_t>(ordinal)]
-                ) * (mixedLengths ? 70 : 12);
-            const int score =
-                intervalScores[static_cast<std::size_t>(
-                    start * lengthStride + length
-                )] +
-                suffix -
-                lengthPenalty;
-            if (score > bestScore) {
-                bestScore = score;
-                bestEnd = end;
+
+            int bestScore = kImpossible;
+            int bestEnd = -1;
+            const int minimumEnd =
+                start +
+                targetMinimums[static_cast<std::size_t>(ordinal)] -
+                1;
+            const int maximumEnd = std::min(
+                area - 1,
+                start +
+                    targetMaximums[
+                        static_cast<std::size_t>(ordinal)
+                    ] -
+                    1
+            );
+            for (int end = minimumEnd; end <= maximumEnd; ++end) {
+                const int length = end - start + 1;
+                if ((intervalFacts.at(start, length) &
+                     IntervalValid) == 0U ||
+                    (!rays[static_cast<std::size_t>(start)]
+                          .hasEarlierBlocker &&
+                     preferredInitialFront[
+                         static_cast<std::size_t>(start)
+                     ] == 0U)) {
+                    continue;
+                }
+                const int after = area - end - 1;
+                if (after <
+                        suffixMinimums[
+                            static_cast<std::size_t>(ordinal + 1)
+                        ] ||
+                    after >
+                        suffixMaximums[
+                            static_cast<std::size_t>(ordinal + 1)
+                        ]) {
+                    continue;
+                }
+                const int suffix =
+                    self(self, end + 1, ordinal + 1);
+                if (suffix == kImpossible) {
+                    continue;
+                }
+                const int lengthPenalty =
+                    std::abs(
+                        length -
+                        targetLengths[
+                            static_cast<std::size_t>(ordinal)
+                        ]
+                    ) * (mixedLengths ? 70 : 12);
+                const int score =
+                    intervalScores[static_cast<std::size_t>(
+                        start * lengthStride + length
+                    )] +
+                    suffix -
+                    lengthPenalty;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestEnd = end;
+                }
             }
-        }
 
-        memo[state] = bestScore;
-        selectedEnd[state] = bestEnd;
-        return bestScore;
-    };
+            memo.emplace(
+                key,
+                MemoState{
+                    bestScore,
+                    bestEnd >= start
+                        ? static_cast<std::uint32_t>(
+                              bestEnd - start + 1
+                          )
+                        : 0U
+                }
+            );
+            return bestScore;
+        };
 
-    if (search(search, 0, arrowCount) == kImpossible) {
-        return false;
-    }
-
-    int start = 0;
-    int remaining = arrowCount;
-    while (remaining > 0) {
-        const std::size_t state = static_cast<std::size_t>(
-            start * stride + remaining
-        );
-        const int end = selectedEnd[state];
-        if (end < start) {
+        if (search(search, 0, 0) == kImpossible) {
             return false;
         }
-        result.push_back({start, end});
-        start = end + 1;
-        --remaining;
+
+        result.clear();
+        int start = 0;
+        for (int ordinal = 0; ordinal < arrowCount; ++ordinal) {
+            const auto state = memo.find(stateKey(start, ordinal));
+            if (state == memo.end()) {
+                return false;
+            }
+            const int length = static_cast<int>(
+                state->second.selectedLength
+            );
+            if (length <= 0) {
+                return false;
+            }
+            const int end = start + length - 1;
+            result.push_back({start, end});
+            start = end + 1;
+        }
+        return start == area;
+    };
+
+    if (!mixedLengths || area >= 4096) {
+        return tryBounds();
     }
-    return start == area;
+
+    constexpr std::array<int, 8> expansions{{
+        0,
+        2,
+        6,
+        16,
+        32,
+        64,
+        128,
+        256
+    }};
+    for (int expansion : expansions) {
+        for (int ordinal = 0; ordinal < arrowCount; ++ordinal) {
+            targetMinimums[static_cast<std::size_t>(ordinal)] =
+                std::max(
+                    minimumLength,
+                    lengthProfile.minimums[
+                        static_cast<std::size_t>(ordinal)
+                    ] - expansion
+                );
+            targetMaximums[static_cast<std::size_t>(ordinal)] =
+                std::min(
+                    maximumLength,
+                    lengthProfile.maximums[
+                        static_cast<std::size_t>(ordinal)
+                    ] + expansion
+                );
+        }
+        if (tryBounds()) {
+            return true;
+        }
+    }
+
+    std::ranges::fill(targetMinimums, minimumLength);
+    std::ranges::fill(targetMaximums, maximumLength);
+    return tryBounds();
 }
 
 std::vector<int> preferredArrowCounts(
@@ -1259,65 +1657,60 @@ TangleMetrics measureTangle(
         }
     }
 
-    const std::size_t blockerWordCount =
-        (arrows.size() + 63U) / 64U;
-    std::vector<std::vector<std::uint64_t>> blockers(
-        arrows.size(),
-        std::vector<std::uint64_t>(blockerWordCount, 0U)
-    );
+    std::vector<std::vector<int>> blockers(arrows.size());
+    std::vector<std::vector<int>> dependents(arrows.size());
+    std::vector<int> seenBlockers(arrows.size(), -1);
     for (std::size_t index = 0; index < arrows.size(); ++index) {
         Cell probe = arrows[index].cells.front() + arrows[index].direction;
         while (isInside(probe, columns, rows)) {
             const int owner = owners[static_cast<std::size_t>(
                 cellIndex(probe, columns)
             )];
-            if (owner != static_cast<int>(index)) {
-                const std::size_t ownerIndex =
-                    static_cast<std::size_t>(owner);
-                blockers[index][ownerIndex / 64U] |=
-                    std::uint64_t{1} << (ownerIndex % 64U);
+            if (owner != static_cast<int>(index) &&
+                seenBlockers[static_cast<std::size_t>(owner)] !=
+                    static_cast<int>(index)) {
+                seenBlockers[static_cast<std::size_t>(owner)] =
+                    static_cast<int>(index);
+                blockers[index].push_back(owner);
+                dependents[static_cast<std::size_t>(owner)].push_back(
+                    static_cast<int>(index)
+                );
             }
             probe = probe + arrows[index].direction;
         }
     }
 
-    std::vector<std::uint64_t> present(
-        blockerWordCount,
-        ~std::uint64_t{0}
-    );
-    const auto hasPresentBlocker = [&](
-        std::size_t index
-    ) {
-        for (std::size_t word = 0;
-             word < blockerWordCount;
-             ++word) {
-            if ((blockers[index][word] & present[word]) != 0U) {
-                return true;
-            }
-        }
-        return false;
-    };
+    std::vector<int> remainingBlockers(arrows.size(), 0);
+    std::vector<std::uint8_t> present(arrows.size(), 1U);
+    int choices = 0;
+    for (std::size_t index = 0; index < arrows.size(); ++index) {
+        remainingBlockers[index] =
+            static_cast<int>(blockers[index].size());
+        choices += remainingBlockers[index] == 0 ? 1 : 0;
+    }
+
     for (std::size_t step = 0; step < arrows.size(); ++step) {
-        int choices = 0;
-        for (std::size_t index = 0; index < arrows.size(); ++index) {
-            const bool isPresent =
-                (present[index / 64U] &
-                 (std::uint64_t{1} << (index % 64U))) != 0U;
-            if (isPresent && !hasPresentBlocker(index)) {
-                ++choices;
-            }
-        }
         if (step == 0) {
             result.initiallyRemovable = choices;
         }
         result.maximumChoices = std::max(result.maximumChoices, choices);
         result.choiceExcess += std::max(0, choices - 1);
-        if (hasPresentBlocker(step)) {
+        if (remainingBlockers[step] != 0) {
             return {};
         }
-        present[step / 64U] &=
-            ~(std::uint64_t{1} << (step % 64U));
+        present[step] = 0U;
+        --choices;
+        for (int dependent : dependents[step]) {
+            int& count =
+                remainingBlockers[static_cast<std::size_t>(dependent)];
+            --count;
+            if (count == 0 &&
+                present[static_cast<std::size_t>(dependent)] != 0U) {
+                ++choices;
+            }
+        }
     }
+    result.intendedOrderValid = true;
     return result;
 }
 
@@ -1468,29 +1861,36 @@ Board generateBoard(const GeneratorOptions& options) {
             ? 33U
             : 17U;
         const std::size_t countAttemptLimit =
-            useReachabilityPruning
+            area >= 256
             ? std::min(
                   preferredCountAttempts,
                   counts.size()
               )
             : counts.size();
 
-        for (int attempt = 0;
-             attempt < candidateAttempts;
-             ++attempt) {
+        const auto generateAttempt = [&](int attempt) {
+            std::seed_seq attemptSeed{
+                options.seed,
+                static_cast<std::uint32_t>(options.columns),
+                static_cast<std::uint32_t>(options.rows),
+                static_cast<std::uint32_t>(minimumLength),
+                static_cast<std::uint32_t>(maximumLength),
+                static_cast<std::uint32_t>(attempt),
+                0xA77E6D5U
+            };
+            std::mt19937 attemptRandom(attemptSeed);
             const std::vector<Cell> cycle = makeLabyrinthCycle(
                 options.columns,
                 options.rows,
-                random
+                attemptRandom
             );
             std::vector<Opening> openings = findOpenings(
                 cycle,
                 options.columns,
                 options.rows
             );
-            std::ranges::shuffle(openings, random);
+            std::ranges::shuffle(openings, attemptRandom);
 
-            bool foundForCycle = false;
             for (Opening opening : openings) {
                 const std::vector<Cell> path = openCycle(cycle, opening);
                 const std::vector<RayInfo> rays = analyzeRays(
@@ -1498,6 +1898,13 @@ Board generateBoard(const GeneratorOptions& options) {
                     options.columns,
                     options.rows
                 );
+                const IntervalFacts intervalFacts =
+                    buildIntervalFacts(
+                        rays,
+                        minimumLength,
+                        maximumLength,
+                        options.allowArrowLoops
+                    );
                 std::vector<std::uint64_t> reachableCounts;
                 int maximumAttemptedCount = 0;
                 if (useReachabilityPruning) {
@@ -1509,13 +1916,26 @@ Board generateBoard(const GeneratorOptions& options) {
                             counts[countIndex]
                         );
                     }
-                    reachableCounts = reachableArrowCounts(
-                        rays,
-                        minimumLength,
-                        maximumLength,
-                        maximumAttemptedCount,
-                        options.allowArrowLoops
-                    );
+                    if (area >= 4096 && area < 16384) {
+                        maximumAttemptedCount = std::max(
+                            maximumAttemptedCount,
+                            area / minimumLength
+                        );
+                    }
+                    reachableCounts =
+                        area >= 4096
+                        ? reachableArrowCountsByRanges(
+                              intervalFacts,
+                              minimumLength,
+                              maximumLength,
+                              maximumAttemptedCount
+                          )
+                        : reachableArrowCounts(
+                              intervalFacts,
+                              minimumLength,
+                              maximumLength,
+                              maximumAttemptedCount
+                          );
                 }
 
                 std::vector<int> countsForOpening(
@@ -1556,14 +1976,14 @@ Board generateBoard(const GeneratorOptions& options) {
                     const bool foundIntervals = findIntervalsForCount(
                         path,
                         rays,
+                        intervalFacts,
                         options.columns,
                         options.rows,
                         minimumLength,
                         maximumLength,
                         count,
                         initialChoiceTarget,
-                        options.allowArrowLoops,
-                        random,
+                        attemptRandom,
                         intervals
                     );
                     if (!foundIntervals) {
@@ -1579,6 +1999,9 @@ Board generateBoard(const GeneratorOptions& options) {
                         options.rows,
                         arrows
                     );
+                    if (!metrics.intendedOrderValid) {
+                        continue;
+                    }
                     const int score = scoreCandidate(
                         metrics,
                         static_cast<int>(arrows.size()),
@@ -1590,26 +2013,49 @@ Board generateBoard(const GeneratorOptions& options) {
                             metrics,
                             static_cast<int>(arrows.size())
                         );
-                    const bool improvesEligibility =
-                        meetsRequiredQuality &&
-                        !best.meetsRequiredQuality;
-                    if (improvesEligibility ||
-                        (meetsRequiredQuality ==
-                             best.meetsRequiredQuality &&
-                         score > best.score)) {
-                        best = {
-                            std::move(arrows),
-                            metrics,
-                            meetsRequiredQuality,
-                            score
-                        };
-                    }
-                    foundForCycle = true;
-                    break;
+                    return BoardCandidate{
+                        std::move(arrows),
+                        metrics,
+                        meetsRequiredQuality,
+                        score
+                    };
                 }
-                if (foundForCycle) {
-                    break;
-                }
+            }
+            return BoardCandidate{};
+        };
+
+        std::vector<std::future<BoardCandidate>> futures;
+        if (candidateAttempts > 1) {
+            futures.reserve(static_cast<std::size_t>(candidateAttempts));
+            for (int attempt = 0;
+                 attempt < candidateAttempts;
+                 ++attempt) {
+                futures.push_back(std::async(
+                    std::launch::async,
+                    generateAttempt,
+                    attempt
+                ));
+            }
+        }
+
+        for (int attempt = 0;
+             attempt < candidateAttempts;
+             ++attempt) {
+            BoardCandidate candidate =
+                candidateAttempts == 1
+                ? generateAttempt(attempt)
+                : futures[static_cast<std::size_t>(attempt)].get();
+            if (candidate.arrows.empty()) {
+                continue;
+            }
+            const bool improvesEligibility =
+                candidate.meetsRequiredQuality &&
+                !best.meetsRequiredQuality;
+            if (improvesEligibility ||
+                (candidate.meetsRequiredQuality ==
+                     best.meetsRequiredQuality &&
+                 candidate.score > best.score)) {
+                best = std::move(candidate);
             }
         }
     }
@@ -1627,8 +2073,7 @@ Board generateBoard(const GeneratorOptions& options) {
     }
 
     Board board(options.columns, options.rows, std::move(best.arrows));
-    if (!board.isCompletelyFilled() || !board.hasValidGeometry() ||
-        board.solveGreedily().size() != board.arrows().size()) {
+    if (!board.isCompletelyFilled() || !board.hasValidGeometry()) {
         throw std::logic_error("Generated board failed its invariants");
     }
     return board;

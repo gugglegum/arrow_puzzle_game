@@ -1595,6 +1595,54 @@ int main(int argc, char** argv) {
                 )
         );
 
+        const arrow::GeneratorOptions hardOptions{
+            80,
+            80,
+            2,
+            120,
+            747U,
+            8
+        };
+        const Quality hardQuality = verifyBoard(
+            arrow::generateBoard(hardOptions),
+            hardOptions
+        );
+        require(
+            hardQuality.initiallyRemovable >= 3 &&
+                hardQuality.initiallyRemovable <= 7,
+            "80x80 board lost its controlled opening fronts"
+        );
+        require(
+            hardQuality.shortArrows >= 250 &&
+                hardQuality.mediumArrows >= 150 &&
+                hardQuality.longArrows >= 60,
+            "80x80 board lost its mixed arrow lengths"
+        );
+
+        const arrow::GeneratorOptions veryHardOptions{
+            160,
+            160,
+            2,
+            960,
+            747U,
+            8
+        };
+        const Quality veryHardQuality = verifyBoard(
+            arrow::generateBoard(veryHardOptions),
+            veryHardOptions
+        );
+        require(
+            veryHardQuality.initiallyRemovable >= 5 &&
+                veryHardQuality.initiallyRemovable <= 10,
+            "160x160 board lost its controlled opening fronts"
+        );
+        require(
+            veryHardQuality.shortArrows >= 1'200 &&
+                veryHardQuality.mediumArrows >= 500 &&
+                veryHardQuality.longArrows >= 250,
+            "160x160 board lost its mixed arrow lengths"
+        );
+
         const arrow::GeneratorOptions looplessOptions{
             40,
             40,
@@ -1832,7 +1880,7 @@ int main(int argc, char** argv) {
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size()) + 4
+                   static_cast<int>(largeBoardSeeds.size()) + 6
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

@@ -107,9 +107,9 @@ The New game menu provides four board sizes:
 - Hard: 80 x 80
 - Very Hard: 160 x 160
 
-Very Hard is experimental. It evaluates one generated candidate instead of
-eight, but generation can still take tens of seconds. The animated generation
-overlay remains responsive while the worker searches.
+Very Hard is experimental. Like the smaller presets, it evaluates eight
+candidates in parallel and selects the highest-scoring tangle. The animated
+generation overlay remains responsive while the candidates are compared.
 
 The Settings menu can prevent newly generated levels from using dynamic arrow
 loops and can disable life penalties for collisions between flying arrows.
@@ -257,10 +257,16 @@ cell, then uses dynamic programming to cut it into arrows with a broad length
 distribution. A cut is accepted only when its exit dependencies preserve a
 constructive solution order.
 
+Ray exits and dynamic self-passes are cached once per opened cycle. Large
+boards use exact range-based reachability and reconstruction instead of dense
+area-by-arrow-count tables, while dependency choices are updated through a
+reverse graph. Independent candidate attempts run in parallel and are compared
+in deterministic order.
+
 Multiple candidates are scored for inter-arrow contact, spatial mixing,
 direction diversity, turns, dependency structure, and length distribution.
-The three smaller presets compare eight candidates. The experimental
-160 x 160 preset currently accepts the first valid candidate to limit waiting.
+All four presets compare eight candidates. Independent candidates are
+generated in parallel before the highest-scoring tangle is selected.
 `GeneratorOptions::candidateAttempts` is the internal quality/time control that
 can later be exposed as a menu setting.
 
