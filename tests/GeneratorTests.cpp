@@ -46,9 +46,52 @@ struct Quality {
     std::size_t scanlineExcessRuns{};
     std::size_t rectangularArrows{};
     std::size_t richMacroBlocks{};
+    std::size_t tightSelfPassArrows{};
+    std::size_t longComplexTightSelfPassArrows{};
     double medianBoundingFill{};
     double lengthCoefficientOfVariation{};
 };
+
+int minimumSelfPassClearance(
+    const arrow::Arrow& value,
+    int columns,
+    int rows
+) {
+    std::vector<int> bodyPositions(
+        static_cast<std::size_t>(columns * rows),
+        -1
+    );
+    for (std::size_t position = 0;
+         position < value.cells.size();
+         ++position) {
+        const arrow::Cell cell = value.cells[position];
+        bodyPositions[static_cast<std::size_t>(
+            cell.y * columns + cell.x
+        )] = static_cast<int>(position);
+    }
+
+    int minimumClearance = std::numeric_limits<int>::max();
+    arrow::Cell probe = value.cells.front() + value.direction;
+    int distance = 1;
+    while (
+        probe.x >= 0 && probe.x < columns &&
+        probe.y >= 0 && probe.y < rows
+    ) {
+        const int position = bodyPositions[static_cast<std::size_t>(
+            probe.y * columns + probe.x
+        )];
+        if (position >= 0) {
+            minimumClearance = std::min(
+                minimumClearance,
+                distance -
+                    (static_cast<int>(value.cells.size()) - position)
+            );
+        }
+        probe = probe + value.direction;
+        ++distance;
+    }
+    return minimumClearance;
+}
 
 Quality analyze(const arrow::Board& board) {
     Quality result;
@@ -57,6 +100,8 @@ Quality analyze(const arrow::Board& board) {
         static_cast<std::size_t>(board.columns() * board.rows()),
         -1
     );
+    std::vector<std::size_t> turnsByArrow(result.arrowCount, 0);
+    std::vector<int> boundingAreas(result.arrowCount, 0);
     std::vector<double> longArrowBoundingFills;
     std::vector<std::size_t> lengths;
     lengths.reserve(result.arrowCount);
@@ -102,6 +147,8 @@ Quality analyze(const arrow::Board& board) {
         }
         const int boundingArea =
             (maximumX - minimumX + 1) * (maximumY - minimumY + 1);
+        boundingAreas[index] = boundingArea;
+        turnsByArrow[index] = arrowTurns;
         const double boundingFill =
             static_cast<double>(value.cells.size()) /
             static_cast<double>(boundingArea);
@@ -157,6 +204,30 @@ Quality analyze(const arrow::Board& board) {
     result.lengthCoefficientOfVariation =
         std::sqrt(squaredDifference / static_cast<double>(lengths.size())) /
         meanLength;
+
+    for (std::size_t index = 0; index < result.arrowCount; ++index) {
+        const arrow::Arrow& value = board.arrows()[index];
+        const int minimumClearance = minimumSelfPassClearance(
+            value,
+            board.columns(),
+            board.rows()
+        );
+        if (minimumClearance != 0) {
+            continue;
+        }
+
+        ++result.tightSelfPassArrows;
+        const int length = static_cast<int>(value.cells.size());
+        const int boundingArea = boundingAreas[index];
+        const bool rectangularThread =
+            length > 12 && length * 10 > boundingArea * 9;
+        const bool complexThread =
+            turnsByArrow[index] >= 2 &&
+            boundingArea - length >= 3;
+        if (!rectangularThread && length >= 18 && complexThread) {
+            ++result.longComplexTightSelfPassArrows;
+        }
+    }
 
     for (int y = 0; y < board.rows(); ++y) {
         for (int x = 0; x < board.columns(); ++x) {
@@ -1046,6 +1117,10 @@ void verifyDynamicSelfCollision() {
         safeBoard.canExit(0, {true}),
         "head cannot enter a cell vacated by its tail on the same tick"
     );
+    require(
+        minimumSelfPassClearance(clearsTailInTime, 5, 4) == 0,
+        "exact tail pass did not report zero-cell clearance"
+    );
 
     const arrow::Arrow clearsSeveralCellsInTime{
         {
@@ -1069,6 +1144,10 @@ void verifyDynamicSelfCollision() {
         multipleSafeCrossings.canExit(0, {true}),
         "later body cells were not released at their exact safe ticks"
     );
+    require(
+        minimumSelfPassClearance(clearsSeveralCellsInTime, 5, 3) == 0,
+        "multi-contact exact tail pass did not report zero clearance"
+    );
 
     const arrow::Arrow hitsOwnBody{
         {
@@ -1087,6 +1166,20 @@ void verifyDynamicSelfCollision() {
     require(
         !collidingBoard.canExit(0, {true}),
         "head incorrectly passes through its own body"
+    );
+    require(
+        minimumSelfPassClearance(hitsOwnBody, 5, 4) < 0,
+        "unsafe self-hit did not report negative clearance"
+    );
+
+    const arrow::Arrow noSelfPass{
+        {{1, 1}, {0, 1}},
+        {1, 0}
+    };
+    require(
+        minimumSelfPassClearance(noSelfPass, 5, 4) ==
+            std::numeric_limits<int>::max(),
+        "arrow without a body crossing reported a finite clearance"
     );
 
     const arrow::Arrow delayedSelfHit{
@@ -1313,6 +1406,43 @@ int main(int argc, char** argv) {
         verifyMotionResolution();
         verifyHighSpeedCollisionSweep();
         verifyDynamicSelfCollision();
+        require(
+            arrow::GeneratorOptions{}.candidateAttempts == 8,
+            "default generator quality no longer evaluates eight candidates"
+        );
+
+        bool oddDimensionsRejected = false;
+        try {
+            static_cast<void>(arrow::generateBoard(
+                arrow::GeneratorOptions{5, 4, 2, 12, 7U, 1}
+            ));
+        } catch (const std::invalid_argument& error) {
+            oddDimensionsRejected =
+                std::string(error.what()).find("even board dimensions") !=
+                std::string::npos;
+        }
+        require(
+            oddDimensionsRejected,
+            "odd board dimensions were not rejected with a clear error"
+        );
+
+        bool impossibleBoardRejected = false;
+        try {
+            static_cast<void>(arrow::generateBoard(
+                arrow::GeneratorOptions{4, 4, 16, 16, 7U, 0}
+            ));
+        } catch (const std::runtime_error& error) {
+            const std::string message = error.what();
+            impossibleBoardRejected =
+                message.find("Unable to generate a valid 4x4 labyrinth") !=
+                    std::string::npos &&
+                message.find("seed 7") != std::string::npos &&
+                message.find("1 candidate attempt") != std::string::npos;
+        }
+        require(
+            impossibleBoardRejected,
+            "failed labyrinth generation used a fallback or unclear error"
+        );
 
         constexpr std::array<std::uint32_t, 8> largeBoardSeeds{
             0U,
@@ -1324,6 +1454,11 @@ int main(int argc, char** argv) {
             23'000U,
             4'000'000'000U
         };
+        std::size_t minimumLargeTightSelfPasses =
+            std::numeric_limits<std::size_t>::max();
+        std::size_t minimumLargeComplexTightSelfPasses =
+            std::numeric_limits<std::size_t>::max();
+        Quality seed64HighQuality;
         for (std::uint32_t largeSeed : largeBoardSeeds) {
             const arrow::GeneratorOptions largeBoardOptions{
                 40,
@@ -1354,7 +1489,45 @@ int main(int argc, char** argv) {
                     quality.directionCount >= 3,
                 "40x40 board has a weak dependency structure"
             );
+            minimumLargeTightSelfPasses = std::min(
+                minimumLargeTightSelfPasses,
+                quality.tightSelfPassArrows
+            );
+            minimumLargeComplexTightSelfPasses = std::min(
+                minimumLargeComplexTightSelfPasses,
+                quality.longComplexTightSelfPassArrows
+            );
+            if (largeSeed == 64U) {
+                seed64HighQuality = quality;
+            }
         }
+        require(
+            minimumLargeTightSelfPasses >= 6,
+            "40x40 fixed seeds contain too few exact tail-pass arrows"
+        );
+        require(
+            minimumLargeComplexTightSelfPasses >= 2,
+            "40x40 fixed seeds contain too few long complex exact tail passes"
+        );
+        const arrow::GeneratorOptions seed64FastOptions{
+            40,
+            40,
+            2,
+            60,
+            64U,
+            1
+        };
+        const Quality seed64FastQuality = verifyBoard(
+            arrow::generateBoard(seed64FastOptions),
+            seed64FastOptions
+        );
+        require(
+            seed64HighQuality.tightSelfPassArrows >=
+                    seed64FastQuality.tightSelfPassArrows &&
+                seed64HighQuality.longComplexTightSelfPassArrows >=
+                    seed64FastQuality.longComplexTightSelfPassArrows,
+            "eight-candidate selection reduced fixed-seed tail-pass quality"
+        );
 
         int defaultSeedCount = 1000;
         if (argc >= 2) {
@@ -1487,8 +1660,8 @@ int main(int argc, char** argv) {
              ++seed) {
             const std::array options{
                 arrow::GeneratorOptions{8, 8, 5, 15, seed},
-                arrow::GeneratorOptions{30, 15, 20, 58, seed},
-                arrow::GeneratorOptions{12, 25, 10, 32, seed}
+                arrow::GeneratorOptions{30, 16, 20, 58, seed},
+                arrow::GeneratorOptions{12, 26, 10, 32, seed}
             };
             for (const arrow::GeneratorOptions& value : options) {
                 try {
@@ -1531,10 +1704,22 @@ int main(int argc, char** argv) {
             << ", median bbox fill <= " << maximumMedianFill
             << ", rectangular arrows <= " << maximumRectangular
             << ", rich 5x5 blocks >= " << minimumRichMacro
+            << ", 40x40 tight/long-complex tail passes >= "
+            << minimumLargeTightSelfPasses
+            << "/" << minimumLargeComplexTightSelfPasses
+            << " (seed 64: one candidate "
+            << seed64FastQuality.tightSelfPassArrows
+            << "/"
+            << seed64FastQuality.longComplexTightSelfPassArrows
+            << ", eight candidates "
+            << seed64HighQuality.tightSelfPassArrows
+            << "/"
+            << seed64HighQuality.longComplexTightSelfPassArrows
+            << ")"
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size())
+                   static_cast<int>(largeBoardSeeds.size()) + 1
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

@@ -8,10 +8,13 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
+#include <exception>
+#include <future>
 #include <limits>
 #include <optional>
 #include <span>
@@ -27,6 +30,7 @@ constexpr int kInitialHeight = 900;
 constexpr int kDefaultColumns = 40;
 constexpr int kDefaultRows = 40;
 constexpr int kDefaultMaximumArrowLength = 60;
+constexpr int kDefaultCandidateAttempts = 8;
 constexpr float kCellSize = 34.0F;
 constexpr float kBoardPadding = 34.0F;
 constexpr float kHudHeight = 82.0F;
@@ -434,10 +438,13 @@ int Game::run() {
             kDefaultRows,
             2,
             kDefaultMaximumArrowLength,
-            boardSeed
+            boardSeed,
+            kDefaultCandidateAttempts
         });
     };
-    Board board = generateDefaultBoard(seed);
+    // Keep raylib entirely on this thread. The worker only creates value-type
+    // board data, which is moved into the live game at a frame boundary.
+    Board board(kDefaultColumns, kDefaultRows, {});
     std::vector<RuntimeArrow> arrows;
     std::vector<std::uint8_t> movingContacts;
     double movingCollisionPauseRemaining = 0.0;
@@ -481,6 +488,10 @@ int Game::run() {
     resetRuntime();
 
     int lives = 3;
+    std::future<Board> generationFuture;
+    bool generationInProgress = false;
+    bool generationOverlayRendered = false;
+    std::string generationError;
     bool closeRequested = false;
     const std::string automatedScreenshot =
         environmentValue("ARROWPUZZLE_SCREENSHOT");
@@ -490,7 +501,13 @@ int Game::run() {
             "ARROWPUZZLE_SCREENSHOT_FRAME"
         ).value_or(30)
     ));
-    if (!automatedScreenshot.empty()) {
+    bool automatedInitialSetupPending =
+        !automatedScreenshot.empty();
+    const auto applyAutomatedInitialSetup = [&]() {
+        if (!automatedInitialSetupPending) {
+            return;
+        }
+        automatedInitialSetupPending = false;
         const std::size_t removeCount = std::min(
             static_cast<std::size_t>(
                 unsignedFromEnvironment(
@@ -517,7 +534,7 @@ int Game::run() {
             value.movingCollisionTint = false;
             value.targetCells.clear();
         }
-    }
+    };
     const std::optional<std::uint32_t> automatedSecondLaunch =
         unsignedFromEnvironment(
             "ARROWPUZZLE_SCREENSHOT_LAUNCH_2"
@@ -531,9 +548,9 @@ int Game::run() {
     bool automatedSecondLaunchDone = false;
     int renderedFrames = 0;
 
-    const float boardWidth =
+    float boardWidth =
         kBoardPadding * 2.0F + board.columns() * kCellSize;
-    const float boardHeight =
+    float boardHeight =
         kBoardPadding * 2.0F + board.rows() * kCellSize;
     Camera2D camera{
         {
@@ -548,6 +565,61 @@ int Game::run() {
             (GetScreenHeight() - kHudHeight - 50.0F) / boardHeight
         )
     };
+    const auto updateBoardDimensions = [&]() {
+        boardWidth =
+            kBoardPadding * 2.0F + board.columns() * kCellSize;
+        boardHeight =
+            kBoardPadding * 2.0F + board.rows() * kCellSize;
+    };
+    const auto resetCamera = [&]() {
+        camera.offset = {
+            static_cast<float>(GetScreenWidth()) * 0.5F,
+            kHudHeight +
+                (static_cast<float>(GetScreenHeight()) -
+                 kHudHeight) *
+                    0.5F
+        };
+        camera.target = {
+            boardWidth * 0.5F,
+            boardHeight * 0.5F
+        };
+        camera.zoom = std::min(
+            (GetScreenWidth() - 60.0F) / boardWidth,
+            (GetScreenHeight() - kHudHeight - 50.0F) /
+                boardHeight
+        );
+    };
+    const auto startGeneration = [&](std::uint32_t boardSeed) {
+        generationError.clear();
+        generationOverlayRendered = false;
+        pressedArrow.reset();
+        try {
+            generationFuture = std::async(
+                std::launch::async,
+                [generateDefaultBoard, boardSeed]() {
+                    return generateDefaultBoard(boardSeed);
+                }
+            );
+            generationInProgress = true;
+        } catch (const std::exception& error) {
+            generationInProgress = false;
+            generationError = error.what();
+            TraceLog(
+                LOG_ERROR,
+                "Could not start level generation: %s",
+                error.what()
+            );
+        } catch (...) {
+            generationInProgress = false;
+            generationError =
+                "Could not start the generation worker";
+            TraceLog(
+                LOG_ERROR,
+                "Could not start the level generation worker"
+            );
+        }
+    };
+    startGeneration(seed);
 
     const auto hasForwardMotion = [&arrows]() {
         return std::ranges::any_of(
@@ -853,12 +925,47 @@ int Game::run() {
     while (!WindowShouldClose() && !closeRequested) {
         const float delta = std::max(GetFrameTime(), 0.0F);
 
+        if (generationInProgress &&
+            generationOverlayRendered &&
+            generationFuture.wait_for(
+                std::chrono::seconds{0}
+            ) == std::future_status::ready) {
+            generationInProgress = false;
+            try {
+                Board generated = generationFuture.get();
+                board = std::move(generated);
+                updateBoardDimensions();
+                resetRuntime();
+                lives = 3;
+                resetCamera();
+                renderedFrames = 0;
+                applyAutomatedInitialSetup();
+            } catch (const std::exception& error) {
+                generationError = error.what();
+                TraceLog(
+                    LOG_ERROR,
+                    "Level generation failed: %s",
+                    error.what()
+                );
+            } catch (...) {
+                generationError = "Unknown generation error";
+                TraceLog(
+                    LOG_ERROR,
+                    "Level generation failed with an unknown error"
+                );
+            }
+        }
+        const bool generationBlocksInput =
+            generationInProgress || !generationError.empty();
+
         if (IsKeyPressed(KEY_F11) ||
             (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))) {
             ToggleFullscreen();
         }
         if (IsKeyPressed(KEY_ESCAPE)) {
-            if (IsWindowFullscreen()) {
+            if (!generationError.empty()) {
+                closeRequested = true;
+            } else if (IsWindowFullscreen()) {
                 ToggleFullscreen();
             } else {
                 closeRequested = true;
@@ -875,7 +982,7 @@ int Game::run() {
         };
 
         const float wheel = GetMouseWheelMove();
-        if (wheel != 0.0F) {
+        if (!generationBlocksInput && wheel != 0.0F) {
             const Vector2 mouse = GetMousePosition();
             const Vector2 before = GetScreenToWorld2D(mouse, camera);
             camera.zoom = std::clamp(
@@ -888,7 +995,8 @@ int Game::run() {
             camera.target.y += before.y - after.y;
         }
 
-        if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
+        if (!generationBlocksInput &&
+            IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
             const Vector2 movement = GetMouseDelta();
             camera.target.x -= movement.x / camera.zoom;
             camera.target.y -= movement.y / camera.zoom;
@@ -908,16 +1016,18 @@ int Game::run() {
                         value.motion == Motion::Returning);
             }
         );
-        if (IsKeyPressed(KEY_R) && !anyArrowInMotion) {
+        if (IsKeyPressed(KEY_R) &&
+            !anyArrowInMotion &&
+            !generationInProgress) {
             ++seed;
-            board = generateDefaultBoard(seed);
-            resetRuntime();
-            lives = 3;
+            startGeneration(seed);
         }
 
         if (!automatedScreenshot.empty() &&
             !automatedSecondLaunchDone &&
             automatedSecondLaunch.has_value() &&
+            !generationInProgress &&
+            generationError.empty() &&
             renderedFrames >= automatedSecondLaunchFrame) {
             automatedSecondLaunchDone = true;
             if (*automatedSecondLaunch < arrows.size()) {
@@ -933,6 +1043,8 @@ int Game::run() {
         const bool launchInputAvailable =
             IsWindowFocused() &&
             lives > 0 &&
+            !generationInProgress &&
+            generationError.empty() &&
             !anyArrowRecovering &&
             movingCollisionPauseRemaining <= 0.0F;
         const bool leftPressed =
@@ -1393,7 +1505,12 @@ int Game::run() {
             kSoft
         );
         DrawText("ARROW PUZZLE", 28, 20, 26, kInk);
-        const std::string countText = "ARROWS  " + std::to_string(remaining);
+        const std::string countText =
+            generationInProgress
+            ? "GENERATING"
+            : !generationError.empty()
+                ? "GENERATION FAILED"
+                : "ARROWS  " + std::to_string(remaining);
         DrawText(
             countText.c_str(),
             GetScreenWidth() / 2 - MeasureText(countText.c_str(), 22) / 2,
@@ -1441,7 +1558,111 @@ int Game::run() {
         }
         EndMode2D();
 
-        if (remaining == 0) {
+        if (generationInProgress) {
+            DrawRectangle(
+                0,
+                static_cast<int>(kHudHeight),
+                GetScreenWidth(),
+                GetScreenHeight() -
+                    static_cast<int>(kHudHeight),
+                {248, 250, 253, 224}
+            );
+            const Vector2 spinnerCenter{
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                kHudHeight +
+                    (static_cast<float>(GetScreenHeight()) -
+                     kHudHeight) *
+                        0.5F -
+                    34.0F
+            };
+            const float spinnerAngle = static_cast<float>(
+                std::fmod(GetTime() * 210.0, 360.0)
+            );
+            DrawRing(
+                spinnerCenter,
+                17.0F,
+                23.0F,
+                spinnerAngle,
+                spinnerAngle + 275.0F,
+                48,
+                kBlue
+            );
+            const char* title = "GENERATING LEVEL";
+            const int titleSize = 26;
+            DrawText(
+                title,
+                GetScreenWidth() / 2 -
+                    MeasureText(title, titleSize) / 2,
+                static_cast<int>(spinnerCenter.y + 43.0F),
+                titleSize,
+                kInk
+            );
+            const char* detail =
+                "Searching for an interesting puzzle...";
+            const int detailSize = 17;
+            DrawText(
+                detail,
+                GetScreenWidth() / 2 -
+                    MeasureText(detail, detailSize) / 2,
+                static_cast<int>(spinnerCenter.y + 79.0F),
+                detailSize,
+                kMuted
+            );
+            generationOverlayRendered = true;
+        } else if (!generationError.empty()) {
+            DrawRectangle(
+                0,
+                static_cast<int>(kHudHeight),
+                GetScreenWidth(),
+                GetScreenHeight() -
+                    static_cast<int>(kHudHeight),
+                {248, 250, 253, 230}
+            );
+            const int centerY =
+                (GetScreenHeight() +
+                 static_cast<int>(kHudHeight)) /
+                2;
+            const char* title = "GENERATION FAILED";
+            const int titleSize = 28;
+            DrawText(
+                title,
+                GetScreenWidth() / 2 -
+                    MeasureText(title, titleSize) / 2,
+                centerY - 58,
+                titleSize,
+                kRed
+            );
+            const char* retry =
+                "Press R to try another level  /  Esc to quit";
+            const int retrySize = 19;
+            DrawText(
+                retry,
+                GetScreenWidth() / 2 -
+                    MeasureText(retry, retrySize) / 2,
+                centerY - 10,
+                retrySize,
+                kInk
+            );
+            std::string errorDetail = generationError;
+            constexpr std::size_t maximumErrorLength = 90;
+            if (errorDetail.size() > maximumErrorLength) {
+                errorDetail.resize(maximumErrorLength - 3);
+                errorDetail += "...";
+            }
+            const int errorSize = 15;
+            DrawText(
+                errorDetail.c_str(),
+                GetScreenWidth() / 2 -
+                    MeasureText(
+                        errorDetail.c_str(),
+                        errorSize
+                    ) /
+                        2,
+                centerY + 31,
+                errorSize,
+                kMuted
+            );
+        } else if (remaining == 0) {
             const char* text = "FIELD CLEARED!  Press R for a new puzzle";
             const int fontSize = 28;
             const int width = MeasureText(text, fontSize);
@@ -1488,14 +1709,27 @@ int Game::run() {
 
         EndDrawing();
 
+        ++renderedFrames;
         if (!automatedScreenshot.empty() &&
-            ++renderedFrames == automatedScreenshotFrame) {
+            !automatedInitialSetupPending &&
+            !generationInProgress &&
+            generationError.empty() &&
+            renderedFrames >= automatedScreenshotFrame) {
             TakeScreenshot(automatedScreenshot.c_str());
             closeRequested = true;
         }
     }
 
     CloseWindow();
+    if (generationFuture.valid()) {
+        generationFuture.wait();
+        try {
+            static_cast<void>(generationFuture.get());
+        } catch (...) {
+            // The window is already closing; generation errors are irrelevant
+            // here, but consuming the future keeps shutdown deterministic.
+        }
+    }
     return 0;
 }
 

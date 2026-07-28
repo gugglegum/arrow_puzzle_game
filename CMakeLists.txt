@@ -13,6 +13,7 @@ if(MSVC AND ARROWPUZZLE_STATIC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 include(FetchContent)
+find_package(Threads REQUIRED)
 
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
@@ -47,7 +48,7 @@ add_executable(arrow_puzzle WIN32
     src/main.cpp
 )
 
-target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib)
+target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib Threads::Threads)
 
 if(MSVC)
     target_compile_options(arrow_puzzle PRIVATE /W4 /permissive- /utf-8)

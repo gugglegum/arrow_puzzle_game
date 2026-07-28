@@ -50,6 +50,8 @@ another arrow's speed.
 - Usually about 180 arrows on the default board
 - A deliberate mix of short, medium, and long arrows from 2 to 60 cells
 - Constructive generation with a stored valid solution order
+- Eight-candidate quality selection with a responsive generation indicator
+- Extra preference for complex arrows whose head follows the vacating tail
 - Dynamic self-collision and simultaneous moving-arrow collisions
 - Three lives with animated collision recovery
 - Persistent light-grey grid dots revealed as arrows leave
@@ -200,12 +202,33 @@ constructive solution order.
 
 Multiple candidates are scored for inter-arrow contact, spatial mixing,
 direction diversity, turns, dependency structure, and length distribution.
+The default game compares eight candidates, including on 40 x 40 boards.
+`GeneratorOptions::candidateAttempts` is the internal quality/time control that
+can later be exposed as a menu setting.
+
+An exact dynamic self-pass receives an additional score: the head reaches one
+of its own body cells on precisely the simulation tick when that cell is
+vacated by the moving tail. Longer and more complex versions receive a further
+bonus. This favours deceptive thread-like arrows without permitting real
+self-collisions.
+
 Large rectangular S-shaped regions are penalized so the result resembles a
 tangle of separate threads rather than a few territorial snakes.
+
+Generation runs on a background thread. The game remains responsive and shows
+an animated overlay while candidates are evaluated. There is deliberately no
+simple serpentine fallback: if no valid candidate can be found, the game shows
+an error and allows another attempt. The current Hamiltonian-cycle constructor
+requires even board dimensions.
 
 The automated suite verifies complete coverage, geometry, requested length
 limits, constructive solvability, dynamic self-collision, and statistical
 quality across many deterministic seeds.
+
+Seeds are development and reproduction aids, not a planned save format.
+Future saves should contain the complete arrow geometry and current gameplay
+state so partially solved levels remain stable across generator versions and
+platforms.
 
 ## Portability
 

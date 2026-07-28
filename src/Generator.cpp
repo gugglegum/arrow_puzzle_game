@@ -10,6 +10,7 @@
 #include <numeric>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -90,6 +91,10 @@ struct TangleMetrics {
     int mediumArrows{};
     int longArrows{};
     int veryLongArrows{};
+    int tightSelfPassArrows{};
+    int rewardedTightSelfPassArrows{};
+    int longComplexTightSelfPassArrows{};
+    int tightSelfPassComplexity{};
     double medianBoundingFill{};
 };
 
@@ -349,6 +354,24 @@ bool clearsOwnBodyInTime(
         }
     }
     return true;
+}
+
+int minimumOwnBodyClearance(
+    const RayInfo& ray,
+    int start,
+    int end
+) {
+    int minimumClearance = std::numeric_limits<int>::max();
+    for (const auto [position, distance] : ray.cells) {
+        if (position < start || position > end) {
+            continue;
+        }
+        minimumClearance = std::min(
+            minimumClearance,
+            distance - (end - position + 1)
+        );
+    }
+    return minimumClearance;
 }
 
 std::vector<std::uint64_t> reachableArrowCounts(
@@ -611,6 +634,10 @@ bool findIntervalsForCount(
         static_cast<std::size_t>(area * lengthStride),
         0U
     );
+    constexpr int tightSelfPassBonus = 2'500;
+    constexpr int tightSelfPassLengthBonus = 10;
+    constexpr int tightSelfPassTurnBonus = 50;
+    constexpr int longComplexTightSelfPassBonus = 2'000;
     std::uniform_int_distribution<int> tieBreaker(0, 7);
     for (int start = 0; start < area; ++start) {
         int minimumX = path[static_cast<std::size_t>(start)].x;
@@ -672,6 +699,32 @@ bool findIntervalsForCount(
                 0,
                 adjacentEdges - (length - 1)
             );
+            const RayInfo& ray =
+                rays[static_cast<std::size_t>(start)];
+            const bool clearsOwnBody =
+                clearsOwnBodyInTime(ray, start, end);
+            const bool valid =
+                ray.requiredEnd <= end && clearsOwnBody;
+            const int minimumClearance = valid
+                ? minimumOwnBodyClearance(ray, start, end)
+                : std::numeric_limits<int>::max();
+            const bool rectangularThread =
+                length > 12 && length * 10 > boundingArea * 9;
+            const bool complexThread =
+                turns >= 2 && boundingArea - length >= 3;
+            int dynamicSelfPassBonus = 0;
+            if (minimumClearance == 0 && !rectangularThread) {
+                dynamicSelfPassBonus =
+                    tightSelfPassBonus +
+                    std::min(length, 40) *
+                        tightSelfPassLengthBonus +
+                    std::min(turns, 12) *
+                        tightSelfPassTurnBonus;
+                if (length >= 18 && complexThread) {
+                    dynamicSelfPassBonus +=
+                        longComplexTightSelfPassBonus;
+                }
+            }
             intervalScores[static_cast<std::size_t>(
                 start * lengthStride + length
             )] =
@@ -680,18 +733,11 @@ bool findIntervalsForCount(
                     : boundingArea * 12) +
                 turns * 5 -
                 extraSelfContacts * 800 -
-                tieBreaker(random);
+                tieBreaker(random) +
+                dynamicSelfPassBonus;
             validIntervals[static_cast<std::size_t>(
                 start * lengthStride + length
-            )] =
-                rays[static_cast<std::size_t>(start)].requiredEnd <= end &&
-                clearsOwnBodyInTime(
-                    rays[static_cast<std::size_t>(start)],
-                    start,
-                    end
-                )
-                ? 1U
-                : 0U;
+            )] = valid ? 1U : 0U;
         }
     }
 
@@ -896,6 +942,12 @@ TangleMetrics measureTangle(
         static_cast<std::size_t>(columns * rows),
         -1
     );
+    std::vector<int> bodyPositions(
+        static_cast<std::size_t>(columns * rows),
+        -1
+    );
+    std::vector<int> arrowTurns(arrows.size(), 0);
+    std::vector<int> arrowBoundingAreas(arrows.size(), 0);
     std::vector<double> longArrowBoundingFills;
     longArrowBoundingFills.reserve(arrows.size());
 
@@ -905,9 +957,16 @@ TangleMetrics measureTangle(
         int maximumX = -1;
         int minimumY = rows;
         int maximumY = -1;
-        for (Cell cell : value.cells) {
-            owners[static_cast<std::size_t>(cellIndex(cell, columns))] =
+        for (std::size_t position = 0;
+             position < value.cells.size();
+             ++position) {
+            const Cell cell = value.cells[position];
+            const std::size_t indexInBoard = static_cast<std::size_t>(
+                cellIndex(cell, columns)
+            );
+            owners[indexInBoard] =
                 static_cast<int>(index);
+            bodyPositions[indexInBoard] = static_cast<int>(position);
             minimumX = std::min(minimumX, cell.x);
             maximumX = std::max(maximumX, cell.x);
             minimumY = std::min(minimumY, cell.y);
@@ -916,6 +975,7 @@ TangleMetrics measureTangle(
 
         const int boundingArea =
             (maximumX - minimumX + 1) * (maximumY - minimumY + 1);
+        arrowBoundingAreas[index] = boundingArea;
         result.boundingBoxEmptyCells +=
             boundingArea - static_cast<int>(value.cells.size());
         const double fill = static_cast<double>(value.cells.size()) /
@@ -943,8 +1003,57 @@ TangleMetrics measureTangle(
                 value.cells[cell - 1] - value.cells[cell - 2];
             const Cell after =
                 value.cells[cell] - value.cells[cell - 1];
-            result.turns += before != after ? 1 : 0;
+            if (before != after) {
+                ++result.turns;
+                ++arrowTurns[index];
+            }
         }
+    }
+
+    for (std::size_t index = 0; index < arrows.size(); ++index) {
+        const Arrow& value = arrows[index];
+        int minimumClearance = std::numeric_limits<int>::max();
+        Cell probe = value.cells.front() + value.direction;
+        int distance = 1;
+        while (isInside(probe, columns, rows)) {
+            const std::size_t indexInBoard = static_cast<std::size_t>(
+                cellIndex(probe, columns)
+            );
+            if (owners[indexInBoard] == static_cast<int>(index)) {
+                const int position = bodyPositions[indexInBoard];
+                const int clearance =
+                    distance -
+                    (static_cast<int>(value.cells.size()) - position);
+                minimumClearance = std::min(
+                    minimumClearance,
+                    clearance
+                );
+            }
+            probe = probe + value.direction;
+            ++distance;
+        }
+        if (minimumClearance != 0) {
+            continue;
+        }
+
+        ++result.tightSelfPassArrows;
+        const int length = static_cast<int>(value.cells.size());
+        const int boundingArea = arrowBoundingAreas[index];
+        const bool rectangularThread =
+            length > 12 && length * 10 > boundingArea * 9;
+        if (rectangularThread) {
+            continue;
+        }
+        ++result.rewardedTightSelfPassArrows;
+        const bool complexThread =
+            arrowTurns[index] >= 2 &&
+            boundingArea - length >= 3;
+        if (length >= 18 && complexThread) {
+            ++result.longComplexTightSelfPassArrows;
+        }
+        result.tightSelfPassComplexity +=
+            std::min(length, 40) +
+            std::min(arrowTurns[index], 12) * 4;
     }
 
     if (!longArrowBoundingFills.empty()) {
@@ -1095,6 +1204,9 @@ int scoreCandidate(const TangleMetrics& metrics, int arrowCount) {
     const int desiredChoiceExcess = std::max(2, arrowCount * 2 / 3);
     const int desiredShort = arrowCount * 40 / 100;
     const int desiredLong = std::max(1, arrowCount * 14 / 100);
+    constexpr int tightSelfPassArrowBonus = 18'000;
+    constexpr int longComplexTightSelfPassBonus = 35'000;
+    constexpr int tightSelfPassComplexityBonus = 100;
     return
         metrics.interArrowEdges * 180 +
         std::min(
@@ -1105,7 +1217,13 @@ int scoreCandidate(const TangleMetrics& metrics, int arrowCount) {
         metrics.boundingBoxEmptyCells * 8 +
         metrics.turns * 6 +
         metrics.directionCount * 8'000 +
-        metrics.richMacroBlocks * 600 -
+        metrics.richMacroBlocks * 600 +
+        metrics.rewardedTightSelfPassArrows *
+            tightSelfPassArrowBonus +
+        metrics.longComplexTightSelfPassArrows *
+            longComplexTightSelfPassBonus +
+        metrics.tightSelfPassComplexity *
+            tightSelfPassComplexityBonus -
         // A compact rectangular S is visually a territory, not a thread.
         // Make even one such arrow dominate small improvements in the global
         // interface score so a genuinely interwoven candidate wins.
@@ -1119,112 +1237,17 @@ int scoreCandidate(const TangleMetrics& metrics, int arrowCount) {
         std::max(0, metrics.initiallyRemovable - 1) * 20'000;
 }
 
-bool isStrongMixedCandidate(const BoardCandidate& candidate) {
-    if (candidate.arrows.empty()) {
-        return false;
-    }
-    const int count = static_cast<int>(candidate.arrows.size());
-    const TangleMetrics& metrics = candidate.metrics;
-    return
-        count >= 48 && count <= 54 &&
-        metrics.shortArrows * 100 >= count * 36 &&
-        metrics.mediumArrows * 100 >= count * 36 &&
-        metrics.longArrows * 100 >= count * 10 &&
-        metrics.veryLongArrows >= 3 &&
-        metrics.initiallyRemovable == 1 &&
-        metrics.directionCount >= 3 &&
-        metrics.maximumChoices <= 8 &&
-        metrics.interArrowEdges >= 330 &&
-        metrics.rectangularArrows == 0 &&
-        metrics.medianBoundingFill <= 0.65 &&
-        metrics.richMacroBlocks >= 12;
-}
-
-std::vector<Cell> makeFallbackPath(int columns, int rows) {
-    std::vector<Cell> path;
-    path.reserve(static_cast<std::size_t>(columns * rows));
-    for (int y = 0; y < rows; ++y) {
-        if (y % 2 == 0) {
-            for (int x = 0; x < columns; ++x) {
-                path.push_back({x, y});
-            }
-        } else {
-            for (int x = columns - 1; x >= 0; --x) {
-                path.push_back({x, y});
-            }
-        }
-    }
-    return path;
-}
-
-bool isFallbackCut(const std::vector<Cell>& path, int index) {
-    if (index <= 0 || index + 1 >= static_cast<int>(path.size())) {
-        return false;
-    }
-    return path[index] - path[index + 1] ==
-           path[index - 1] - path[index];
-}
-
-std::vector<Arrow> generateFallback(
-    int columns,
-    int rows,
-    int minimumLength,
-    int maximumLength,
-    std::mt19937& random
-) {
-    const std::vector<Cell> path = makeFallbackPath(columns, rows);
-    const int area = static_cast<int>(path.size());
-    std::vector<Arrow> arrows;
-    int start = 0;
-
-    while (start < area) {
-        if (area - start <= maximumLength) {
-            Arrow value;
-            value.cells.assign(path.begin() + start, path.end());
-            value.direction = value.cells[0] - value.cells[1];
-            arrows.push_back(std::move(value));
-            break;
-        }
-
-        std::vector<int> nextStarts;
-        for (int length = minimumLength; length <= maximumLength; ++length) {
-            const int next = start + length;
-            if (next < area && area - next >= minimumLength &&
-                isFallbackCut(path, next)) {
-                nextStarts.push_back(next);
-            }
-        }
-        if (nextStarts.empty()) {
-            for (int next = start + 2; next < area - 1; ++next) {
-                if (isFallbackCut(path, next)) {
-                    nextStarts.push_back(next);
-                }
-            }
-        }
-        if (nextStarts.empty()) {
-            throw std::logic_error("Fallback generator cannot make a cut");
-        }
-
-        std::uniform_int_distribution<std::size_t> distribution(
-            0,
-            nextStarts.size() - 1
-        );
-        const int next = nextStarts[distribution(random)];
-        Arrow value;
-        value.cells.assign(path.begin() + start, path.begin() + next);
-        value.direction = value.cells[0] - value.cells[1];
-        arrows.push_back(std::move(value));
-        start = next;
-    }
-    return arrows;
-}
-
 } // namespace
 
 Board generateBoard(const GeneratorOptions& options) {
     if (options.columns < 3 || options.rows < 2) {
         throw std::invalid_argument(
             "Generator requires at least a 3 x 2 board"
+        );
+    }
+    if (options.columns % 2 != 0 || options.rows % 2 != 0) {
+        throw std::invalid_argument(
+            "Labyrinth generator requires even board dimensions"
         );
     }
 
@@ -1248,16 +1271,17 @@ Board generateBoard(const GeneratorOptions& options) {
         0xC10BBE2U
     };
     std::mt19937 random(seed);
+    const int candidateAttempts = std::max(
+        1,
+        options.candidateAttempts
+    );
 
     BoardCandidate best;
     const bool supportsLabyrinth =
-        options.columns % 2 == 0 &&
-        options.rows % 2 == 0 &&
         area / minimumLength >= 3;
 
     if (supportsLabyrinth) {
         const bool useLargeBoardFastPath = area >= 1024;
-        constexpr int cycleAttempts = 8;
         const std::vector<int> counts = preferredArrowCounts(
             area,
             minimumLength,
@@ -1267,7 +1291,9 @@ Board generateBoard(const GeneratorOptions& options) {
             ? std::min<std::size_t>(17, counts.size())
             : counts.size();
 
-        for (int attempt = 0; attempt < cycleAttempts; ++attempt) {
+        for (int attempt = 0;
+             attempt < candidateAttempts;
+             ++attempt) {
             const std::vector<Cell> cycle = makeLabyrinthCycle(
                 options.columns,
                 options.rows,
@@ -1354,20 +1380,18 @@ Board generateBoard(const GeneratorOptions& options) {
                     break;
                 }
             }
-            if ((useLargeBoardFastPath && !best.arrows.empty()) ||
-                (attempt >= 2 && isStrongMixedCandidate(best))) {
-                break;
-            }
         }
     }
 
     if (best.arrows.empty()) {
-        best.arrows = generateFallback(
-            options.columns,
-            options.rows,
-            minimumLength,
-            maximumLength,
-            random
+        throw std::runtime_error(
+            "Unable to generate a valid " +
+            std::to_string(options.columns) + "x" +
+            std::to_string(options.rows) +
+            " labyrinth board for seed " +
+            std::to_string(options.seed) + " after " +
+            std::to_string(candidateAttempts) +
+            " candidate attempt(s)"
         );
     }
 
