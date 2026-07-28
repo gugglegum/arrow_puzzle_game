@@ -1529,19 +1529,25 @@ int main(int argc, char** argv) {
             "eight-candidate selection reduced fixed-seed tail-pass quality"
         );
 
-        // Regression: tail-pass bonuses must not make a candidate below the
-        // verified short/medium/long composition floor win.
-        const arrow::GeneratorOptions seed206CompositionOptions{
-            20,
-            20,
-            2,
-            30,
-            206U
+        // Regression: score bonuses must not make a candidate below the
+        // verified default-board quality floor win.
+        constexpr std::array<std::uint32_t, 2> qualityRegressionSeeds{
+            206U,
+            404U
         };
-        static_cast<void>(verifyBoard(
-            arrow::generateBoard(seed206CompositionOptions),
-            seed206CompositionOptions
-        ));
+        for (std::uint32_t seed : qualityRegressionSeeds) {
+            const arrow::GeneratorOptions options{
+                20,
+                20,
+                2,
+                30,
+                seed
+            };
+            static_cast<void>(verifyBoard(
+                arrow::generateBoard(options),
+                options
+            ));
+        }
 
         int defaultSeedCount = 1000;
         if (argc >= 2) {
@@ -1733,7 +1739,7 @@ int main(int argc, char** argv) {
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size()) + 2
+                   static_cast<int>(largeBoardSeeds.size()) + 3
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

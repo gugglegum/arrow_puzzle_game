@@ -101,6 +101,7 @@ struct TangleMetrics {
 struct BoardCandidate {
     std::vector<Arrow> arrows;
     TangleMetrics metrics;
+    bool meetsRequiredQuality{};
     int score{std::numeric_limits<int>::min()};
 };
 
@@ -1204,7 +1205,7 @@ int minimumCountForShare(int arrowCount, int percentage) {
     return (arrowCount * percentage + 99) / 100;
 }
 
-bool meetsDefaultCompositionFloor(
+bool meetsDefaultQualityFloor(
     const TangleMetrics& metrics,
     int arrowCount
 ) {
@@ -1213,26 +1214,36 @@ bool meetsDefaultCompositionFloor(
     const int minimumLong = minimumCountForShare(arrowCount, 10);
     const int maximumLong = arrowCount * 24 / 100;
     return
+        arrowCount >= 48 &&
+        arrowCount <= 54 &&
+        metrics.initiallyRemovable == 1 &&
+        metrics.directionCount >= 3 &&
         metrics.shortArrows >= minimumShort &&
         metrics.mediumArrows >= minimumMedium &&
         metrics.longArrows >= minimumLong &&
-        metrics.longArrows <= maximumLong;
+        metrics.longArrows <= maximumLong &&
+        metrics.veryLongArrows >= 2 &&
+        metrics.turns >= 55 &&
+        metrics.turns <= 160 &&
+        metrics.interArrowEdges >= 300 &&
+        metrics.horizontalInterArrowEdges * 100 >=
+            metrics.interArrowEdges * 35 &&
+        metrics.verticalInterArrowEdges * 100 >=
+            metrics.interArrowEdges * 35 &&
+        metrics.medianBoundingFill <= 0.70 &&
+        metrics.rectangularArrows == 0 &&
+        metrics.richMacroBlocks >= 12 &&
+        metrics.maximumChoices <= 10 &&
+        metrics.choiceExcess <= arrowCount * 6;
 }
 
-int scoreCandidate(
-    const TangleMetrics& metrics,
-    int arrowCount,
-    bool enforceDefaultComposition
-) {
+int scoreCandidate(const TangleMetrics& metrics, int arrowCount) {
     const int desiredChoiceExcess = std::max(2, arrowCount * 2 / 3);
     const int desiredShort = arrowCount * 40 / 100;
     const int desiredLong = std::max(1, arrowCount * 14 / 100);
     constexpr int tightSelfPassArrowBonus = 18'000;
     constexpr int longComplexTightSelfPassBonus = 35'000;
     constexpr int tightSelfPassComplexityBonus = 100;
-    // Tail-pass rewards are intentionally strong, but they are secondary to
-    // the verified short/medium/long mix of the default board.
-    constexpr int compositionFloorPenalty = 500'000;
     return
         metrics.interArrowEdges * 180 +
         std::min(
@@ -1255,10 +1266,6 @@ int scoreCandidate(
         // interface score so a genuinely interwoven candidate wins.
         metrics.rectangularArrows * 500'000 -
         metrics.headAtBoundingCorner * 180 -
-        (enforceDefaultComposition &&
-                 !meetsDefaultCompositionFloor(metrics, arrowCount)
-             ? compositionFloorPenalty
-             : 0) -
         std::abs(metrics.shortArrows - desiredShort) * 25'000 -
         std::abs(metrics.longArrows - desiredLong) * 16'000 -
         std::max(0, 3 - metrics.veryLongArrows) * 20'000 -
@@ -1305,6 +1312,11 @@ Board generateBoard(const GeneratorOptions& options) {
         1,
         options.candidateAttempts
     );
+    const bool enforceDefaultQuality =
+        options.columns == 20 &&
+        options.rows == 20 &&
+        minimumLength == 2 &&
+        maximumLength == 30;
 
     BoardCandidate best;
     const bool supportsLabyrinth =
@@ -1398,17 +1410,27 @@ Board generateBoard(const GeneratorOptions& options) {
                     );
                     const int score = scoreCandidate(
                         metrics,
-                        static_cast<int>(arrows.size()),
-                        options.columns == 20 &&
-                            options.rows == 20 &&
-                            usesMixedLengthProfile(
-                                minimumLength,
-                                maximumLength,
-                                static_cast<int>(arrows.size())
-                            )
+                        static_cast<int>(arrows.size())
                     );
-                    if (score > best.score) {
-                        best = {std::move(arrows), metrics, score};
+                    const bool meetsRequiredQuality =
+                        !enforceDefaultQuality ||
+                        meetsDefaultQualityFloor(
+                            metrics,
+                            static_cast<int>(arrows.size())
+                        );
+                    const bool improvesEligibility =
+                        meetsRequiredQuality &&
+                        !best.meetsRequiredQuality;
+                    if (improvesEligibility ||
+                        (meetsRequiredQuality ==
+                             best.meetsRequiredQuality &&
+                         score > best.score)) {
+                        best = {
+                            std::move(arrows),
+                            metrics,
+                            meetsRequiredQuality,
+                            score
+                        };
                     }
                     foundForCycle = true;
                     break;
