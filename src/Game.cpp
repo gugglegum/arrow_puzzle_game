@@ -448,6 +448,7 @@ int Game::run() {
     bool recoveryStepActive = false;
     float recoveryStepProgress = 0.0F;
     std::uint64_t recoveryTick = 0;
+    std::optional<std::size_t> pressedArrow;
     auto resetRuntime = [&]() {
         arrows.clear();
         arrows.reserve(board.arrows().size());
@@ -475,6 +476,7 @@ int Game::run() {
         recoveryStepActive = false;
         recoveryStepProgress = 0.0F;
         recoveryTick = 0;
+        pressedArrow.reset();
     };
     resetRuntime();
 
@@ -572,6 +574,20 @@ int Game::run() {
                 movingContacts[other * count + arrowIndex] = 0;
             }
         };
+
+    const auto launchArrow = [&](
+        std::size_t arrowIndex
+    ) {
+        RuntimeArrow& value = arrows[arrowIndex];
+        clearMovingContactsFor(arrowIndex);
+        value.motion = Motion::Forward;
+        value.progress = 0.0;
+        value.speed = kInitialForwardSpeed;
+        value.launchDelay = forwardTimeDebt;
+        value.movingCollisionTint = false;
+        value.history.clear();
+        value.targetCells.clear();
+    };
 
     const auto prepareForwardTransitions = [&]() {
         std::vector<std::vector<Cell>> proposals(arrows.size());
@@ -909,40 +925,50 @@ int Game::run() {
                     arrows[*automatedSecondLaunch];
                 if (value.present &&
                     value.motion == Motion::Idle) {
-                    clearMovingContactsFor(
-                        *automatedSecondLaunch
-                    );
-                    value.motion = Motion::Forward;
-                    value.progress = 0.0;
-                    value.speed = kInitialForwardSpeed;
-                    value.launchDelay = forwardTimeDebt;
-                    value.movingCollisionTint = false;
-                    value.history.clear();
-                    value.targetCells.clear();
+                    launchArrow(*automatedSecondLaunch);
                 }
             }
         }
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+        const bool launchInputAvailable =
+            IsWindowFocused() &&
             lives > 0 &&
             !anyArrowRecovering &&
-            movingCollisionPauseRemaining <= 0.0F) {
+            movingCollisionPauseRemaining <= 0.0F;
+        const bool leftPressed =
+            IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+        const bool leftReleased =
+            IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+        const bool leftDown =
+            IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+
+        if (!launchInputAvailable ||
+            (!leftDown && !leftReleased)) {
+            pressedArrow.reset();
+        }
+
+        if (leftPressed && launchInputAvailable) {
             const Vector2 world = GetScreenToWorld2D(
                 GetMousePosition(),
                 camera
             );
-            const std::optional<std::size_t> launched =
-                hitTest(world, arrows);
-            if (launched.has_value()) {
-                RuntimeArrow& value = arrows[*launched];
-                clearMovingContactsFor(*launched);
-                value.motion = Motion::Forward;
-                value.progress = 0.0;
-                value.speed = kInitialForwardSpeed;
-                value.launchDelay = forwardTimeDebt;
-                value.movingCollisionTint = false;
-                value.history.clear();
-                value.targetCells.clear();
+            pressedArrow = hitTest(world, arrows);
+        }
+
+        if (leftReleased) {
+            const std::optional<std::size_t> armedArrow =
+                std::exchange(pressedArrow, std::nullopt);
+            if (armedArrow.has_value() &&
+                launchInputAvailable) {
+                const Vector2 world = GetScreenToWorld2D(
+                    GetMousePosition(),
+                    camera
+                );
+                const std::optional<std::size_t> releasedArrow =
+                    hitTest(world, arrows);
+                if (releasedArrow == armedArrow) {
+                    launchArrow(*armedArrow);
+                }
             }
         }
 
