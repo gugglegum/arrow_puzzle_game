@@ -9,6 +9,14 @@ The project is an early but fully playable prototype. Its start menu offers
 20 x 20, 40 x 40, 80 x 80, and experimental 160 x 160 generated boards.
 Settings and unfinished games are saved beside the executable.
 
+## Screenshots
+
+[![A generated Arrow Puzzle level](docs/screenshots/simple-level.png)](docs/screenshots/simple-level.png)
+
+| Main menu | Difficulty selection |
+| :---: | :---: |
+| [![Arrow Puzzle main menu](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![New game difficulty selection](docs/screenshots/new-game.png)](docs/screenshots/new-game.png) |
+
 ## Download
 
 Download the latest Windows x64 build from

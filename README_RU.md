@@ -10,6 +10,14 @@ Arrow Puzzle — минималистичная головоломка для П
 выбрать поля 20 x 20, 40 x 40, 80 x 80 и экспериментальное 160 x 160.
 Настройки и незавершённая партия сохраняются рядом с исполняемым файлом.
 
+## Скриншоты
+
+[![Сгенерированный уровень Arrow Puzzle](docs/screenshots/simple-level.png)](docs/screenshots/simple-level.png)
+
+| Главное меню | Выбор сложности |
+| :---: | :---: |
+| [![Главное меню Arrow Puzzle](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![Выбор сложности новой игры](docs/screenshots/new-game.png)](docs/screenshots/new-game.png) |
+
 ## Скачать
 
 Последнюю сборку для Windows x64 можно скачать в разделе
