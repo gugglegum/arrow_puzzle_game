@@ -929,6 +929,19 @@ int Game::run() {
     bool staticBoardLayerDirty = true;
     StaticBoardGeometry staticBoardGeometry;
     bool staticBoardGeometryDirty = true;
+    int cursorRefreshFrames = 0;
+    const auto restoreCursor = []() {
+        ShowCursor();
+        // Refresh the native cursor image without warping its position.
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+    };
+    const auto toggleDesktopFullscreen = [&]() {
+        ToggleBorderlessWindowed();
+        restoreCursor();
+        // Repeat after queued window-mode and focus notifications.
+        cursorRefreshFrames = 2;
+        staticBoardLayerDirty = true;
+    };
     const auto invalidateStaticBoard = [&]() {
         staticBoardLayerDirty = true;
         staticBoardGeometryDirty = true;
@@ -1676,6 +1689,10 @@ int Game::run() {
     std::optional<PlayingFrameState> lastPlayingFrame;
     while (!WindowShouldClose() && !closeRequested) {
         const float delta = framePacer.beginFrame();
+        if (cursorRefreshFrames > 0) {
+            restoreCursor();
+            --cursorRefreshFrames;
+        }
 
         if (generationInProgress &&
             (generationOverlayRendered ||
@@ -1727,13 +1744,11 @@ int Game::run() {
 
         if (IsKeyPressed(KEY_F11) ||
             (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))) {
-            ToggleFullscreen();
-            staticBoardLayerDirty = true;
+            toggleDesktopFullscreen();
         }
         if (IsKeyPressed(KEY_ESCAPE)) {
-            if (IsWindowFullscreen()) {
-                ToggleFullscreen();
-                staticBoardLayerDirty = true;
+            if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
+                toggleDesktopFullscreen();
             } else if (screen == Screen::Playing) {
                 (void)persistCurrentGame();
                 generationError.clear();
