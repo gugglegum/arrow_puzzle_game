@@ -24,6 +24,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -131,6 +132,53 @@ struct ArrowHeadTriangle {
     Vector2 tip;
     Vector2 left;
     Vector2 right;
+};
+
+// Sleep on the CPU instead of waiting inside the graphics driver's swap call.
+// Keep a separate clock because idle frames poll input without EndDrawing().
+class FramePacer {
+public:
+    float beginFrame() {
+        constexpr auto interval = std::chrono::duration<double>{1.0 / 60.0};
+        const auto deadline = previous_ +
+            std::chrono::duration_cast<Clock::duration>(interval);
+        std::this_thread::sleep_until(deadline);
+        const auto now = Clock::now();
+        const float elapsed = std::chrono::duration<float>(now - previous_).count();
+        previous_ = now;
+        return elapsed;
+    }
+
+private:
+    using Clock = std::chrono::steady_clock;
+    Clock::time_point previous_{Clock::now()};
+};
+
+struct MenuFrameState {
+    Screen screen;
+    int width;
+    int height;
+    int focusedButton;
+    std::optional<int> pressedButton;
+    std::optional<int> hoveredButton;
+    Settings settings;
+    bool resumeAvailable;
+    bool generationInProgress;
+    bool windowFocused;
+
+    bool operator==(const MenuFrameState&) const = default;
+};
+
+struct PlayingFrameState {
+    int width;
+    int height;
+    int lives;
+    int remaining;
+    bool generationInProgress;
+    bool windowFocused;
+    std::string generationError;
+
+    bool operator==(const PlayingFrameState&) const = default;
 };
 
 Vector2 measureText(
@@ -781,10 +829,10 @@ std::optional<std::uint32_t> unsignedFromEnvironment(
 } // namespace
 
 int Game::run() {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(kInitialWidth, kInitialHeight, "Arrow Puzzle");
     SetWindowMinSize(720, 600);
-    SetTargetFPS(60);
+    SetTargetFPS(0);
     SetExitKey(KEY_NULL);
 
     const Font defaultFont = GetFontDefault();
@@ -1603,8 +1651,12 @@ int Game::run() {
         staticBoardLayerDirty = false;
     };
 
+    FramePacer framePacer;
+    std::optional<Screen> lastDrawnScreen;
+    std::optional<MenuFrameState> lastMenuFrame;
+    std::optional<PlayingFrameState> lastPlayingFrame;
     while (!WindowShouldClose() && !closeRequested) {
-        const float delta = std::max(GetFrameTime(), 0.0F);
+        const float delta = framePacer.beginFrame();
 
         if (generationInProgress &&
             (generationOverlayRendered ||
@@ -1825,6 +1877,28 @@ int Game::run() {
                     pressedMenuButton.reset();
                 }
             }
+            const MenuFrameState menuFrame{
+                menuScreen,
+                GetScreenWidth(),
+                GetScreenHeight(),
+                focusedMenuButton,
+                pressedMenuButton,
+                menuItemAtPoint(GetMousePosition()),
+                settings,
+                resumeAvailable,
+                generationInProgress,
+                IsWindowFocused()
+            };
+            if (automatedScreenshot.empty() &&
+                delta < 0.1F &&
+                !activatedMenuButton.has_value() &&
+                lastDrawnScreen == menuScreen &&
+                lastMenuFrame == menuFrame) {
+                PollInputEvents();
+                continue;
+            }
+            lastMenuFrame = menuFrame;
+
             const auto menuButton = [&](
                 int index,
                 Rectangle bounds,
@@ -2034,6 +2108,7 @@ int Game::run() {
                 focusedMenuButton = 0;
             }
             EndDrawing();
+            lastDrawnScreen = menuScreen;
             ++renderedFrames;
             if (!automatedScreenshot.empty() &&
                 automatedMenuScreen != 0 &&
@@ -2571,6 +2646,26 @@ int Game::run() {
             savedGame.reset();
         }
 
+        const PlayingFrameState playingFrame{
+            GetScreenWidth(),
+            GetScreenHeight(),
+            lives,
+            remaining,
+            generationInProgress,
+            IsWindowFocused(),
+            generationError
+        };
+        if (automatedScreenshot.empty() &&
+            delta < 0.1F &&
+            !generationInProgress &&
+            !anyArrowInMotion &&
+            !staticBoardLayerDirty &&
+            lastDrawnScreen == Screen::Playing &&
+            lastPlayingFrame == playingFrame) {
+            PollInputEvents();
+            continue;
+        }
+        lastPlayingFrame = playingFrame;
         rebuildStaticBoardLayer();
 
         BeginDrawing();
@@ -2801,6 +2896,8 @@ int Game::run() {
         }
 
         EndDrawing();
+
+        lastDrawnScreen = Screen::Playing;
 
         ++renderedFrames;
         if (!automatedScreenshot.empty() &&
