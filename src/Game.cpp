@@ -867,6 +867,24 @@ int Game::run() {
         );
     }
 
+    std::array<int, 38> hudCodepoints{' ', '?'};
+    for (int index = 0; index < 10; ++index) hudCodepoints[2 + index] = '0' + index;
+    for (int index = 0; index < 26; ++index) hudCodepoints[12 + index] = 'A' + index;
+    const auto loadHudFont = [&](int size) {
+        Font font = LoadFontFromMemory(
+            ".ttf", assets::kUiFontData, uiFontDataSize, size,
+            hudCodepoints.data(), static_cast<int>(hudCodepoints.size())
+        );
+        if (font.texture.id == 0 || font.texture.id == defaultFont.texture.id) {
+            return uiFont;
+        }
+        SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+        return font;
+    };
+    // Rasterize at the displayed sizes so minification cannot skip thin strokes.
+    const Font hudBrandFont = loadHudFont(static_cast<int>(kBrandText.size));
+    const Font hudCountFont = loadHudFont(static_cast<int>(kHudText.size));
+
     Persistence persistence(Persistence::executableDirectory());
     Settings settings = persistence.loadSettings();
     std::optional<SavedGame> savedGame =
@@ -2707,12 +2725,12 @@ int Game::run() {
             kSoft
         );
         const Vector2 brandSize = measureText(
-            uiFont,
+            hudBrandFont,
             "ARROW PUZZLE",
             kBrandText
         );
         drawText(
-            uiFont,
+            hudBrandFont,
             "ARROW PUZZLE",
             {
                 28.0F,
@@ -2728,17 +2746,17 @@ int Game::run() {
                 ? "GENERATION FAILED"
                 : "ARROWS  " + std::to_string(remaining);
         const Vector2 countSize = measureText(
-            uiFont,
+            hudCountFont,
             countText.c_str(),
             kHudText
         );
         drawText(
-            uiFont,
+            hudCountFont,
             countText.c_str(),
             {
-                static_cast<float>(GetScreenWidth()) * 0.5F -
-                    countSize.x * 0.5F,
-                (kHudHeight - countSize.y) * 0.5F
+                std::round(static_cast<float>(GetScreenWidth()) * 0.5F -
+                           countSize.x * 0.5F),
+                std::round((kHudHeight - countSize.y) * 0.5F)
             },
             kHudText,
             kMuted
@@ -2981,6 +2999,13 @@ int Game::run() {
             // Generation errors no longer matter during shutdown, but
             // consuming the future keeps the worker lifetime deterministic.
         }
+    }
+    if (hudBrandFont.texture.id != uiFont.texture.id) {
+        UnloadFont(hudBrandFont);
+    }
+    if (hudCountFont.texture.id != uiFont.texture.id &&
+        hudCountFont.texture.id != hudBrandFont.texture.id) {
+        UnloadFont(hudCountFont);
     }
     if (ownsUiFont) {
         UnloadFont(uiFont);
