@@ -478,7 +478,7 @@ ArrowHeadTriangle arrowHeadTriangle(
     };
 }
 
-void drawArrow(const RuntimeArrow& value) {
+void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value) {
     const std::vector<Vector2> points = displayPoints(value);
     if (points.empty()) {
         return;
@@ -498,19 +498,19 @@ void drawArrow(const RuntimeArrow& value) {
     }
 
     for (std::size_t index = 1; index < points.size(); ++index) {
-        DrawLineEx(
+        geometry.addLine(
             points[index - 1],
             points[index],
             kArrowThickness,
             color
         );
-        DrawCircleV(
+        geometry.addCircle(
             points[index],
             kArrowThickness * 0.5F,
             color
         );
     }
-    DrawCircleV(
+    geometry.addCircle(
         points.front(),
         kArrowThickness * 0.5F,
         color
@@ -520,7 +520,7 @@ void drawArrow(const RuntimeArrow& value) {
         points.front(),
         value.direction
     );
-    DrawTriangle(
+    geometry.addTriangle(
         head.tip,
         head.left,
         head.right,
@@ -1638,7 +1638,7 @@ int Game::run() {
             8,
             {248, 250, 253, 255}
         );
-        staticBoardGeometry.draw();
+        staticBoardGeometry.draw(camera.zoom);
         DrawRectangleRoundedLinesEx(
             {0.0F, 0.0F, boardWidth, boardHeight},
             0.035F,
@@ -2740,12 +2740,14 @@ int Game::run() {
         }
 
         BeginMode2D(camera);
+        staticBoardGeometry.beginDynamic(camera.zoom);
         for (const RuntimeArrow& value : arrows) {
             if (value.present &&
                 value.motion != Motion::Idle) {
-                drawArrow(value);
+                drawArrow(staticBoardGeometry, value);
             }
         }
+        staticBoardGeometry.endDynamic();
         EndMode2D();
 
         if (generationInProgress) {

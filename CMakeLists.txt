@@ -69,6 +69,7 @@ add_executable(arrow_puzzle WIN32
     src/Game.cpp
     src/StaticBoardGeometry.cpp
     src/StaticBoardGeometry.hpp
+    src/BoardCoverageShader.hpp
     src/main.cpp
     src/UiFontData.hpp
 )
@@ -119,4 +120,15 @@ if(ARROWPUZZLE_BUILD_TESTS)
         NAME arrow_persistence_tests
         COMMAND arrow_persistence_tests
     )
+
+    # Explicit GPU check: keep the default core tests runnable without a display.
+    add_executable(arrow_render_tests EXCLUDE_FROM_ALL
+        tests/RenderingTests.cpp
+        src/StaticBoardGeometry.cpp
+    )
+    target_include_directories(arrow_render_tests PRIVATE src)
+    target_link_libraries(arrow_render_tests PRIVATE raylib)
+    if(MSVC)
+        target_compile_options(arrow_render_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
 endif()

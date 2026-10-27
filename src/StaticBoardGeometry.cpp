@@ -1,4 +1,5 @@
 #include "StaticBoardGeometry.hpp"
+#include "BoardCoverageShader.hpp"
 
 #include <raymath.h>
 #include <rlgl.h>
@@ -10,15 +11,8 @@
 namespace arrow {
 namespace {
 
-constexpr int kDiscSize = 128;
-constexpr int kAtlasWidth = kDiscSize + 4;
-constexpr float kDiscRadius = 62.0F;
 // Stay well below the 16-bit index limit, with a bounded CPU upload buffer.
 constexpr std::size_t kBatchVertices = 16384;
-constexpr Vector2 kWhiteUv{
-    (static_cast<float>(kDiscSize) + 2.0F) / kAtlasWidth,
-    0.5F
-};
 
 } // namespace
 
@@ -31,40 +25,16 @@ void StaticBoardGeometry::ensureMaterial() {
         return;
     }
 
-    // All dots and round line joins share this tiny antialiased disc. The white
-    // strip supplies solid strokes and arrowheads in the same draw calls.
-    Image atlas = GenImageColor(kAtlasWidth, kDiscSize, BLANK);
-    if (atlas.data == nullptr) {
-        throw std::runtime_error("Could not allocate board geometry atlas");
+    Shader shader = LoadShaderFromMemory(
+        render::kBoardCoverageVertexShader,
+        render::kBoardCoverageFragmentShader
+    );
+    if (shader.id == 0 || shader.id == rlGetShaderIdDefault()) {
+        throw std::runtime_error("Could not load board antialiasing shader");
     }
-    auto* pixels = static_cast<Color*>(atlas.data);
-    for (int y = 0; y < kDiscSize; ++y) {
-        for (int x = 0; x < kAtlasWidth; ++x) {
-            const float dx = static_cast<float>(x) + 0.5F -
-                             kDiscSize * 0.5F;
-            const float dy = static_cast<float>(y) + 0.5F -
-                             kDiscSize * 0.5F;
-            const float coverage = x >= kDiscSize
-                ? 1.0F
-                : std::clamp(
-                      kDiscRadius + 0.5F - std::hypot(dx, dy),
-                      0.0F,
-                      1.0F
-                  );
-            pixels[y * kAtlasWidth + x] = {
-                255, 255, 255,
-                static_cast<unsigned char>(std::round(coverage * 255.0F))
-            };
-        }
-    }
-    const Texture2D texture = LoadTextureFromImage(atlas);
-    UnloadImage(atlas);
-    if (texture.id == 0) {
-        throw std::runtime_error("Could not upload board geometry atlas");
-    }
-    SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
     material_ = LoadMaterialDefault();
-    SetMaterialTexture(&material_, MATERIAL_MAP_DIFFUSE, texture);
+    material_.shader = shader;
+    pixelSizeLocation_ = GetShaderLocation(shader, "pixelSize");
 }
 
 void StaticBoardGeometry::clearMeshes() {
@@ -94,24 +64,48 @@ void StaticBoardGeometry::reserveVertices(std::size_t count) {
     }
 }
 
-void StaticBoardGeometry::addVertex(Vector2 point, Vector2 uv, Color color) {
-    positions_.insert(positions_.end(), {point.x, point.y, 0.0F});
-    texcoords_.insert(texcoords_.end(), {uv.x, uv.y});
+void StaticBoardGeometry::addVertex(
+    Vector2 point,
+    Vector2 local,
+    Color color,
+    float kind
+) {
+    positions_.insert(positions_.end(), {point.x, point.y, kind});
+    texcoords_.insert(texcoords_.end(), {local.x, local.y});
     colors_.insert(colors_.end(), {color.r, color.g, color.b, color.a});
 }
 
-void StaticBoardGeometry::addCircle(Vector2 center, float radius, Color color) {
+void StaticBoardGeometry::addQuad(Rectangle bounds, Color color, float kind) {
+    const float x = bounds.x;
+    const float y = bounds.y;
+    const float w = bounds.width;
+    const float h = bounds.height;
+    if (drawingDynamic_) {
+        rlCheckRenderBatchLimit(4);
+        rlSetTexture(rlGetTextureIdDefault());
+        rlBegin(RL_QUADS);
+        rlColor4ub(color.r, color.g, color.b, color.a);
+        rlTexCoord2f(-w*0.5F, -h*0.5F); rlVertex3f(x, y, kind);
+        rlTexCoord2f(-w*0.5F, h*0.5F); rlVertex3f(x, y+h, kind);
+        rlTexCoord2f(w*0.5F, h*0.5F); rlVertex3f(x+w, y+h, kind);
+        rlTexCoord2f(w*0.5F, -h*0.5F); rlVertex3f(x+w, y, kind);
+        rlEnd();
+        rlSetTexture(0);
+        return;
+    }
     reserveVertices(4);
     const auto first = static_cast<unsigned short>(positions_.size() / 3);
-    const float extent = radius * (kDiscSize * 0.5F) / kDiscRadius;
-    constexpr float rightUv = static_cast<float>(kDiscSize) / kAtlasWidth;
-    addVertex({center.x - extent, center.y - extent}, {0.0F, 0.0F}, color);
-    addVertex({center.x - extent, center.y + extent}, {0.0F, 1.0F}, color);
-    addVertex({center.x + extent, center.y + extent}, {rightUv, 1.0F}, color);
-    addVertex({center.x + extent, center.y - extent}, {rightUv, 0.0F}, color);
+    addVertex({x, y}, {-w*0.5F, -h*0.5F}, color, kind);
+    addVertex({x, y+h}, {-w*0.5F, h*0.5F}, color, kind);
+    addVertex({x+w, y+h}, {w*0.5F, h*0.5F}, color, kind);
+    addVertex({x+w, y}, {w*0.5F, -h*0.5F}, color, kind);
     for (int offset : {0, 1, 2, 0, 2, 3}) {
         indices_.push_back(static_cast<unsigned short>(first + offset));
     }
+}
+
+void StaticBoardGeometry::addCircle(Vector2 center, float radius, Color color) {
+    addQuad({center.x-radius, center.y-radius, 2*radius, 2*radius}, color, 1.0F);
 }
 
 void StaticBoardGeometry::addLine(
@@ -120,25 +114,17 @@ void StaticBoardGeometry::addLine(
     float thickness,
     Color color
 ) {
-    const float dx = to.x - from.x;
-    const float dy = to.y - from.y;
-    const float length = std::hypot(dx, dy);
-    if (length <= 0.0F) {
+    if (from.x == to.x && from.y == to.y) {
         return;
     }
-    const Vector2 radius{
-        -dy * thickness * 0.5F / length,
-        dx * thickness * 0.5F / length
-    };
-    reserveVertices(4);
-    const auto first = static_cast<unsigned short>(positions_.size() / 3);
-    addVertex({from.x - radius.x, from.y - radius.y}, kWhiteUv, color);
-    addVertex({from.x + radius.x, from.y + radius.y}, kWhiteUv, color);
-    addVertex({to.x + radius.x, to.y + radius.y}, kWhiteUv, color);
-    addVertex({to.x - radius.x, to.y - radius.y}, kWhiteUv, color);
-    for (int offset : {0, 1, 2, 0, 2, 3}) {
-        indices_.push_back(static_cast<unsigned short>(first + offset));
+    if (from.x != to.x && from.y != to.y) {
+        throw std::invalid_argument("Static board segments must be orthogonal");
     }
+    const float half = thickness * 0.5F;
+    const Rectangle bounds = from.x == to.x
+        ? Rectangle{from.x-half, std::min(from.y, to.y), thickness, std::abs(to.y-from.y)}
+        : Rectangle{std::min(from.x, to.x), from.y-half, std::abs(to.x-from.x), thickness};
+    addQuad(bounds, color, from.x == to.x ? 6.0F : 0.0F);
 }
 
 void StaticBoardGeometry::addTriangle(
@@ -147,14 +133,16 @@ void StaticBoardGeometry::addTriangle(
     Vector2 c,
     Color color
 ) {
-    reserveVertices(3);
-    const auto first = static_cast<unsigned short>(positions_.size() / 3);
-    addVertex(a, kWhiteUv, color);
-    addVertex(b, kWhiteUv, color);
-    addVertex(c, kWhiteUv, color);
-    for (int offset : {0, 1, 2}) {
-        indices_.push_back(static_cast<unsigned short>(first + offset));
-    }
+    // Board arrowheads are cardinal isosceles triangles, with a as the tip.
+    const Vector2 direction{a.x - (b.x+c.x)*0.5F, a.y - (b.y+c.y)*0.5F};
+    const float kind = std::abs(direction.x) > std::abs(direction.y)
+        ? (direction.x > 0.0F ? 2.0F : 4.0F)
+        : (direction.y > 0.0F ? 3.0F : 5.0F);
+    const float left = std::min({a.x, b.x, c.x});
+    const float top = std::min({a.y, b.y, c.y});
+    const float right = std::max({a.x, b.x, c.x});
+    const float bottom = std::max({a.y, b.y, c.y});
+    addQuad({left, top, right-left, bottom-top}, color, kind);
 }
 
 void StaticBoardGeometry::flush() {
@@ -201,18 +189,33 @@ void StaticBoardGeometry::finish() {
     std::vector<unsigned short>{}.swap(indices_);
 }
 
-void StaticBoardGeometry::draw() const {
+void StaticBoardGeometry::draw(float zoom) const {
     // Preserve ordering with the background and other queued 2D shapes.
     rlDrawRenderBatchActive();
+    const float pixelSize = 1.0F / std::max(zoom, 0.0001F);
+    SetShaderValue(material_.shader, pixelSizeLocation_, &pixelSize, SHADER_UNIFORM_FLOAT);
     for (Mesh mesh : meshes_) {
         DrawMesh(mesh, material_, MatrixIdentity());
     }
 }
 
+void StaticBoardGeometry::beginDynamic(float zoom) {
+    ensureMaterial();
+    BeginShaderMode(material_.shader);
+    const float pixelSize = 1.0F / std::max(zoom, 0.0001F);
+    SetShaderValue(material_.shader, pixelSizeLocation_, &pixelSize, SHADER_UNIFORM_FLOAT);
+    drawingDynamic_ = true;
+}
+
+void StaticBoardGeometry::endDynamic() {
+    EndShaderMode();
+    drawingDynamic_ = false;
+}
+
 void StaticBoardGeometry::release() {
     clearMeshes();
     if (material_.maps != nullptr) {
-        // The material owns its atlas; the default shader belongs to raylib.
+        // The material owns its shader; its default white texture is shared.
         UnloadMaterial(material_);
         material_ = {};
     }
