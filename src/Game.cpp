@@ -2740,6 +2740,13 @@ int Game::run() {
             );
         }
 
+        const int gameplayTop = static_cast<int>(kHudHeight) + 1;
+        BeginScissorMode(
+            0,
+            gameplayTop,
+            GetScreenWidth(),
+            std::max(0, GetScreenHeight() - gameplayTop)
+        );
         BeginMode2D(camera);
         staticBoardGeometry.beginDynamic(camera.zoom);
         for (const RuntimeArrow& value : arrows) {
@@ -2750,6 +2757,7 @@ int Game::run() {
         }
         staticBoardGeometry.endDynamic();
         EndMode2D();
+        EndScissorMode();
 
         if (generationInProgress) {
             DrawRectangle(
