@@ -67,6 +67,8 @@ add_custom_command(
 add_executable(arrow_puzzle WIN32
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
     src/Game.cpp
+    src/StaticBoardGeometry.cpp
+    src/StaticBoardGeometry.hpp
     src/main.cpp
     src/UiFontData.hpp
 )

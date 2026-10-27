@@ -4,6 +4,7 @@
 #include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
+#include "StaticBoardGeometry.hpp"
 #include "UiFontData.hpp"
 
 #include <raylib.h>
@@ -479,6 +480,66 @@ void drawArrow(const RuntimeArrow& value) {
     );
 }
 
+void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value) {
+    if (value.cells.empty()) {
+        return;
+    }
+    const Color color = value.failed ? kRed : kInk;
+    const Vector2 head = cellCenter(value.cells.front());
+    Vector2 segmentStart = head;
+    geometry.addCircle(head, kArrowThickness * 0.5F, color);
+    for (std::size_t index = 1; index < value.cells.size(); ++index) {
+        const bool endOfRun = index + 1 == value.cells.size() ||
+            value.cells[index] - value.cells[index - 1] !=
+                value.cells[index + 1] - value.cells[index];
+        if (endOfRun) {
+            const Vector2 point = cellCenter(value.cells[index]);
+            geometry.addLine(segmentStart, point, kArrowThickness, color);
+            geometry.addCircle(point, kArrowThickness * 0.5F, color);
+            segmentStart = point;
+        }
+    }
+    const ArrowHeadTriangle triangle = arrowHeadTriangle(head, value.direction);
+    geometry.addTriangle(triangle.tip, triangle.left, triangle.right, color);
+}
+
+void cacheIdleBoardGeometry(
+    StaticBoardGeometry& geometry,
+    const Board& board,
+    std::span<const RuntimeArrow> arrows
+) {
+    geometry.begin();
+    std::vector<std::uint8_t> occupied(
+        static_cast<std::size_t>(board.columns()) * board.rows(),
+        0
+    );
+    for (const RuntimeArrow& value : arrows) {
+        if (value.present && value.motion == Motion::Idle) {
+            for (Cell cell : value.cells) {
+                if (board.isInside(cell)) {
+                    occupied[static_cast<std::size_t>(cell.y) *
+                                 board.columns() + cell.x] = 1;
+                }
+            }
+        }
+    }
+    for (int y = 0; y < board.rows(); ++y) {
+        for (int x = 0; x < board.columns(); ++x) {
+            // An idle stroke completely covers its grid dot. Exposed dots are
+            // restored when launching an arrow invalidates the geometry.
+            if (occupied[static_cast<std::size_t>(y) * board.columns() + x] == 0) {
+                geometry.addCircle(cellCenter({x, y}), kGridDotRadius, kGridDot);
+            }
+        }
+    }
+    for (const RuntimeArrow& value : arrows) {
+        if (value.present && value.motion == Motion::Idle) {
+            cacheIdleArrow(geometry, value);
+        }
+    }
+    geometry.finish();
+}
+
 bool allOutside(const RuntimeArrow& value, const Board& board) {
     return std::ranges::none_of(value.cells, [&board](Cell cell) {
         return board.isInside(cell);
@@ -799,6 +860,12 @@ int Game::run() {
     int staticBoardLayerWidth = 0;
     int staticBoardLayerHeight = 0;
     bool staticBoardLayerDirty = true;
+    StaticBoardGeometry staticBoardGeometry;
+    bool staticBoardGeometryDirty = true;
+    const auto invalidateStaticBoard = [&]() {
+        staticBoardLayerDirty = true;
+        staticBoardGeometryDirty = true;
+    };
     auto resetRuntime = [&](const SavedGame* restored = nullptr) {
         arrows.clear();
         arrows.reserve(board.arrows().size());
@@ -836,7 +903,7 @@ int Game::run() {
         recoveryStepProgress = 0.0F;
         recoveryTick = 0;
         pressedArrow.reset();
-        staticBoardLayerDirty = true;
+        invalidateStaticBoard();
     };
     resetRuntime();
 
@@ -1193,7 +1260,7 @@ int Game::run() {
         value.movingCollisionTint = false;
         value.history.clear();
         value.targetCells.clear();
-        staticBoardLayerDirty = true;
+        invalidateStaticBoard();
     };
 
     const auto prepareForwardTransitions = [&]() {
@@ -1509,6 +1576,11 @@ int Game::run() {
             return;
         }
 
+        if (staticBoardGeometryDirty) {
+            cacheIdleBoardGeometry(staticBoardGeometry, board, arrows);
+            staticBoardGeometryDirty = false;
+        }
+
         BeginTextureMode(staticBoardLayer);
         ClearBackground(RAYWHITE);
         BeginMode2D(camera);
@@ -1518,15 +1590,7 @@ int Game::run() {
             8,
             {248, 250, 253, 255}
         );
-        for (int y = 0; y < board.rows(); ++y) {
-            for (int x = 0; x < board.columns(); ++x) {
-                DrawCircleV(
-                    cellCenter({x, y}),
-                    kGridDotRadius,
-                    kGridDot
-                );
-            }
-        }
+        staticBoardGeometry.draw();
         DrawRectangleRoundedLinesEx(
             {0.0F, 0.0F, boardWidth, boardHeight},
             0.035F,
@@ -1534,12 +1598,6 @@ int Game::run() {
             2.0F,
             kSoft
         );
-        for (const RuntimeArrow& value : arrows) {
-            if (value.present &&
-                value.motion == Motion::Idle) {
-                drawArrow(value);
-            }
-        }
         EndMode2D();
         EndTextureMode();
         staticBoardLayerDirty = false;
@@ -2010,9 +2068,11 @@ int Game::run() {
         if (!generationBlocksInput &&
             IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
             const Vector2 movement = GetMouseDelta();
-            camera.target.x -= movement.x / camera.zoom;
-            camera.target.y -= movement.y / camera.zoom;
-            staticBoardLayerDirty = true;
+            if (movement.x != 0.0F || movement.y != 0.0F) {
+                camera.target.x -= movement.x / camera.zoom;
+                camera.target.y -= movement.y / camera.zoom;
+                staticBoardLayerDirty = true;
+            }
         }
 
         const bool anyArrowInMotion = std::ranges::any_of(
@@ -2146,7 +2206,7 @@ int Game::run() {
                     if (value.history.empty()) {
                         value.motion = Motion::Idle;
                         value.progress = 0.0F;
-                        staticBoardLayerDirty = true;
+                        invalidateStaticBoard();
                     } else {
                         value.motion = Motion::Returning;
                         value.progress = 0.0F;
@@ -2279,7 +2339,7 @@ int Game::run() {
                 value.history.pop_back();
                 if (value.history.empty()) {
                     value.motion = Motion::Idle;
-                    staticBoardLayerDirty = true;
+                    invalidateStaticBoard();
                 }
             }
             if (recoveryTick > 0) {
@@ -2818,6 +2878,7 @@ int Game::run() {
     if (staticBoardLayer.id != 0) {
         UnloadRenderTexture(staticBoardLayer);
     }
+    staticBoardGeometry.release();
     CloseWindow();
     return 0;
 }
