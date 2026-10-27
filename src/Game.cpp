@@ -1631,7 +1631,7 @@ int Game::run() {
         }
 
         BeginTextureMode(staticBoardLayer);
-        ClearBackground(RAYWHITE);
+        ClearBackground(BLANK);
         BeginMode2D(camera);
         DrawRectangleRounded(
             {0.0F, 0.0F, boardWidth, boardHeight},
@@ -2671,6 +2671,19 @@ int Game::run() {
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
+        if (!generationInProgress && generationError.empty() &&
+            remaining > 0 && lives > 0) {
+            const char* help =
+                "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   Esc menu";
+            drawCenteredText(
+                uiFont,
+                help,
+                static_cast<float>(GetScreenWidth()) * 0.5F,
+                static_cast<float>(GetScreenHeight()) - 30.0F,
+                kHelpText,
+                kMuted
+            );
+        }
         if (staticBoardLayer.id != 0) {
             DrawTextureRec(
                 staticBoardLayer.texture,
@@ -2892,17 +2905,6 @@ int Game::run() {
                 static_cast<float>(GetScreenHeight()) - 48.0F,
                 kBannerText,
                 kRed
-            );
-        } else {
-            const char* help =
-                "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   Esc menu";
-            drawCenteredText(
-                uiFont,
-                help,
-                static_cast<float>(GetScreenWidth()) * 0.5F,
-                static_cast<float>(GetScreenHeight()) - 30.0F,
-                kHelpText,
-                kMuted
             );
         }
 
