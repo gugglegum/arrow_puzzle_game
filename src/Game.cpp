@@ -41,6 +41,7 @@ constexpr int kDefaultCandidateAttempts = 8;
 constexpr float kCellSize = 34.0F;
 constexpr float kBoardPadding = 34.0F;
 constexpr float kHudHeight = 82.0F;
+constexpr float kMinimumZoom = 0.05F;
 constexpr float kReturnStepDuration = 0.0175F;
 constexpr float kCollisionPause = 0.22F;
 constexpr float kMovingCollisionPause = 0.5F;
@@ -2131,7 +2132,7 @@ int Game::run() {
             const Vector2 before = GetScreenToWorld2D(mouse, camera);
             camera.zoom = std::clamp(
                 camera.zoom * std::pow(1.12F, wheel),
-                0.25F,
+                kMinimumZoom,
                 3.5F
             );
             const Vector2 after = GetScreenToWorld2D(mouse, camera);
