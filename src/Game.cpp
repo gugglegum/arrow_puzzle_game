@@ -937,6 +937,52 @@ int Game::run() {
     };
     const auto toggleDesktopFullscreen = [&]() {
         ToggleBorderlessWindowed();
+#if defined(_WIN32)
+        if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
+            // Some Windows OpenGL drivers promote an exactly monitor-sized
+            // window to exclusive presentation on the first SwapBuffers().
+            // One offscreen row/column avoids that heuristic. Prefer an edge
+            // with no neighbouring monitor so the extra pixel stays invisible.
+            const int monitor = GetCurrentMonitor();
+            const Vector2 origin = GetMonitorPosition(monitor);
+            const float width = static_cast<float>(GetMonitorWidth(monitor));
+            const float height = static_cast<float>(GetMonitorHeight(monitor));
+            const std::array<Rectangle, 4> edges{{
+                {origin.x, origin.y + height, width, 1.0F},
+                {origin.x, origin.y - 1.0F, width, 1.0F},
+                {origin.x + width, origin.y, 1.0F, height},
+                {origin.x - 1.0F, origin.y, 1.0F, height}
+            }};
+            Rectangle overflow = edges.front();
+            for (const Rectangle edge : edges) {
+                bool occupied = false;
+                for (int other = 0; other < GetMonitorCount(); ++other) {
+                    if (other == monitor) continue;
+                    const Vector2 position = GetMonitorPosition(other);
+                    occupied |= CheckCollisionRecs(edge, {
+                        position.x, position.y,
+                        static_cast<float>(GetMonitorWidth(other)),
+                        static_cast<float>(GetMonitorHeight(other))
+                    });
+                }
+                if (!occupied) {
+                    overflow = edge;
+                    break;
+                }
+            }
+            SetWindowPosition(
+                static_cast<int>(std::min(origin.x, overflow.x)),
+                static_cast<int>(std::min(origin.y, overflow.y))
+            );
+            SetWindowSize(
+                static_cast<int>(width) + (overflow.width == 1.0F ? 1 : 0),
+                static_cast<int>(height) + (overflow.height == 1.0F ? 1 : 0)
+            );
+            // Allow other applications to come to the foreground, like F11
+            // in a browser, instead of keeping the game above their windows.
+            ClearWindowState(FLAG_WINDOW_TOPMOST);
+        }
+#endif
         restoreCursor();
         // Repeat after queued window-mode and focus notifications.
         cursorRefreshFrames = 2;
