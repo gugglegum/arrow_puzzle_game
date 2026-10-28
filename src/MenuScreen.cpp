@@ -44,7 +44,7 @@ void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
             DrawRectangleRounded({center.x - 13 + bar * 7.0F, center.y + 10 - height, 4, height},
                 0.4F, 4, Fade(ink, bar <= index ? 1.0F : 0.18F));
         }
-    } else if ((page != MenuScreen::Page::Main && index == 4)) {
+    } else if (page != MenuScreen::Page::Main && index == (page == MenuScreen::Page::Settings ? 5 : 4)) {
         DrawLineEx({center.x + 9, center.y}, {center.x - 9, center.y}, 1.8F, ink);
         DrawLineEx({center.x - 9, center.y}, {center.x - 3, center.y - 6}, 1.8F, ink);
         DrawLineEx({center.x - 9, center.y}, {center.x - 3, center.y + 6}, 1.8F, ink);
@@ -78,13 +78,16 @@ void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
         DrawRing(center, 6, 7.5F, 0, 360, 24, ink);
         DrawLineEx({center.x - 12, center.y}, {center.x + 12, center.y}, 1.5F, ink);
         DrawLineEx({center.x, center.y - 12}, {center.x, center.y + 12}, 1.5F, ink);
-    } else {
+    } else if (index == 3) {
         DrawRectangleRec({center.x - 11, center.y - 4, 4, 8}, ink);
         const std::array<Vector2, 4> cone{{{center.x - 7, center.y - 4}, {center.x - 7, center.y + 4},
             {center.x, center.y + 10}, {center.x, center.y - 10}}};
         DrawTriangleFan(cone.data(), static_cast<int>(cone.size()), ink);
         DrawRing({center.x, center.y}, 7, 8.5F, -50, 50, 16, ink);
         DrawRing({center.x, center.y}, 11, 12.5F, -50, 50, 16, ink);
+    } else {
+        DrawCircleSector(center, 10, 90, 270, 24, ink);
+        DrawRing(center, 9, 10.5F, 0, 360, 32, ink);
     }
 }
 
@@ -92,11 +95,11 @@ const char* description(MenuScreen::Page page, int index, bool enabled) {
     constexpr std::array<const char*, 4> main{{"Choose your next challenge", "Continue your saved puzzle",
         "Sound and gameplay preferences", "Close Arrow Puzzle"}};
     constexpr std::array<const char*, 4> difficulty{{"20 x 20 cells", "40 x 40 cells", "80 x 80 cells", "160 x 160 cells"}};
-    constexpr std::array<const char*, 4> settings{{"Allow loops in newly generated puzzles.",
+    constexpr std::array<const char*, 5> settings{{"Allow loops in newly generated puzzles.",
         "Moving arrows can cost a life on contact.", "Highlight the cursor's row and column.",
-        "Play arrow, collision and celebration sounds."}};
+        "Play arrow, collision and celebration sounds.", "Light or dark board and top panel."}};
     if (page == MenuScreen::Page::Main) return index == 1 && !enabled ? "No unfinished puzzle to resume" : main[index];
-    if (index == 4) return nullptr;
+    if (index == (page == MenuScreen::Page::Settings ? 5 : 4)) return nullptr;
     return page == MenuScreen::Page::Settings ? settings[index] : difficulty[index];
 }
 
@@ -108,14 +111,17 @@ Rectangle MenuScreen::Layout::button(int index) const {
 
 MenuScreen::Layout MenuScreen::layout(int width, int height, int count) {
     const float panelWidth = std::min(620.0F, static_cast<float>(width) - 64);
-    const float panelHeight = std::min(count == 4 ? 550.0F : 600.0F, static_cast<float>(height) - 72);
+    const float panelHeight = std::min(count == 4 ? 550.0F : count == 5 ? 600.0F : 676.0F,
+        static_cast<float>(height) - 72);
     const Rectangle panel{std::round((width - panelWidth) * 0.5F), std::round((height - panelHeight) * 0.5F),
                           panelWidth, panelHeight};
     const float gap = height < 700 ? 10.0F : 12.0F;
-    const float available = panelHeight - 180 - 64;
+    const bool compact = count > 5 && height < 700;
+    const float header = compact ? 146.0F : 180.0F;
+    const float available = panelHeight - header - (compact ? 48.0F : 64.0F);
     const float rowHeight = std::min(66.0F, (available - gap * (count - 1)) / count);
     const float total = rowHeight * count + gap * (count - 1);
-    return {panel, panel.y + 180 + (available - total) * 0.5F, rowHeight, gap};
+    return {panel, panel.y + header + (available - total) * 0.5F, rowHeight, gap};
 }
 
 Color MenuScreen::mutedColor() { return kQuiet; }
@@ -167,15 +173,19 @@ void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int
     } else {
         icon(page == Page::Settings ? Page::Main : Page::Difficulty, 2, badge, kGold);
     }
-    centered(text, page == Page::Main ? "MAIN MENU" : "ARROW PUZZLE", center, panel.y + 43, 12, 2.6F, kQuiet);
+    const bool compact = count > 5 && height < 700;
+    centered(text, page == Page::Main ? "MAIN MENU" : "ARROW PUZZLE", center,
+        panel.y + (compact ? 38 : 43), compact ? 11.0F : 12.0F, 2.6F, kQuiet);
     centered(text, page == Page::Main ? "ARROW PUZZLE" : page == Page::Settings ? "SETTINGS" : "NEW GAME",
-        center, panel.y + 68, page == Page::Main ? 46.0F : 42.0F, 1.5F, kGold);
+        center, panel.y + (compact ? 59 : 68), page == Page::Main ? 46.0F : compact ? 36.0F : 42.0F, 1.5F, kGold);
     centered(text, page == Page::Main ? "Find a way for every arrow." : page == Page::Settings
-        ? "Choose how you play." : "Choose your challenge.", center, panel.y + 126, 17, 0.2F, kLight);
+        ? "Choose how you play." : "Choose your challenge.", center, panel.y + (compact ? 105 : 126),
+        compact ? 15.0F : 17.0F, 0.2F, kLight);
 }
 
 void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, Page page,
-                            int index, bool enabled, bool focused, bool armed, std::optional<bool> toggle) {
+                            int index, bool enabled, bool focused, bool armed,
+                            std::optional<bool> toggle, const char* choice) {
     const bool hovered = enabled && CheckCollisionPointRec(GetMousePosition(), bounds);
     const bool pressed = hovered && armed;
     const bool highlighted = enabled && (hovered || focused);
@@ -213,6 +223,16 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
         DrawCircleV({pill.x + (*toggle ? pill.width - 14 : 14), center.y}, 9, *toggle ? kTeal : kQuiet);
         centered(text, *toggle ? "ON" : "OFF", pill.x + (*toggle ? 23 : 45), center.y - 7, 11, 0.2F,
             *toggle ? kTeal : kQuiet);
+    } else if (choice != nullptr) {
+        const Rectangle pill{bounds.x + bounds.width - 116, center.y - 14, 96, 28};
+        DrawRectangleRounded(pill, 1, 12, Fade(kGold, 0.10F));
+        DrawRectangleRoundedLinesEx(pill, 1, 12, 1, Fade(kGold, 0.45F));
+        centered(text, choice, pill.x + pill.width * 0.5F, center.y - 7, 11, 0.2F, kGold);
+        for (float sign : {-1.0F, 1.0F}) {
+            const float x = pill.x + pill.width * 0.5F + sign * 36;
+            DrawLineEx({x - sign * 2, center.y - 3}, {x + sign * 1, center.y}, 1.2F, kGold);
+            DrawLineEx({x + sign * 1, center.y}, {x - sign * 2, center.y + 3}, 1.2F, kGold);
+        }
     } else if (enabled && (page == Page::Main || index < 4)) {
         const Vector2 chevron{bounds.x + bounds.width - 28, center.y};
         DrawLineEx({chevron.x - 3, chevron.y - 5}, {chevron.x + 2, chevron.y}, 1.6F, primary ? ink : kQuiet);

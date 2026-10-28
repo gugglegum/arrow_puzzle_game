@@ -8,6 +8,7 @@
 #include "GameAudio.hpp"
 #include "EndScreen.hpp"
 #include "MenuScreen.hpp"
+#include "BoardPalette.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "UiText.hpp"
 
@@ -55,14 +56,6 @@ constexpr std::size_t kMaxForwardEventsPerFrame = 1024;
 constexpr std::size_t kMaxRecoveryEventsPerFrame = 1024;
 constexpr float kArrowThickness = 6.4F;
 constexpr float kGridDotRadius = kArrowThickness * 0.5F;
-
-constexpr Color kInk{22, 29, 48, 255};
-constexpr Color kBlue{16, 132, 255, 255};
-constexpr Color kRed{238, 67, 74, 255};
-constexpr Color kSoft{226, 232, 241, 255};
-constexpr Color kMuted{104, 115, 132, 255};
-constexpr Color kGridDot{195, 202, 214, 255};
-constexpr Color kGridGuideDot{148, 158, 176, 255};
 
 struct TextStyle {
     float size;
@@ -179,6 +172,7 @@ struct PlayingFrameState {
     bool generationInProgress;
     bool windowFocused;
     bool soundsEnabled;
+    BoardTheme boardTheme;
     bool soundButtonHovered;
     bool soundButtonPressed;
     bool menuButtonHovered;
@@ -246,32 +240,29 @@ Rectangle soundButtonRectangle() {
 }
 
 Rectangle hudMenuButtonRectangle() {
-    return {static_cast<float>(GetScreenWidth()) - 312.0F, 21.0F, 82.0F, 40.0F};
+    return {22.0F, 21.0F, 40.0F, 40.0F};
 }
 
-void drawHudMenuButton(UiText& font, bool hovered, bool pressed) {
+void drawHudMenuButton(UiText& font, bool hovered, bool pressed, const BoardPalette& palette) {
     const Rectangle bounds = hudMenuButtonRectangle();
-    DrawRectangleRounded(bounds, 0.22F, 8, hovered && pressed ? Color{218, 233, 252, 255}
-        : hovered ? Color{232, 241, 253, 255} : Color{249, 250, 252, 255});
-    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, hovered ? kBlue : kSoft);
-    const Color ink = hovered ? kBlue : kMuted;
-    for (int index = -1; index <= 1; ++index) {
-        const float y = bounds.y + bounds.height * 0.5F + index * 5.0F;
-        DrawLineEx({bounds.x + 12.0F, y}, {bounds.x + 25.0F, y}, 1.5F, ink);
-    }
-    const Vector2 size = measureText(font, "Menu", kMenuHintText);
-    drawText(font, "Menu", {bounds.x + 34.0F, std::round(bounds.y + (bounds.height - size.y) * 0.5F)},
-             kMenuHintText, ink);
+    DrawRectangleRounded(bounds, 0.22F, 8, hovered && pressed ? palette.buttonPressed
+        : hovered ? palette.buttonHovered : palette.button);
+    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, hovered ? palette.flight : palette.border);
+    const Color ink = hovered ? palette.flight : palette.muted;
+    const Vector2 center{bounds.x + bounds.width * 0.5F, bounds.y + bounds.height * 0.5F};
+    DrawLineEx({center.x + 8, center.y}, {center.x - 8, center.y}, 1.8F, ink);
+    DrawLineEx({center.x - 8, center.y}, {center.x - 2, center.y - 6}, 1.8F, ink);
+    DrawLineEx({center.x - 8, center.y}, {center.x - 2, center.y + 6}, 1.8F, ink);
+    if (hovered) drawCenteredText(font, "Main menu", center.x, 4, kMenuVersionText, palette.muted);
 }
 
-void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed) {
+void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed, const BoardPalette& palette) {
     const Rectangle bounds = soundButtonRectangle();
-    const Color fill = hovered && pressed ? Color{218, 233, 252, 255}
-        : enabled || hovered ? Color{232, 241, 253, 255}
-        : Color{249, 250, 252, 255};
-    const Color ink = enabled ? kBlue : kMuted;
+    const Color fill = hovered && pressed ? palette.buttonPressed
+        : enabled || hovered ? palette.buttonHovered : palette.button;
+    const Color ink = enabled ? palette.flight : palette.muted;
     DrawRectangleRounded(bounds, 0.22F, 8, fill);
-    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, enabled || hovered ? kBlue : kSoft);
+    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, enabled || hovered ? palette.flight : palette.border);
     const Vector2 center{bounds.x + bounds.width * 0.5F, bounds.y + bounds.height * 0.5F};
     DrawRectangleRec({center.x - 12.0F, center.y - 4.0F, 5.0F, 8.0F}, ink);
     const std::array<Vector2, 4> cone{{
@@ -290,7 +281,7 @@ void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed) {
     }
     if (hovered) {
         drawCenteredText(font, enabled ? "Sounds: ON" : "Sounds: OFF",
-                         center.x, 4.0F, kMenuVersionText, kMuted);
+                         center.x, 4.0F, kMenuVersionText, palette.muted);
     }
 }
 
@@ -446,23 +437,23 @@ ArrowHeadTriangle arrowHeadTriangle(
     };
 }
 
-void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value) {
+void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const BoardPalette& palette) {
     const std::vector<Vector2> points = displayPoints(value);
     if (points.empty()) {
         return;
     }
 
-    Color color = value.failed ? kRed : kInk;
+    Color color = value.failed ? palette.error : palette.ink;
     if (value.motion == Motion::Forward &&
         value.launchDelay <= 0.0) {
         color = value.movingCollisionTint
-            ? kRed
-            : kBlue;
+            ? palette.error
+            : palette.flight;
     } else if (
         value.motion == Motion::CollisionPause ||
         value.motion == Motion::Returning
     ) {
-        color = kRed;
+        color = palette.error;
     }
 
     for (std::size_t index = 1; index < points.size(); ++index) {
@@ -496,11 +487,11 @@ void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value) {
     );
 }
 
-void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value) {
+void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const BoardPalette& palette) {
     if (value.cells.empty()) {
         return;
     }
-    const Color color = value.failed ? kRed : kInk;
+    const Color color = value.failed ? palette.error : palette.ink;
     const Vector2 head = cellCenter(value.cells.front());
     Vector2 segmentStart = head;
     geometry.addCircle(head, kArrowThickness * 0.5F, color);
@@ -523,7 +514,8 @@ void cacheIdleBoardGeometry(
     StaticBoardGeometry& geometry,
     const Board& board,
     std::span<const RuntimeArrow> arrows,
-    std::vector<std::uint8_t>& occupied
+    std::vector<std::uint8_t>& occupied,
+    const BoardPalette& palette
 ) {
     geometry.begin();
     occupied.assign(
@@ -545,13 +537,13 @@ void cacheIdleBoardGeometry(
             // An idle stroke completely covers its grid dot. Exposed dots are
             // restored when launching an arrow invalidates the geometry.
             if (occupied[static_cast<std::size_t>(y) * board.columns() + x] == 0) {
-                geometry.addCircle(cellCenter({x, y}), kGridDotRadius, kGridDot);
+                geometry.addCircle(cellCenter({x, y}), kGridDotRadius, palette.dot);
             }
         }
     }
     for (const RuntimeArrow& value : arrows) {
         if (value.present && value.motion == Motion::Idle) {
-            cacheIdleArrow(geometry, value);
+            cacheIdleArrow(geometry, value, palette);
         }
     }
     geometry.finish();
@@ -579,18 +571,20 @@ void drawGridGuides(
     const Board& board,
     std::span<const std::uint8_t> occupied,
     Cell selected,
-    float zoom
+    float zoom,
+    const BoardPalette& palette
 ) {
     if (occupied.size() != static_cast<std::size_t>(board.columns()) * board.rows()) {
         return;
     }
-    constexpr Color difference{
-        kGridDot.r - kGridGuideDot.r,
-        kGridDot.g - kGridGuideDot.g,
-        kGridDot.b - kGridGuideDot.b,
+    const Color difference{
+        static_cast<unsigned char>(std::abs(palette.dot.r - palette.guide.r)),
+        static_cast<unsigned char>(std::abs(palette.dot.g - palette.guide.g)),
+        static_cast<unsigned char>(std::abs(palette.dot.b - palette.guide.b)),
         255
     };
-    geometry.beginDarkening(zoom);
+    if (palette.brightenGuides) geometry.beginBrightening(zoom);
+    else geometry.beginDarkening(zoom);
     const auto drawEmptyDot = [&](Cell cell) {
         if (occupied[static_cast<std::size_t>(cell.y) * board.columns() + cell.x] == 0) {
             geometry.addCircle(cellCenter(cell), kGridDotRadius, difference);
@@ -600,7 +594,8 @@ void drawGridGuides(
     for (int y = 0; y < board.rows(); ++y) {
         if (y != selected.y) drawEmptyDot({selected.x, y});
     }
-    geometry.endDarkening();
+    if (palette.brightenGuides) geometry.endBrightening();
+    else geometry.endDarkening();
 }
 
 bool allOutside(const RuntimeArrow& value, const Board& board) {
@@ -657,8 +652,8 @@ bool movingContactContains(
            (key & 0xFFFFFFFFULL) == index;
 }
 
-void drawHeart(Vector2 center, bool filled) {
-    const Color color = filled ? kRed : kSoft;
+void drawHeart(Vector2 center, bool filled, const BoardPalette& palette) {
+    const Color color = filled ? palette.error : palette.border;
     constexpr std::size_t segmentCount = 6;
     constexpr std::size_t pointsPerSegment = 8;
     constexpr std::size_t pointCount = 48;
@@ -1710,7 +1705,8 @@ int Game::run() {
         }
 
         if (staticBoardGeometryDirty) {
-            cacheIdleBoardGeometry(staticBoardGeometry, board, arrows, idleBoardOccupancy);
+            cacheIdleBoardGeometry(staticBoardGeometry, board, arrows, idleBoardOccupancy,
+                                   boardPalette(settings.boardTheme));
             staticBoardGeometryDirty = false;
         }
 
@@ -1721,7 +1717,7 @@ int Game::run() {
             {0.0F, 0.0F, boardWidth, boardHeight},
             0.035F,
             8,
-            {248, 250, 253, 255}
+            boardPalette(settings.boardTheme).surface
         );
         staticBoardGeometry.draw(camera.zoom);
         DrawRectangleRoundedLinesEx(
@@ -1729,7 +1725,7 @@ int Game::run() {
             0.035F,
             8,
             2.0F,
-            kSoft
+            boardPalette(settings.boardTheme).border
         );
         EndMode2D();
         EndTextureMode();
@@ -1825,7 +1821,7 @@ int Game::run() {
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
                 ? 4
-                : 5;
+                : menuScreen == Screen::SettingsMenu ? 6 : 5;
             const auto menuItemEnabled = [&](int index) {
                 if (index < 0 || index >= menuItemCount) {
                     return false;
@@ -1955,7 +1951,7 @@ int Game::run() {
                 } else if (
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
-                    focusedMenuButton <= 3) {
+                    focusedMenuButton <= 4) {
                     activatedMenuButton =
                         focusedMenuButton;
                     pressedMenuButton.reset();
@@ -1992,10 +1988,14 @@ int Game::run() {
                 const int id =
                     static_cast<int>(menuScreen) * 16 + index;
                 std::optional<bool> toggle;
+                const char* choice = nullptr;
                 if (menuScreen == Screen::SettingsMenu && index < 4) {
                     const std::array<bool, 4> values{{settings.arrowLoops, settings.flyingArrowCollisions,
                         settings.crosshairGuides, settings.sounds}};
                     toggle = values[index];
+                }
+                if (menuScreen == Screen::SettingsMenu && index == 4) {
+                    choice = settings.boardTheme == BoardTheme::Dark ? "DARK" : "LIGHT";
                 }
                 MenuScreen::drawButton(
                     uiText,
@@ -2007,7 +2007,8 @@ int Game::run() {
                     enabled &&
                         focusedMenuButton == index,
                     pressedMenuButton == id,
-                    toggle
+                    toggle,
+                    choice
                 );
                 return enabled &&
                        activatedMenuButton == index;
@@ -2119,7 +2120,7 @@ int Game::run() {
                     GetScreenWidth(), GetScreenHeight(), menuItemCount
                 );
             } else if (screen == Screen::SettingsMenu) {
-                constexpr int buttonCount = 5;
+                constexpr int buttonCount = 6;
                 if (menuButton(
                         0,
                         menuButtonRectangle(0, buttonCount),
@@ -2169,6 +2170,15 @@ int Game::run() {
                 if (menuButton(
                         4,
                         menuButtonRectangle(4, buttonCount),
+                        "Board theme"
+                    )) {
+                    const BoardTheme next = settings.boardTheme == BoardTheme::Dark ? BoardTheme::Light : BoardTheme::Dark;
+                    if (persistence.setBoardTheme(settings, next)) invalidateStaticBoard();
+                    else TraceLog(LOG_WARNING, "Could not save board theme");
+                }
+                if (menuButton(
+                        5,
+                        menuButtonRectangle(5, buttonCount),
                         "Back"
                     )) {
                     screen = Screen::MainMenu;
@@ -2814,6 +2824,7 @@ int Game::run() {
             generationInProgress,
             IsWindowFocused(),
             settings.sounds,
+            settings.boardTheme,
             soundButtonHovered,
             pressedSoundButton,
             hudMenuButtonHovered,
@@ -2837,8 +2848,9 @@ int Game::run() {
         lastPlayingFrame = playingFrame;
         if (!endScreen.visible()) rebuildStaticBoardLayer();
 
+        const BoardPalette& palette = boardPalette(settings.boardTheme);
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(palette.background);
         if (!generationInProgress && generationError.empty() &&
             remaining > 0 && lives > 0) {
             const char* help =
@@ -2849,7 +2861,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(GetScreenHeight()) - 30.0F,
                 kHelpText,
-                kMuted
+                palette.muted
             );
         }
         if (staticBoardLayer.id != 0 && !endScreen.visible()) {
@@ -2866,13 +2878,13 @@ int Game::run() {
             );
         }
 
-        DrawRectangle(0, 0, GetScreenWidth(), static_cast<int>(kHudHeight), RAYWHITE);
+        DrawRectangle(0, 0, GetScreenWidth(), static_cast<int>(kHudHeight), palette.hud);
         DrawLine(
             0,
             static_cast<int>(kHudHeight),
             GetScreenWidth(),
             static_cast<int>(kHudHeight),
-            kSoft
+            palette.border
         );
         const Vector2 brandSize = measureText(
             uiText,
@@ -2883,11 +2895,11 @@ int Game::run() {
             uiText,
             "ARROW PUZZLE",
             {
-                28.0F,
+                80.0F,
                 (kHudHeight - brandSize.y) * 0.5F
             },
             kBrandText,
-            kInk
+            palette.ink
         );
         const std::string countText =
             generationInProgress
@@ -2896,8 +2908,8 @@ int Game::run() {
                 ? "GENERATION FAILED"
                 : "ARROWS  " + std::to_string(remaining);
         TextStyle countStyle = kHudText;
-        const float countLeft = 28.0F + brandSize.x + 20.0F;
-        const float countRight = hudMenuButtonRectangle().x - 16.0F;
+        const float countLeft = 80.0F + brandSize.x + 20.0F;
+        const float countRight = soundButtonRectangle().x - 16.0F;
         const float countWidth = std::max(1.0F, countRight - countLeft);
         const float measuredCountWidth = measureText(uiText, countText.c_str(), countStyle).x;
         if (measuredCountWidth > countWidth) {
@@ -2917,17 +2929,18 @@ int Game::run() {
                 std::round((kHudHeight - countSize.y) * 0.5F)
             },
             countStyle,
-            kMuted
+            palette.muted
         );
-        drawHudMenuButton(uiText, hudMenuButtonHovered, pressedHudMenuButton);
-        drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton);
+        drawHudMenuButton(uiText, hudMenuButtonHovered, pressedHudMenuButton, palette);
+        drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton, palette);
         for (int index = 0; index < 3; ++index) {
             drawHeart(
                 {
                     static_cast<float>(GetScreenWidth() - 128 + index * 38),
                     34.0F
                 },
-                index < lives
+                index < lives,
+                palette
             );
         }
 
@@ -2941,13 +2954,13 @@ int Game::run() {
             );
             BeginMode2D(camera);
             if (guideCell.has_value()) {
-                drawGridGuides(staticBoardGeometry, board, idleBoardOccupancy, *guideCell, camera.zoom);
+                drawGridGuides(staticBoardGeometry, board, idleBoardOccupancy, *guideCell, camera.zoom, palette);
             }
             staticBoardGeometry.beginDynamic(camera.zoom);
             for (const RuntimeArrow& value : arrows) {
                 if (value.present &&
                     value.motion != Motion::Idle) {
-                    drawArrow(staticBoardGeometry, value);
+                    drawArrow(staticBoardGeometry, value, palette);
                 }
             }
             staticBoardGeometry.endDynamic();
@@ -2962,7 +2975,7 @@ int Game::run() {
                 GetScreenWidth(),
                 GetScreenHeight() -
                     static_cast<int>(kHudHeight),
-                {248, 250, 253, 224}
+                Fade(palette.surface, 224.0F / 255.0F)
             );
             const Vector2 spinnerCenter{
                 static_cast<float>(GetScreenWidth()) * 0.5F,
@@ -2982,7 +2995,7 @@ int Game::run() {
                 spinnerAngle,
                 spinnerAngle + 275.0F,
                 48,
-                kBlue
+                palette.flight
             );
             const char* title = "GENERATING LEVEL";
             drawCenteredText(
@@ -2991,7 +3004,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 43.0F,
                 kOverlayTitleText,
-                kInk
+                palette.ink
             );
             const char* detail =
                 "Searching for an interesting puzzle...";
@@ -3001,7 +3014,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 79.0F,
                 kOverlayDetailText,
-                kMuted
+                palette.muted
             );
             generationOverlayRendered = true;
         } else if (!generationError.empty()) {
@@ -3011,7 +3024,7 @@ int Game::run() {
                 GetScreenWidth(),
                 GetScreenHeight() -
                     static_cast<int>(kHudHeight),
-                {248, 250, 253, 230}
+                Fade(palette.surface, 230.0F / 255.0F)
             );
             const int centerY =
                 (GetScreenHeight() +
@@ -3024,7 +3037,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) - 58.0F,
                 kErrorTitleText,
-                kRed
+                palette.error
             );
             const char* retry =
                 "Press R to try another level  /  Esc for menu";
@@ -3034,7 +3047,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) - 10.0F,
                 kErrorActionText,
-                kInk
+                palette.ink
             );
             std::string errorDetail = generationError;
             constexpr std::size_t maximumErrorLength = 90;
@@ -3048,7 +3061,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) + 31.0F,
                 kErrorDetailText,
-                kMuted
+                palette.muted
             );
         } else if (endScreen.visible()) {
             endScreen.draw(uiText, GetScreenWidth(), GetScreenHeight(), kHudHeight,
@@ -3074,18 +3087,19 @@ int Game::run() {
         (void)persistCurrentGame();
     }
     if (generationFuture.valid()) {
+        const BoardPalette& palette = boardPalette(settings.boardTheme);
         while (generationFuture.wait_for(
                    std::chrono::milliseconds{16}
                ) != std::future_status::ready) {
             BeginDrawing();
-            ClearBackground(RAYWHITE);
+            ClearBackground(palette.background);
             DrawRectangleGradientV(
                 0,
                 0,
                 GetScreenWidth(),
                 GetScreenHeight(),
-                RAYWHITE,
-                Color{247, 249, 252, 255}
+                palette.background,
+                palette.surface
             );
             const Vector2 spinnerCenter{
                 static_cast<float>(GetScreenWidth()) * 0.5F,
@@ -3102,7 +3116,7 @@ int Game::run() {
                 spinnerAngle,
                 spinnerAngle + 275.0F,
                 48,
-                kBlue
+                palette.flight
             );
             drawCenteredText(
                 uiText,
@@ -3110,7 +3124,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 43.0F,
                 kOverlayTitleText,
-                kInk
+                palette.ink
             );
             drawCenteredText(
                 uiText,
@@ -3118,7 +3132,7 @@ int Game::run() {
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 79.0F,
                 kOverlayDetailText,
-                kMuted
+                palette.muted
             );
             EndDrawing();
         }

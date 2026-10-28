@@ -398,6 +398,7 @@ Settings Persistence::loadSettings() const noexcept {
         bool collisionsSeen = false;
         bool crosshairGuidesSeen = false;
         bool soundsSeen = false;
+        bool boardThemeSeen = false;
         std::string line;
         while (std::getline(input, line)) {
             if (line.size() > kMaximumLineLength) {
@@ -436,13 +437,17 @@ Settings Persistence::loadSettings() const noexcept {
             } else if (key == "sounds") {
                 soundsSeen = parseBool(value, settings.sounds);
                 canonical = canonical && soundsSeen;
+            } else if (key == "board_theme") {
+                boardThemeSeen = value == "light" || value == "dark";
+                if (boardThemeSeen) settings.boardTheme = value == "light" ? BoardTheme::Light : BoardTheme::Dark;
+                canonical = canonical && boardThemeSeen;
             }
         }
         if (!input.eof()) {
             canonical = false;
         }
         canonical = canonical && formatSeen && versionSeen &&
-                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen;
+                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen && boardThemeSeen;
         if (!formatSeen || !versionSeen) {
             settings = {};
         }
@@ -458,6 +463,7 @@ Settings Persistence::loadSettings() const noexcept {
 }
 
 bool Persistence::saveSettings(const Settings& settings) const noexcept {
+    if (settings.boardTheme != BoardTheme::Light && settings.boardTheme != BoardTheme::Dark) return false;
     return writeAtomically(settingsPath(), [&settings](std::ostream& output) {
         output << "format=" << kSettingsFormat << '\n'
                << "version=" << kSettingsVersion << '\n'
@@ -467,7 +473,8 @@ bool Persistence::saveSettings(const Settings& settings) const noexcept {
                << (settings.flyingArrowCollisions ? "on" : "off") << '\n'
                << "crosshair_guides="
                << (settings.crosshairGuides ? "on" : "off") << '\n'
-               << "sounds=" << (settings.sounds ? "on" : "off") << '\n';
+               << "sounds=" << (settings.sounds ? "on" : "off") << '\n'
+               << "board_theme=" << (settings.boardTheme == BoardTheme::Dark ? "dark" : "light") << '\n';
         return static_cast<bool>(output);
     });
 }
@@ -517,6 +524,14 @@ bool Persistence::setSounds(Settings& settings, bool enabled) const noexcept {
     if (!saveSettings(changed)) {
         return false;
     }
+    settings = changed;
+    return true;
+}
+
+bool Persistence::setBoardTheme(Settings& settings, BoardTheme theme) const noexcept {
+    Settings changed = settings;
+    changed.boardTheme = theme;
+    if (!saveSettings(changed)) return false;
     settings = changed;
     return true;
 }

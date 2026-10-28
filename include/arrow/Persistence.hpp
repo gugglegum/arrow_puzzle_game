@@ -8,11 +8,14 @@
 
 namespace arrow {
 
+enum class BoardTheme { Light, Dark };
+
 struct Settings {
     bool arrowLoops{true};
     bool flyingArrowCollisions{true};
     bool crosshairGuides{false};
     bool sounds{false};
+    BoardTheme boardTheme{BoardTheme::Dark};
 
     auto operator<=>(const Settings&) const = default;
 };
@@ -62,6 +65,7 @@ public:
         Settings& settings,
         bool enabled
     ) const noexcept;
+    [[nodiscard]] bool setBoardTheme(Settings& settings, BoardTheme theme) const noexcept;
 
     [[nodiscard]] std::optional<SavedGame> loadSavedGame() const noexcept;
     [[nodiscard]] bool saveSavedGame(const SavedGame& game) const noexcept;

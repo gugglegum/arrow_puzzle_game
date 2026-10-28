@@ -117,6 +117,7 @@ void testDefaultSettingsAreCreated() {
     );
     require(!settings.crosshairGuides, "Crosshair guides must default to off");
     require(!settings.sounds, "Sounds must default to off");
+    require(settings.boardTheme == arrow::BoardTheme::Dark, "Board theme must default to dark");
     require(
         std::filesystem::is_regular_file(persistence.settingsPath()),
         "Loading missing settings must create settings.txt"
@@ -136,6 +137,7 @@ void testDefaultSettingsAreCreated() {
         "Default crosshair guide setting was not written"
     );
     require(text.find("sounds=off") != std::string::npos, "Default sound setting was not written");
+    require(text.find("board_theme=dark") != std::string::npos, "Default board theme was not written");
 }
 
 void testSettingsRoundTripAndAutomaticSetters() {
@@ -181,6 +183,44 @@ void testSettingsRoundTripAndAutomaticSetters() {
     require(settings.sounds && persistence.loadSettings().sounds, "Sounds did not stay enabled");
     require(persistence.setSounds(settings, false), "Disabling sounds failed");
     require(!settings.sounds && !persistence.loadSettings().sounds, "Sounds did not stay disabled");
+    require(persistence.setBoardTheme(settings, arrow::BoardTheme::Light), "Choosing a light board failed");
+    require(settings.boardTheme == arrow::BoardTheme::Light && persistence.loadSettings() == settings,
+            "Light board theme did not persist");
+    require(persistence.setBoardTheme(settings, arrow::BoardTheme::Dark), "Choosing a dark board failed");
+    require(persistence.loadSettings() == arrow::Settings{}, "Dark board theme did not persist");
+}
+
+void testBoardThemeUpgradeAndRepair() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    const std::string legacy = "format=arrow-puzzle-settings\nversion=1\narrow_loops=off\n"
+        "flying_arrow_collisions=off\ncrosshair_guides=on\nsounds=on\n";
+    writeText(persistence.settingsPath(), legacy);
+    const auto upgraded = persistence.loadSettings();
+    require(!upgraded.arrowLoops && !upgraded.flyingArrowCollisions && upgraded.crosshairGuides && upgraded.sounds,
+            "Adding board themes changed another preference");
+    require(upgraded.boardTheme == arrow::BoardTheme::Dark &&
+            readText(persistence.settingsPath()).find("board_theme=dark") != std::string::npos,
+            "Legacy settings were not upgraded to a dark board");
+
+    writeText(persistence.settingsPath(), legacy + "board_theme=light\n");
+    auto expected = upgraded;
+    expected.boardTheme = arrow::BoardTheme::Light;
+    require(persistence.loadSettings() == expected, "A light board preference was not loaded");
+    writeText(persistence.settingsPath(), legacy + "board_theme=invalid\n");
+    require(persistence.loadSettings() == upgraded, "Repairing a board theme changed another preference");
+    require(readText(persistence.settingsPath()).find("board_theme=dark") != std::string::npos,
+            "Malformed board theme was not repaired");
+
+    auto unchanged = upgraded;
+    const auto before = readText(persistence.settingsPath());
+    require(!persistence.setBoardTheme(unchanged, static_cast<arrow::BoardTheme>(99)) && unchanged == upgraded &&
+            readText(persistence.settingsPath()) == before, "Invalid enum changed the active or saved theme");
+    const auto blockedPath = temporary.path() / "not-a-directory";
+    writeText(blockedPath, "keep");
+    const arrow::Persistence blocked{blockedPath};
+    require(!blocked.setBoardTheme(unchanged, arrow::BoardTheme::Light) && unchanged == upgraded,
+            "Failed board theme write changed the active preference");
 }
 
 void testSoundsUpgradeAndRepair() {
@@ -464,6 +504,7 @@ int main() {
     try {
         testDefaultSettingsAreCreated();
         testSettingsRoundTripAndAutomaticSetters();
+        testBoardThemeUpgradeAndRepair();
         testSoundsUpgradeAndRepair();
         testCrosshairGuidesUpgradeAndRepair();
         testMalformedSettingsAreRepaired();

@@ -31,6 +31,9 @@ public:
     // their antialiased edges or changing destination alpha.
     void beginDarkening(float zoom);
     void endDarkening();
+    // Add the coverage-weighted RGB difference, preserving destination alpha.
+    void beginBrightening(float zoom);
+    void endBrightening();
     void release();
 
     [[nodiscard]] std::size_t gpuBytes() const noexcept;

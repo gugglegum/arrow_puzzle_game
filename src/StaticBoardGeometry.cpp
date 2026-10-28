@@ -226,6 +226,20 @@ void StaticBoardGeometry::endDarkening() {
     EndBlendMode();
 }
 
+void StaticBoardGeometry::beginBrightening(float zoom) {
+    rlSetBlendFactorsSeparate(
+        RL_SRC_ALPHA, RL_ONE, RL_ZERO, RL_ONE,
+        RL_FUNC_ADD, RL_FUNC_ADD
+    );
+    BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    beginDynamic(zoom);
+}
+
+void StaticBoardGeometry::endBrightening() {
+    endDynamic();
+    EndBlendMode();
+}
+
 void StaticBoardGeometry::release() {
     clearMeshes();
     if (material_.maps != nullptr) {

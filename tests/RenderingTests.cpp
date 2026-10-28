@@ -1,4 +1,5 @@
 #include "StaticBoardGeometry.hpp"
+#include "BoardPalette.hpp"
 
 #include <raylib.h>
 
@@ -126,31 +127,37 @@ void checkCoverage(RenderTexture2D target) {
     }
 }
 
-void checkDotRecolouring(RenderTexture2D target) {
+void checkDotRecolouring(RenderTexture2D target, arrow::BoardTheme theme) {
     const RenderTexture2D reference = LoadRenderTexture(kWidth, kHeight);
     arrow::StaticBoardGeometry geometry;
-    constexpr Color base{195, 202, 214, 255};
-    constexpr Color highlighted{148, 158, 176, 255};
-    constexpr Color difference{47, 44, 38, 255};
+    const auto& palette = arrow::boardPalette(theme);
+    const Color base = palette.dot;
+    const Color highlighted = palette.guide;
+    const Color difference{
+        static_cast<unsigned char>(std::abs(base.r - highlighted.r)),
+        static_cast<unsigned char>(std::abs(base.g - highlighted.g)),
+        static_cast<unsigned char>(std::abs(base.b - highlighted.b)), 255};
     for (float zoom : {0.05F, 0.139434F, 0.25F, 1.0F, 3.5F}) {
         for (int phase = 0; phase <= 8; ++phase) {
             const Camera2D camera{{phase / 8.0F, phase / 11.0F}, {}, 0.0F, zoom};
             const Vector2 center{64.0F / zoom, 48.0F / zoom};
             const auto render = [&](RenderTexture2D destination, bool overlay) {
                 BeginTextureMode(destination);
-                ClearBackground({248, 250, 253, 255});
+                ClearBackground(palette.surface);
                 BeginMode2D(camera);
                 geometry.beginDynamic(zoom);
                 geometry.addCircle(center, 3.2F, overlay ? base : highlighted);
                 geometry.endDynamic();
                 if (overlay) {
-                    geometry.beginDarkening(zoom);
+                    if (palette.brightenGuides) geometry.beginBrightening(zoom);
+                    else geometry.beginDarkening(zoom);
                     geometry.addCircle(center, 3.2F, difference);
-                    geometry.endDarkening();
+                    if (palette.brightenGuides) geometry.endBrightening();
+                    else geometry.endDarkening();
                 }
                 // Normal blending must be restored for subsequent moving arrows.
                 geometry.beginDynamic(zoom);
-                geometry.addCircle({100.0F / zoom, 48.0F / zoom}, 3.2F, BLUE);
+                geometry.addCircle({100.0F / zoom, 48.0F / zoom}, 3.2F, palette.flight);
                 geometry.endDynamic();
                 EndMode2D();
                 EndTextureMode();
@@ -191,8 +198,8 @@ int main() {
     int result = 0;
     try {
         checkCoverage(target);
-        checkDotRecolouring(target);
-        std::cout << "Rendering tests passed: 2870 coverage samples, streaming batch flush and 45 dot recolouring samples.\n";
+        for (const auto theme : {arrow::BoardTheme::Light, arrow::BoardTheme::Dark}) checkDotRecolouring(target, theme);
+        std::cout << "Rendering tests passed: 2870 coverage samples, streaming batch flush and 90 dot recolouring samples across both themes.\n";
     } catch (const std::exception& error) {
         std::cerr << "Rendering test failure: " << error.what() << '\n';
         result = 1;

@@ -120,6 +120,7 @@ add_executable(arrow_puzzle WIN32
     src/MenuScreen.cpp
     src/MenuScreen.hpp
     src/AudioData.hpp
+    src/BoardPalette.hpp
     src/Game.cpp
     src/StaticBoardGeometry.cpp
     src/StaticBoardGeometry.hpp
@@ -201,7 +202,7 @@ if(ARROWPUZZLE_BUILD_TESTS)
         tests/RenderingTests.cpp
         src/StaticBoardGeometry.cpp
     )
-    target_include_directories(arrow_render_tests PRIVATE src)
+    target_include_directories(arrow_render_tests PRIVATE src include)
     target_link_libraries(arrow_render_tests PRIVATE raylib)
     if(MSVC)
         target_compile_options(arrow_render_tests PRIVATE /W4 /permissive- /utf-8)
