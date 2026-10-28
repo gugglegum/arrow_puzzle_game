@@ -26,10 +26,9 @@ GitHub Actions does not enable it: a tagged Actions build gets its version from
 the tag. A local preview has no GitHub provenance attestation; its
 `build-info.json` records that it was built locally.
 
-For 0.3.0, finish the README changes and add the new screenshots **before**
-creating the tag. Keep the changelog entry marked Unreleased until that final
-step, then set its release date and use its contents for the GitHub release
-description.
+Finish README changes and add release screenshots **before** creating the tag.
+Set the release date on the corresponding changelog entry at that final step,
+then use its contents for the GitHub release description.
 
 ## Preparing a release
 
@@ -54,7 +53,8 @@ creates or moves a tag.
 ## Files and checks
 
 - `ArrowPuzzle-<version>-windows-x64.zip` contains the standalone executable,
-  README files, changelog, license notices and `build-info.json`.
+  README files, changelog, developer documentation and screenshots, license
+  notices and `build-info.json`. Relative README links work after extraction.
 - `SHA256SUMS.txt` identifies both the ZIP and its unpacked `ArrowPuzzle.exe`.
 - `build-info.json` records the source commit, visible version, executable hash
   and Actions run URL.

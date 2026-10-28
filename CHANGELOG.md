@@ -7,10 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-## [0.3.0] - Unreleased
-
-Prepared for local preview. The release tag and GitHub Actions build will follow
-after the documentation screenshots are updated.
+## [0.3.0] - 2026-10-29
 
 ### Added
 
@@ -31,8 +28,11 @@ after the documentation screenshots are updated.
 - A Windows x64 release workflow on GitHub Actions, with build metadata,
   SHA-256 checksums, and verifiable build-provenance attestations for the EXE
   and ZIP. It runs only for release tags or an explicit manual request.
-- Gameplay, main-menu, and difficulty-selection screenshots to the project
-  documentation.
+- Six updated screenshots covering Simple and Middle gameplay, the main menu,
+  difficulty selection, settings, and victory fireworks.
+- Developer documentation for the architecture, generator, runtime, and
+  release process. Release archives include this documentation and its images
+  so README links also work offline.
 
 ### Changed
 

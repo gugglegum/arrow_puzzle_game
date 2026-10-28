@@ -10,9 +10,9 @@ Inter 4.1 release.
 - Copyright: Copyright (c) 2016 The Inter Project Authors
 - License: SIL Open Font License, Version 1.1
 
-The complete license is included in the source tree at
-[`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt) and as
-`INTER-OFL.txt` in binary release archives.
+The complete license is included at
+[`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt) in both the
+source tree and binary release archives.
 
 ## raylib 5.5
 

@@ -5,8 +5,9 @@
 Arrow Puzzle is a minimalist desktop puzzle game about untangling a board of
 arrows. It is written in C++20 with raylib and currently targets Windows.
 
-The project is an early but fully playable prototype. Its start menu offers
-20 x 20, 40 x 40, 80 x 80, and experimental 160 x 160 generated boards.
+Version **0.3.0** offers 20 x 20, 40 x 40, 80 x 80, and experimental 160 x 160
+generated boards, dark and light board themes, optional sounds, and animated
+result screens.
 Settings and unfinished games are saved beside the executable.
 
 ## Screenshots
@@ -30,6 +31,12 @@ Download the latest Windows x64 build from
 extract the ZIP archive, and run `ArrowPuzzle.exe`. The executable is
 standalone; the accompanying text files are license notices, not runtime
 dependencies.
+
+Release builds are compiled and tested by **GitHub Actions**. The ZIP includes
+build metadata and SHA-256 checksums are supplied with the download; the EXE
+and ZIP have GitHub build-provenance attestations. See the
+[release verification guide](docs/RELEASING.md#verifying-a-download).
+Changes since 0.2.0 are listed in the [changelog](CHANGELOG.md#030---2026-10-29).
 
 The current build is not digitally signed, so Windows SmartScreen may display
 an unknown-publisher warning.
@@ -85,12 +92,19 @@ another arrow's speed.
 - Optional arrow loops and flying-arrow collision penalties
 - Automatic settings and unfinished-game persistence beside the executable
 - Three lives with animated collision recovery
-- Persistent light-grey grid dots revealed as arrows leave
+- Subtle grid dots revealed as arrows leave, with optional row and column guides
 - Independent, continuously accelerating motion without a speed cap
 - Event-driven cell collision checks that prevent high-speed tunnelling
-- Windowed and fullscreen modes
-- Pointer-centred zoom and middle-button panning
-- Screen-optimized Inter typography with consistent anti-aliased strokes
+- Dark board theme by default, with a persistent Light option
+- Windowed and borderless fullscreen at the desktop resolution
+- Pointer-centred zoom and fast middle-button panning on large boards
+- Analytic antialiasing for arrows and grid dots at small zoom levels
+- Native Windows font smoothing with the embedded Inter typeface
+- Optional launch, collision, defeat, victory, and firework sounds
+- Mouse-accessible menu and sound buttons in the gameplay HUD
+- Animated result screens and victory fireworks
+- Redesigned menus with one shared mouse and keyboard selection
+- Cached board rendering and no unnecessary GPU redraws while idle
 - Deterministic seeds and extensive generator tests
 - No ads, telemetry, accounts, or runtime network access
 
@@ -101,9 +115,11 @@ another arrow's speed.
 | Left mouse button | Launch an idle arrow |
 | Mouse wheel | Zoom at the pointer |
 | Middle mouse button + drag | Pan the board |
-| Up / Down | Move the keyboard focus through menu items |
-| Enter | Activate the focused menu item |
-| Space | Toggle the focused on/off setting |
+| Up / Down | Move the current menu selection |
+| Enter | Activate the selected menu item |
+| Space | Change the selected setting, including board theme |
+| Top-left back arrow | Save the unfinished game and return to the menu |
+| HUD speaker button | Toggle sound |
 | F11 or Left Alt+Enter | Toggle fullscreen |
 | Escape | Leave fullscreen, return to the menu, or close the main menu |
 | R | Generate a new board when no arrow is moving |
@@ -132,6 +148,22 @@ obstacles remain active in both collision modes. Changes are written
 immediately to `settings.txt`. Disabling arrow loops makes generation more
 restrictive; the experimental Very Hard preset can reject a seed and offer a
 retry instead of falling back to a simpler board.
+
+**Crosshair guides** highlight exposed dots along the row and column nearest
+the pointer. **Sounds** enables the embedded effects; the HUD speaker button
+changes the same preference. Both options are off by default. **Board theme**
+defaults to Dark and can be switched to Light; it affects the board and HUD,
+while menus and result screens stay dark. These preferences are also saved in
+`settings.txt` and remain compatible with older settings files.
+
+Hovering a menu item selects it. The selection stays in place when the pointer
+leaves the item or crosses a gap. Arrow keys navigate from the current item,
+even with the pointer resting on another row, until the mouse moves again.
+
+Use the back-arrow button beside the game title or Escape to visit the menu,
+change settings, and return through **Resume game**. Clearing the board shows
+**YOU WON!** with fireworks; losing all three lives shows **GAME OVER**. The
+celebration ends automatically and the finished game returns to idle.
 
 When the game returns to the menu or exits with an uncleared board and at
 least one life remaining, it writes `savegame.txt`. The save contains the
@@ -169,7 +201,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 The helper configures the project, builds it, and runs the complete test suite.
-The generator stress test creates 1,312 boards and can take several minutes.
+The generator stress test creates 1,314 boards and can take several minutes.
 
 The resulting executable is:
 
@@ -249,20 +281,33 @@ Additional screenshot-only hooks are available:
 ```text
 include/arrow/       Public C++ headers
 assets/fonts/        Inter UI font source and its OFL license
-cmake/               Build-time font embedding helper
+assets/sounds/       Embedded game and firework sound sources
+cmake/               Font/audio embedding and build-version helpers
 src/Board.cpp        Board state, movement rules, and solution checks
 src/Generator.cpp    Constructive level generator and candidate scoring
 src/MotionKinematics.cpp  Independent accelerated movement calculations
 src/MotionResolver.cpp  Moving/static collision classification
 src/Persistence.cpp  Versioned settings and unfinished-game storage
 src/Game.cpp         raylib rendering, input, and animation
-tests/               Board, generator, and persistence tests
-tools/               Windows build helper
+src/StaticBoardGeometry.cpp  Cached geometry and analytic antialiasing
+src/UiText.cpp       Native Windows font smoothing and text cache
+src/MenuScreen.cpp   Menu presentation
+src/MenuSelection.hpp  Shared mouse and keyboard menu selection
+src/EndScreen.cpp    Result cards and finite victory celebration
+src/GameAudio.cpp    Optional embedded sound effects
+tests/               Core, persistence, menus, and result-screen tests
+tools/               Windows build and packaging helpers
+docs/                Developer guides and screenshots
+.github/workflows/   Release-only GitHub Actions build and provenance
 ```
 
 `arrow_core` contains the board and generator without a raylib dependency.
 `arrow_puzzle` links that core with statically built raylib. `arrow_tests`
 links only `arrow_core`.
+
+Detailed developer and AI-assistant documentation is indexed in
+[`docs/README.md`](docs/README.md). It covers the architecture, generator,
+runtime simulation, collisions, persistence, and safe change workflows.
 
 ## How generation works
 
