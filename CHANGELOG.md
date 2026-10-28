@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Hold the final collision on screen for 1.2 seconds before showing GAME OVER.
+  Arrow movement stops at the fatal event, new launches are blocked, and the
+  defeat sound follows the pause instead of covering the collision sound.
+
 ## [0.3.0] - 2026-10-29
 
 ### Added

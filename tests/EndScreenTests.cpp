@@ -32,6 +32,38 @@ void checkTimeline(float step) {
     require(!screen.visible() && !screen.update(step).changed, "Reset left an active celebration");
 }
 
+void checkDelayedDefeat(float step) {
+    arrow::EndScreen screen;
+    screen.show(arrow::EndScreen::Outcome::Defeat, 1.2F);
+    require(screen.active() && !screen.visible(), "Delayed defeat did not finish gameplay before covering it");
+    require(!screen.buttonAt({300, 450}, 720, 600, 82), "Delayed result captured a hidden button");
+    require(!screen.update(-1).changed && !screen.update(std::numeric_limits<float>::quiet_NaN()).changed,
+            "Invalid delta advanced the defeat delay");
+    float elapsed = 0;
+    int reveals = 0;
+    while (!screen.visible() && elapsed < 2) {
+        const auto update = screen.update(step);
+        elapsed += step;
+        require(update.fireworks == 0, "Delayed defeat emitted fireworks");
+        require(update.changed == screen.visible(), "Invisible timer caused a redraw or missed its reveal");
+        reveals += update.changed ? 1 : 0;
+    }
+    require(elapsed >= 1.19F && elapsed <= 1.2F + step + 0.001F && reveals == 1,
+            "Defeat delay depends on frame rate or revealed more than once");
+    for (int frame = 0; frame < 100; ++frame) screen.update(step);
+    require(!screen.update(step).changed, "Defeat kept redrawing after its fade");
+
+    screen.show(arrow::EndScreen::Outcome::Defeat, 1.2F);
+    screen.update(10000);
+    require(!screen.visible(), "A stalled frame skipped the whole defeat delay");
+    screen.reset();
+    require(!screen.active() && !screen.visible() && !screen.update(10).changed,
+            "Reset left a pending defeat");
+    screen.show(arrow::EndScreen::Outcome::Defeat, 1.2F);
+    screen.show(arrow::EndScreen::Outcome::Victory);
+    require(screen.visible(), "Previous defeat delay affected a new victory");
+}
+
 void screenshots(const char* directory) {
     std::filesystem::create_directories(directory);
     const std::filesystem::path previous = std::filesystem::current_path();
@@ -69,6 +101,9 @@ int main(int argc, char** argv) {
         checkTimeline(1.0F / 10.0F);
         checkTimeline(1.0F / 60.0F);
         checkTimeline(1.0F / 144.0F);
+        checkDelayedDefeat(1.0F / 10.0F);
+        checkDelayedDefeat(1.0F / 60.0F);
+        checkDelayedDefeat(1.0F / 144.0F);
         arrow::EndScreen screen;
         require(!screen.buttonAt({400, 400}, 720, 600, 82), "Hidden screen captured input");
         screen.show(arrow::EndScreen::Outcome::Victory);
@@ -87,7 +122,7 @@ int main(int argc, char** argv) {
             require(!screen.buttonAt({static_cast<float>(width) / 2, 40}, width, height, 82), "Result screen captured the HUD");
         }
         if (argc == 2) screenshots(argv[1]);
-        std::cout << "End screen tests passed: finite animation, five one-shot reports, reset, stalled frames, button layout, "
+        std::cout << "End screen tests passed: delayed defeat, finite animation, five one-shot reports, reset, stalled frames, button layout, "
                   << sizeof(screen) << " bytes of fixed state.\n";
         return 0;
     } catch (const std::exception& e) {

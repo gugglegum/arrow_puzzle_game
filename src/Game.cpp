@@ -51,6 +51,7 @@ constexpr float kMinimumZoom = 0.05F;
 constexpr float kReturnStepDuration = 0.0175F;
 constexpr float kCollisionPause = 0.22F;
 constexpr float kMovingCollisionPause = 0.5F;
+constexpr float kDefeatRevealDelay = 1.2F;
 constexpr double kInitialForwardSpeed = 16.0;
 constexpr double kForwardAcceleration = 88.0;
 constexpr std::size_t kMaxForwardEventsPerFrame = 1024;
@@ -2252,6 +2253,7 @@ int Game::run() {
         if (!automatedScreenshot.empty() &&
             !automatedSecondLaunchDone &&
             automatedSecondLaunch.has_value() &&
+            !endScreen.active() &&
             !generationInProgress &&
             generationError.empty() &&
             renderedFrames >= automatedSecondLaunchFrame) {
@@ -2268,7 +2270,7 @@ int Game::run() {
 
         const bool launchInputAvailable =
             IsWindowFocused() &&
-            !endScreen.visible() &&
+            !endScreen.active() &&
             lives > 0 &&
             !generationInProgress &&
             generationError.empty() &&
@@ -2348,10 +2350,11 @@ int Game::run() {
             }
         }
 
-        // The result covers the board. Freeze the finished simulation instead
-        // of spending time rewinding or moving hidden arrows after game over.
-        double simulationDelta = endScreen.visible() ? 0.0 : static_cast<double>(delta);
-        if (endScreen.visible()) {
+        // Hold the fatal collision in place before revealing Game Over, then
+        // keep the finished simulation frozen behind the result screen.
+        const bool simulationFinished = endScreen.active() || lives <= 0;
+        double simulationDelta = simulationFinished ? 0.0 : static_cast<double>(delta);
+        if (simulationFinished) {
             forwardTimeDebt = 0.0;
             recoveryTimeDebt = 0.0;
         }
@@ -2584,14 +2587,14 @@ int Game::run() {
             const std::size_t eventBudget =
                 forwardEventBudget();
 
-            while (remainingForwardTime > 0.0 &&
+            while (lives > 0 && remainingForwardTime > 0.0 &&
                    hasForwardMotion()) {
                 const bool preparationCollision =
                     prepareForwardTransitions();
                 if (preparationCollision) {
                     loseLife();
                 }
-                if (!hasForwardMotion()) {
+                if (lives <= 0 || !hasForwardMotion()) {
                     break;
                 }
                 if (processedEvents >= eventBudget) {
@@ -2758,25 +2761,33 @@ int Game::run() {
             arrows,
             [](const RuntimeArrow& value) { return value.present; }
         ));
-        if (activeGame && !generationBlocksInput && !endScreen.visible()) {
+        const bool resultWasActive = endScreen.active();
+        const bool resultWasVisible = endScreen.visible();
+        if (activeGame && !generationBlocksInput && !endScreen.active()) {
             if (lives <= 0) {
-                endScreen.show(EndScreen::Outcome::Defeat);
+                endScreen.show(EndScreen::Outcome::Defeat, kDefeatRevealDelay);
                 pressedArrow.reset();
-                gameAudio.playDefeat();
             } else if (remaining == 0) {
                 endScreen.show(EndScreen::Outcome::Victory);
                 pressedArrow.reset();
                 gameAudio.playVictory();
             }
-            if (endScreen.visible()) {
+            if (endScreen.active()) {
                 // Finished games cannot be resumed; release their rewind data.
                 for (RuntimeArrow& value : arrows) {
                     value.history.clear();
-                    value.targetCells.clear();
                 }
             }
         }
-        const EndScreen::Update endAnimation = endScreen.update(delta);
+        const bool defeatStarted = !resultWasActive &&
+            endScreen.outcome() == EndScreen::Outcome::Defeat;
+        const EndScreen::Update endAnimation = endScreen.update(defeatStarted ? 0.0F : delta);
+        if (!resultWasVisible && endScreen.visible()) {
+            // Keep interpolation targets while the fatal board is still on
+            // screen, so in-flight arrows do not snap back during the pause.
+            for (RuntimeArrow& value : arrows) value.targetCells.clear();
+            if (endScreen.outcome() == EndScreen::Outcome::Defeat) gameAudio.playDefeat();
+        }
         for (int index = 0; index < endAnimation.fireworks; ++index) gameAudio.playFirework();
         if (activeGame &&
             (remaining == 0 || lives <= 0) &&
@@ -2811,7 +2822,7 @@ int Game::run() {
             !endAnimation.changed &&
             delta < 0.1F &&
             !generationInProgress &&
-            (!anyArrowInMotion || endScreen.visible()) &&
+            (!anyArrowInMotion || endScreen.active()) &&
             (!staticBoardLayerDirty || endScreen.visible()) &&
             lastDrawnScreen == Screen::Playing &&
             lastPlayingFrame == playingFrame) {

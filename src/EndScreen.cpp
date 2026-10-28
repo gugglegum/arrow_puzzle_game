@@ -45,13 +45,15 @@ void star(Vector2 center, float radius, Color color) {
 
 void EndScreen::reset() {
     outcome_ = Outcome::None;
+    delayRemaining_ = 0;
     age_ = 0;
     nextBurst_ = 0;
 }
 
-void EndScreen::show(Outcome outcome) {
+void EndScreen::show(Outcome outcome, float delay) {
     reset();
     outcome_ = outcome;
+    delayRemaining_ = std::isfinite(delay) ? std::max(0.0F, delay) : 0.0F;
     if (outcome != Outcome::Victory) return;
     constexpr std::array<float, 5> times{1.0F, 1.7F, 2.5F, 3.2F, 4.0F};
     constexpr std::array<Vector2, 5> origins{{{0.15F, 0.26F}, {0.84F, 0.22F},
@@ -78,8 +80,15 @@ void EndScreen::show(Outcome outcome) {
 }
 
 EndScreen::Update EndScreen::update(float delta) {
+    if (!active() || !std::isfinite(delta) || delta <= 0) return {};
+    if (delayRemaining_ > 0.0F) {
+        // The board stays unchanged during the delay; only its end needs a
+        // new frame. Clamp stalled frames just like the result animation.
+        delayRemaining_ = std::max(0.0F, delayRemaining_ - std::min(delta, 0.1F));
+        return {visible(), 0};
+    }
     const float duration = outcome_ == Outcome::Victory ? kCelebrationDuration : kFadeDuration;
-    if (!visible() || age_ >= duration || !std::isfinite(delta) || delta <= 0) return {};
+    if (age_ >= duration) return {};
     age_ = std::min(duration, age_ + std::min(delta, 0.1F));
     int count = 0;
     if (outcome_ == Outcome::Victory) {

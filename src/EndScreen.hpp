@@ -18,12 +18,14 @@ public:
     };
 
     void reset();
-    void show(Outcome outcome);
+    void show(Outcome outcome, float delay = 0.0F);
     Update update(float delta);
     void draw(UiText& text, int width, int height, float top,
               std::optional<int> hovered, std::optional<int> pressed) const;
 
-    [[nodiscard]] bool visible() const { return outcome_ != Outcome::None; }
+    // Gameplay ends immediately; the result may still be waiting to appear.
+    [[nodiscard]] bool active() const { return outcome_ != Outcome::None; }
+    [[nodiscard]] bool visible() const { return active() && delayRemaining_ <= 0.0F; }
     [[nodiscard]] Outcome outcome() const { return outcome_; }
     [[nodiscard]] static Rectangle buttonRectangle(int index, int width, int height, float top);
     [[nodiscard]] std::optional<int> buttonAt(Vector2 point, int width, int height, float top) const;
@@ -44,6 +46,7 @@ private:
     void drawFireworks(int width, int height, float top) const;
 
     Outcome outcome_{Outcome::None};
+    float delayRemaining_{};
     float age_{};
     int nextBurst_{};
     std::array<Burst, 5> bursts_{};
