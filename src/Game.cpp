@@ -183,6 +183,8 @@ struct PlayingFrameState {
     bool soundsEnabled;
     bool soundButtonHovered;
     bool soundButtonPressed;
+    bool menuButtonHovered;
+    bool menuButtonPressed;
     std::optional<Cell> guideCell;
     std::string generationError;
 
@@ -338,6 +340,25 @@ void drawMenuHeading(UiText& font, const char* title) {
 
 Rectangle soundButtonRectangle() {
     return {static_cast<float>(GetScreenWidth()) - 218.0F, 21.0F, 44.0F, 40.0F};
+}
+
+Rectangle hudMenuButtonRectangle() {
+    return {static_cast<float>(GetScreenWidth()) - 312.0F, 21.0F, 82.0F, 40.0F};
+}
+
+void drawHudMenuButton(UiText& font, bool hovered, bool pressed) {
+    const Rectangle bounds = hudMenuButtonRectangle();
+    DrawRectangleRounded(bounds, 0.22F, 8, hovered && pressed ? Color{218, 233, 252, 255}
+        : hovered ? Color{232, 241, 253, 255} : Color{249, 250, 252, 255});
+    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, hovered ? kBlue : kSoft);
+    const Color ink = hovered ? kBlue : kMuted;
+    for (int index = -1; index <= 1; ++index) {
+        const float y = bounds.y + bounds.height * 0.5F + index * 5.0F;
+        DrawLineEx({bounds.x + 12.0F, y}, {bounds.x + 25.0F, y}, 1.5F, ink);
+    }
+    const Vector2 size = measureText(font, "Menu", kMenuHintText);
+    drawText(font, "Menu", {bounds.x + 34.0F, std::round(bounds.y + (bounds.height - size.y) * 0.5F)},
+             kMenuHintText, ink);
 }
 
 void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed) {
@@ -976,6 +997,7 @@ int Game::run() {
     std::optional<std::size_t> pressedArrow;
     std::optional<int> pressedMenuButton;
     bool pressedSoundButton = false;
+    bool pressedHudMenuButton = false;
     int focusedMenuButton = 0;
     RenderTexture2D staticBoardLayer{};
     int staticBoardLayerWidth = 0;
@@ -1372,6 +1394,17 @@ int Game::run() {
             savedGame.reset();
         }
         return saved;
+    };
+
+    const auto returnToMainMenu = [&]() {
+        (void)persistCurrentGame();
+        generationError.clear();
+        pressedArrow.reset();
+        pressedMenuButton.reset();
+        pressedSoundButton = false;
+        pressedHudMenuButton = false;
+        focusedMenuButton = 0;
+        screen = Screen::MainMenu;
     };
 
     if (!automatedScreenshot.empty() &&
@@ -1859,12 +1892,7 @@ int Game::run() {
             if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
                 toggleDesktopFullscreen();
             } else if (screen == Screen::Playing) {
-                (void)persistCurrentGame();
-                generationError.clear();
-                pressedArrow.reset();
-                pressedMenuButton.reset();
-                focusedMenuButton = 0;
-                screen = Screen::MainMenu;
+                returnToMainMenu();
             } else if (screen != Screen::MainMenu) {
                 pressedMenuButton.reset();
                 focusedMenuButton = 0;
@@ -1879,6 +1907,7 @@ int Game::run() {
 
         if (screen != Screen::Playing) {
             pressedSoundButton = false;
+            pressedHudMenuButton = false;
             const Screen menuScreen = screen;
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
@@ -2381,13 +2410,21 @@ int Game::run() {
         const Vector2 mouse = GetMousePosition();
         const bool soundButtonHovered = IsWindowFocused() &&
             CheckCollisionPointRec(mouse, soundButtonRectangle());
+        const bool hudMenuButtonHovered = IsWindowFocused() &&
+            CheckCollisionPointRec(mouse, hudMenuButtonRectangle());
         if (!IsWindowFocused() || (!leftDown && !leftReleased)) {
             pressedSoundButton = false;
+            pressedHudMenuButton = false;
         }
         if (leftPressed) {
             pressedSoundButton = soundButtonHovered;
+            pressedHudMenuButton = hudMenuButtonHovered;
         }
         if (leftReleased) {
+            if (std::exchange(pressedHudMenuButton, false) && hudMenuButtonHovered) {
+                returnToMainMenu();
+                continue;
+            }
             if (std::exchange(pressedSoundButton, false) && soundButtonHovered) {
                 setSoundsEnabled(!settings.sounds);
             }
@@ -2858,6 +2895,8 @@ int Game::run() {
             settings.sounds,
             soundButtonHovered,
             pressedSoundButton,
+            hudMenuButtonHovered,
+            pressedHudMenuButton,
             guideCell,
             generationError
         };
@@ -2932,22 +2971,31 @@ int Game::run() {
             : !generationError.empty()
                 ? "GENERATION FAILED"
                 : "ARROWS  " + std::to_string(remaining);
+        TextStyle countStyle = kHudText;
+        const float countLeft = 28.0F + brandSize.x + 20.0F;
+        const float countRight = hudMenuButtonRectangle().x - 16.0F;
+        const float countWidth = std::max(1.0F, countRight - countLeft);
+        const float measuredCountWidth = measureText(uiText, countText.c_str(), countStyle).x;
+        if (measuredCountWidth > countWidth) {
+            countStyle.size = std::floor(countStyle.size * countWidth / measuredCountWidth);
+        }
         const Vector2 countSize = measureText(
             uiText,
             countText.c_str(),
-            kHudText
+            countStyle
         );
         drawText(
             uiText,
             countText.c_str(),
             {
-                std::round(static_cast<float>(GetScreenWidth()) * 0.5F -
+                std::round((countLeft + countRight) * 0.5F -
                            countSize.x * 0.5F),
                 std::round((kHudHeight - countSize.y) * 0.5F)
             },
-            kHudText,
+            countStyle,
             kMuted
         );
+        drawHudMenuButton(uiText, hudMenuButtonHovered, pressedHudMenuButton);
         drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton);
         for (int index = 0; index < 3; ++index) {
             drawHeart(
