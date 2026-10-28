@@ -1,6 +1,6 @@
 # Status, accepted decisions, and open work
 
-Snapshot: 2026-10-29, including unreleased generator work toward 0.4.0. Check
+Snapshot: 2026-10-29, preparing the user-approved 0.4.0 release. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
@@ -24,7 +24,9 @@ published 0.3.0 binary or already tested by a new Actions release run.
 The development Very Hard generator now constructs arrows from multiple
 fronts in both directions, with bounded search and explicit perimeter-quality
 limits. Local Release tests and benchmarks passed; see
-[generator evidence](generator-0.4.md). This also remains unreleased.
+[generator evidence](generator-0.4.md). The user accepted it and authorized the
+0.4.0 release, together with the delayed Game Over fix and bilingual docs.
+Publication is pending the tagged Actions build and artifact verification.
 
 The last supplied development EXE was in `build/windows-msvc/arrow_puzzle.exe`.
 Its existence/version is not guaranteed on another checkout. Rebuild to deliver
@@ -55,11 +57,11 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 
 - No active implementation task is assigned by this roadmap. Work on the live
   user's request; do not silently implement backlog items.
-- The Game Over delay is an unreleased change relative to 0.3.0. A future release
-  must deliberately choose its version and include the new changelog entry.
+- The Game Over delay and frontier generator are included in the 0.4.0 release
+  preparation. Record verified tagged build and publication evidence afterward.
 - Game.cpp remains large; refactor only in scoped steps that preserve event
   ordering, rendering invalidation, and testability.
-- Very Hard now uses bounded frontier construction in development toward 0.4.0;
+- Very Hard now uses bounded frontier construction for 0.4.0;
   see [generator work](generator-0.4.md) for the method, measurements and limits.
   This is separate from the earlier rendering work and is not in released 0.3.0.
 - Linux/Android are unverified; even dimensions are a generator restriction.

@@ -36,7 +36,7 @@ There is deliberately no simplified fallback level.
 ## 2. Overall pipeline
 
 The path-cutting pipeline below remains in use for Simple, Middle, Hard, and
-custom length constraints. Development toward 0.4.0 uses frontier construction
+custom length constraints. Since 0.4.0, the generator uses frontier construction
 for boards with both sides at least 128 cells, minimum length 2, and maximum
 length at least 30. Narrow custom boards retain the path cutter. See section
 11. Saved games retain their geometry across this change.
@@ -216,7 +216,7 @@ Particularly risky changes include:
 - falling back to a simple serpentine board;
 - exhaustive area-by-arrow-count work on 160 x 160 and larger boards.
 
-## 11. Large-board frontier construction (development toward 0.4.0)
+## 11. Large-board frontier construction (0.4.0)
 
 The random macro-tree still supplies a maze-like Hamiltonian cycle, but the
 generator no longer has to follow one global orientation or solve a giant

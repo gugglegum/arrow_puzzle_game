@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(ArrowPuzzle VERSION 0.3.0 LANGUAGES CXX)
+project(ArrowPuzzle VERSION 0.4.0 LANGUAGES CXX)
 
 option(ARROWPUZZLE_BUILD_TESTS "Build Arrow Puzzle tests" ON)
 option(ARROWPUZZLE_STATIC_RUNTIME "Use the static MSVC runtime" ON)

@@ -17,12 +17,12 @@ cmake -S . -B build/release-preview -G Ninja `
     -DCMAKE_BUILD_TYPE=Release -DARROWPUZZLE_RELEASE_PREVIEW=ON
 cmake --build build/release-preview --parallel 2
 ctest --test-dir build/release-preview --output-on-failure
-.\tools\package-windows.ps1 -Version 0.3.0 `
+.\tools\package-windows.ps1 -Version 0.4.0 `
     -BuildDirectory build/release-preview -OutputDirectory out/release-preview
 ```
 
 `ARROWPUZZLE_RELEASE_PREVIEW` показывает версию проекта из CMake, например
-`v0.3.0`, не создавая и не перемещая Git-теги. По умолчанию параметр выключен:
+`v0.4.0`, не создавая и не перемещая Git-теги. По умолчанию параметр выключен:
 обычные сборки определяют версию по последнему релизному тегу и числу коммитов.
 GitHub Actions его не включает: сборка тега получает версию из самого тега.
 Локальная предварительная сборка не имеет подтверждения происхождения GitHub;
@@ -37,7 +37,7 @@ GitHub Actions его не включает: сборка тега получа�
 1. Завершите changelog и документацию, затем закоммитьте и отправьте нужные
    исходники вместе с workflow. Версия тега должна совпадать с
    `project(... VERSION ...)` в `CMakeLists.txt`.
-2. Создайте и отправьте стабильный тег, например `v0.3.0`, на этом коммите.
+2. Создайте и отправьте стабильный тег, например `v0.4.0`, на этом коммите.
 3. Откройте **Actions → Windows release** и дождитесь сборки и тестов.
 4. Проверьте созданный черновик в **Releases**, добавьте соответствующий раздел
    changelog к сведениям о происхождении сборки и опубликуйте релиз.
@@ -77,7 +77,7 @@ GPU и звука, которым нужны дисплей и устройст�
 распаковки, подставив имя скачанной версии:
 
 ```powershell
-gh attestation verify .\ArrowPuzzle-0.3.0-windows-x64.zip `
+gh attestation verify .\ArrowPuzzle-0.4.0-windows-x64.zip `
     --repo gugglegum/arrow_puzzle_game `
     --signer-workflow gugglegum/arrow_puzzle_game/.github/workflows/release.yml `
     --deny-self-hosted-runners

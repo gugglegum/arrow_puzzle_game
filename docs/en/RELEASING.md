@@ -17,12 +17,12 @@ cmake -S . -B build/release-preview -G Ninja `
     -DCMAKE_BUILD_TYPE=Release -DARROWPUZZLE_RELEASE_PREVIEW=ON
 cmake --build build/release-preview --parallel 2
 ctest --test-dir build/release-preview --output-on-failure
-.\tools\package-windows.ps1 -Version 0.3.0 `
+.\tools\package-windows.ps1 -Version 0.4.0 `
     -BuildDirectory build/release-preview -OutputDirectory out/release-preview
 ```
 
 `ARROWPUZZLE_RELEASE_PREVIEW` displays the CMake project version (for example,
-`v0.3.0`) without creating or moving Git tags. It is off by default, so ordinary
+`v0.4.0`) without creating or moving Git tags. It is off by default, so ordinary
 builds still identify themselves using the last release tag and commit count.
 GitHub Actions does not enable it: a tagged Actions build gets its version from
 the tag. A local preview has no GitHub provenance attestation; its
@@ -37,7 +37,7 @@ then use its contents for the GitHub release description.
 1. Finish the changelog and documentation, then commit and push the intended
    release source, including the workflow. Check that the tag version matches
    `project(... VERSION ...)` in `CMakeLists.txt`.
-2. Create and push a stable release tag such as `v0.3.0` on that commit.
+2. Create and push a stable release tag such as `v0.4.0` on that commit.
 3. Open **Actions → Windows release** and wait for the build and tests.
 4. Review the generated draft under **Releases**, add the corresponding
    changelog entry to its build-provenance notes, and publish it.
@@ -74,7 +74,7 @@ With a recent [GitHub CLI](https://cli.github.com/), verify the ZIP before
 extracting it (replace the filename with the downloaded version):
 
 ```powershell
-gh attestation verify .\ArrowPuzzle-0.3.0-windows-x64.zip `
+gh attestation verify .\ArrowPuzzle-0.4.0-windows-x64.zip `
     --repo gugglegum/arrow_puzzle_game `
     --signer-workflow gugglegum/arrow_puzzle_game/.github/workflows/release.yml `
     --deny-self-hosted-runners

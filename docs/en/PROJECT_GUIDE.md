@@ -2,7 +2,7 @@
 
 **English** | [Русский](../ru/PROJECT_GUIDE.md)
 
-This guide was reviewed for version 0.3.0 on 2026-10-29. It introduces the
+This guide was reviewed for version 0.4.0 on 2026-10-29. It introduces the
 implementation and development workflow. User-facing information is in the
 root `README.md` and `README_RU.md`.
 
@@ -71,6 +71,7 @@ include/arrow/             Public core interfaces
 src/
   Board.cpp                Geometry invariants, canExit(), solveGreedily()
   Generator.cpp            Constructive generation and candidate scoring
+  FrontierGenerator.cpp    Bounded large-board construction in both directions
   MotionKinematics.cpp     Pure numerical motion functions
   MotionResolver.cpp       Pure collision classification
   Persistence.cpp          Versioned text formats and atomic replacement
@@ -281,8 +282,8 @@ After editing:
 
 - Game.cpp is a large controller. Extract UI, rendering, or simulation modules
   in small testable steps rather than an unrelated rewrite.
-- Very Hard uses bounded frontier construction with up to four workers in
-  development toward 0.4.0. The 0.3.0 generator had substantial time/memory
+- Very Hard uses bounded frontier construction with up to four workers since
+  0.4.0. The 0.3.0 generator had substantial time/memory
   spikes. See the generator guide for current limits and the benchmark tool.
 - The generator needs even board dimensions.
 - Linux and Android are not built or verified in CI.
@@ -295,7 +296,7 @@ After editing:
 - raylib 5.5: zlib/libpng, `THIRD_PARTY_NOTICES.md`.
 - Inter 4.1: SIL OFL 1.1, `assets/fonts/Inter-LICENSE.txt`.
 
-The CMake project version is 0.3.0; check GitHub Releases for published versions.
+The CMake project version is 0.4.0; check GitHub Releases for published versions.
 A release ZIP contains standalone ArrowPuzzle.exe, both READMEs, changelog,
 documentation/screenshots, and licenses. Publication requires a clean Release
 build, full CTest, successful unpacked startup, and SHA-256 checks.

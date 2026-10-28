@@ -7,16 +7,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-29
+
+### Added
+
+- A reproducible generator benchmark with separate generation timing, peak
+  working set, border metrics, geometry hashes, and solution verification.
+- A Very Hard screenshot showing the new generator, plus refreshed menu
+  screenshots for 0.4.0.
+
 ### Changed
 
-- Reworked Very Hard generation for 0.4.0 development: construct solvable arrows
+- Reworked Very Hard generation: construct solvable arrows
   from both ends of available maze fragments, with bounded retries and at most
   four workers instead of large interval/count tables. Border arrows now mostly
   continue into the interior, with enforced length diversity, 6..10 opening
   moves, and the same quality limits when arrow loops are disabled. Smaller
   presets retain their existing generator.
-- Added a reproducible generator benchmark with separate generation timing,
-  peak working set, border metrics, geometry hashes, and solution verification.
 - Organized technical documentation into matching English and Russian editions
   under `docs/en` and `docs/ru`, with language switches, shared screenshots, and
   updated links from the main READMEs, agent roadmap, and release workflow.
@@ -169,7 +176,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Allowed an armed mouse click to be cancelled by releasing away from the
   originally pressed arrow.
 
-[Unreleased]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/gugglegum/arrow_puzzle_game/releases/tag/v0.1.0

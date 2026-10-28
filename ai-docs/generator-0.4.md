@@ -1,6 +1,7 @@
 # Very Hard generator work for 0.4.0
 
-Status: implemented in development, 2026-10-29; not published as 0.4.0.
+Status: accepted by the user on 2026-10-29; release 0.4.0 authorized and being
+prepared. See [release history](release-history.md) for verified publication.
 The previous generator source was unchanged between released `52182f1` and
 the starting code snapshot `955af41`. Preserve the existing unrelated fatal
 collision delay and bilingual documentation changes when publishing this work.
@@ -30,8 +31,8 @@ collision delay and bilingual documentation changes when publishing this work.
   even lengths. The preset's 960 option remains a legal upper bound, not a
   promised generated length. Typical new boards contain more arrows than
   0.3.0: roughly 3.3k..3.7k rather than the old fixed 2,844. More medium and long
-  threads replace much of the short-arrow population; assess play feel with
-  the user before a release rather than claiming subjective fun is proven.
+  threads replace much of the short-arrow population. The user accepted the
+  resulting generator and requested the 0.4.0 release.
 
 Algorithm details and benchmark commands live in the mirrored
 [English](../docs/en/GENERATOR.md) and [Russian](../docs/ru/GENERATOR.md) guides.
@@ -93,5 +94,6 @@ these are not a dedicated steady-state idle-memory benchmark.
 - The 200-board run is a measured sample, not a proof that every seed succeeds.
   Work budgets and quality limits remain fixed; an exhausted seed returns the
   existing explicit error/retry UI. Linux/Android remain unverified.
-- A source push is not a release. CMake/release tags remain 0.3.0 until the user
-  authorizes preparation/publication of the next release.
+- A source push is not a release. The user authorized preparation, tag creation
+  and the GitHub release build for 0.4.0; record actual build/publication evidence
+  in release history after verification.
