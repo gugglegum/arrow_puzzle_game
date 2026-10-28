@@ -2487,7 +2487,13 @@ int Game::run() {
             }
         }
 
-        double simulationDelta = static_cast<double>(delta);
+        // The result covers the board. Freeze the finished simulation instead
+        // of spending time rewinding or moving hidden arrows after game over.
+        double simulationDelta = endScreen.visible() ? 0.0 : static_cast<double>(delta);
+        if (endScreen.visible()) {
+            forwardTimeDebt = 0.0;
+            recoveryTimeDebt = 0.0;
+        }
         if (movingCollisionPauseRemaining > 0.0) {
             const double pausedTime = std::min(
                 simulationDelta,
@@ -2901,6 +2907,13 @@ int Game::run() {
                 pressedArrow.reset();
                 gameAudio.playVictory();
             }
+            if (endScreen.visible()) {
+                // Finished games cannot be resumed; release their rewind data.
+                for (RuntimeArrow& value : arrows) {
+                    value.history.clear();
+                    value.targetCells.clear();
+                }
+            }
         }
         const EndScreen::Update endAnimation = endScreen.update(delta);
         for (int index = 0; index < endAnimation.fireworks; ++index) gameAudio.playFirework();
@@ -2936,15 +2949,15 @@ int Game::run() {
             !endAnimation.changed &&
             delta < 0.1F &&
             !generationInProgress &&
-            !anyArrowInMotion &&
-            !staticBoardLayerDirty &&
+            (!anyArrowInMotion || endScreen.visible()) &&
+            (!staticBoardLayerDirty || endScreen.visible()) &&
             lastDrawnScreen == Screen::Playing &&
             lastPlayingFrame == playingFrame) {
             PollInputEvents();
             continue;
         }
         lastPlayingFrame = playingFrame;
-        rebuildStaticBoardLayer();
+        if (!endScreen.visible()) rebuildStaticBoardLayer();
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -2961,7 +2974,7 @@ int Game::run() {
                 kMuted
             );
         }
-        if (staticBoardLayer.id != 0) {
+        if (staticBoardLayer.id != 0 && !endScreen.visible()) {
             DrawTextureRec(
                 staticBoardLayer.texture,
                 {
@@ -3040,27 +3053,29 @@ int Game::run() {
             );
         }
 
-        const int gameplayTop = static_cast<int>(kHudHeight) + 1;
-        BeginScissorMode(
-            0,
-            gameplayTop,
-            GetScreenWidth(),
-            std::max(0, GetScreenHeight() - gameplayTop)
-        );
-        BeginMode2D(camera);
-        if (guideCell.has_value()) {
-            drawGridGuides(staticBoardGeometry, board, idleBoardOccupancy, *guideCell, camera.zoom);
-        }
-        staticBoardGeometry.beginDynamic(camera.zoom);
-        for (const RuntimeArrow& value : arrows) {
-            if (value.present &&
-                value.motion != Motion::Idle) {
-                drawArrow(staticBoardGeometry, value);
+        if (!endScreen.visible()) {
+            const int gameplayTop = static_cast<int>(kHudHeight) + 1;
+            BeginScissorMode(
+                0,
+                gameplayTop,
+                GetScreenWidth(),
+                std::max(0, GetScreenHeight() - gameplayTop)
+            );
+            BeginMode2D(camera);
+            if (guideCell.has_value()) {
+                drawGridGuides(staticBoardGeometry, board, idleBoardOccupancy, *guideCell, camera.zoom);
             }
+            staticBoardGeometry.beginDynamic(camera.zoom);
+            for (const RuntimeArrow& value : arrows) {
+                if (value.present &&
+                    value.motion != Motion::Idle) {
+                    drawArrow(staticBoardGeometry, value);
+                }
+            }
+            staticBoardGeometry.endDynamic();
+            EndMode2D();
+            EndScissorMode();
         }
-        staticBoardGeometry.endDynamic();
-        EndMode2D();
-        EndScissorMode();
 
         if (generationInProgress) {
             DrawRectangle(
