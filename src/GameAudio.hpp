@@ -15,17 +15,24 @@ public:
     GameAudio& operator=(const GameAudio&) = delete;
 
     // The audio device is opened only on the first enable. Muting stops every
-    // voice immediately and keeps the small shared sample ready for re-enable.
+    // voice immediately and keeps the decoded samples ready for re-enable.
     void setEnabled(bool enabled);
     void playArrowLaunch();
+    void playCollision();
+    void playDefeat();
+    void playVictory();
     void release();
     [[nodiscard]] bool ready() const noexcept;
 
 private:
     bool load();
+    void stopLaunches();
     void stopVoices();
 
     Sound launchSource_{};
+    Sound collisionSource_{};
+    Sound defeatSource_{};
+    Sound victorySource_{};
     std::array<Sound, 4> launchVoices_{};
     std::size_t nextVoice_{};
     bool deviceOpen_{};

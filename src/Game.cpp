@@ -944,6 +944,7 @@ int Game::run() {
     bool resumeAvailable = savedGame.has_value();
     Screen screen = Screen::MainMenu;
     bool activeGame = false;
+    bool gameResultAnnounced = false;
 
     std::uint32_t seed = unsignedFromEnvironment(
         "ARROWPUZZLE_SEED"
@@ -1047,6 +1048,7 @@ int Game::run() {
         staticBoardGeometryDirty = true;
     };
     auto resetRuntime = [&](const SavedGame* restored = nullptr) {
+        gameResultAnnounced = false;
         arrows.clear();
         arrows.reserve(board.arrows().size());
         for (std::size_t index = 0;
@@ -1088,6 +1090,12 @@ int Game::run() {
     resetRuntime();
 
     int lives = 3;
+    const auto loseLife = [&]() {
+        if (lives > 0) {
+            --lives;
+            gameAudio.playCollision();
+        }
+    };
     std::future<Board> generationFuture;
     bool generationInProgress = false;
     bool generationOverlayRendered = false;
@@ -2651,7 +2659,7 @@ int Game::run() {
                 const bool preparationCollision =
                     prepareForwardTransitions();
                 if (preparationCollision) {
-                    lives = std::max(0, lives - 1);
+                    loseLife();
                 }
                 if (!hasForwardMotion()) {
                     break;
@@ -2794,7 +2802,7 @@ int Game::run() {
                 if (completionHardCollision ||
                     movingCollision ||
                     nextHardCollision) {
-                    lives = std::max(0, lives - 1);
+                    loseLife();
                 }
                 ++processedEvents;
 
@@ -2820,6 +2828,15 @@ int Game::run() {
             arrows,
             [](const RuntimeArrow& value) { return value.present; }
         ));
+        if (activeGame && !generationBlocksInput && !gameResultAnnounced) {
+            if (lives <= 0) {
+                gameResultAnnounced = true;
+                gameAudio.playDefeat();
+            } else if (remaining == 0) {
+                gameResultAnnounced = true;
+                gameAudio.playVictory();
+            }
+        }
         if (activeGame &&
             (remaining == 0 || lives <= 0) &&
             resumeAvailable &&

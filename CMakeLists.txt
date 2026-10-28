@@ -83,28 +83,35 @@ add_custom_command(
     VERBATIM
 )
 
-set(ARROWPUZZLE_EMBEDDED_SOUND_SOURCE
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/EmbeddedLaunchSound.cpp"
-)
-add_custom_command(
-    OUTPUT "${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
-    COMMAND
-        ${CMAKE_COMMAND}
-        "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/assets/sounds/b2-light-pistol.wav"
-        "-DOUTPUT_FILE=${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
-        "-DHEADER_NAME=AudioData.hpp"
-        "-DSYMBOL_NAME=kArrowLaunchWav"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
-    DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/sounds/b2-light-pistol.wav"
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
-    COMMENT "Embedding arrow launch sound"
-    VERBATIM
-)
+function(arrow_embed_sound filename symbol)
+    set(source "${CMAKE_CURRENT_BINARY_DIR}/generated/${symbol}.cpp")
+    add_custom_command(
+        OUTPUT "${source}"
+        COMMAND
+            ${CMAKE_COMMAND}
+            "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/assets/sounds/${filename}"
+            "-DOUTPUT_FILE=${source}"
+            "-DHEADER_NAME=AudioData.hpp"
+            "-DSYMBOL_NAME=${symbol}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/sounds/${filename}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+        COMMENT "Embedding ${filename}"
+        VERBATIM
+    )
+    set(ARROWPUZZLE_EMBEDDED_SOUND_SOURCES
+        ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES} "${source}" PARENT_SCOPE)
+endfunction()
+
+arrow_embed_sound(b2-light-pistol.wav kArrowLaunchWav)
+arrow_embed_sound(c3-metal-clack.wav kCollisionWav)
+arrow_embed_sound(d4-retro-fail.wav kDefeatWav)
+arrow_embed_sound(v3-glass-chord.wav kVictoryWav)
 
 add_executable(arrow_puzzle WIN32
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
-    "${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
+    ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES}
     src/GameAudio.cpp
     src/GameAudio.hpp
     src/AudioData.hpp
@@ -195,7 +202,7 @@ if(ARROWPUZZLE_BUILD_TESTS)
     add_executable(arrow_audio_tests EXCLUDE_FROM_ALL
         tests/AudioTests.cpp
         src/GameAudio.cpp
-        "${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
+        ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES}
     )
     target_include_directories(arrow_audio_tests PRIVATE src)
     target_link_libraries(arrow_audio_tests PRIVATE raylib)

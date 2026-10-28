@@ -4,6 +4,19 @@
 #include <limits>
 
 namespace arrow {
+namespace {
+
+Sound loadEmbeddedSound(const unsigned char* data, std::size_t size) {
+    if (size > static_cast<std::size_t>(std::numeric_limits<int>::max())) return {};
+    Wave wave = LoadWaveFromMemory(".wav", data, static_cast<int>(size));
+    Sound sound{};
+    if (IsWaveValid(wave)) sound = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    if (IsSoundValid(sound)) SetSoundVolume(sound, 0.45F);
+    return sound;
+}
+
+} // namespace
 
 GameAudio::~GameAudio() { release(); }
 
@@ -17,15 +30,12 @@ bool GameAudio::load() {
         }
         deviceOpen_ = true;
     }
-    if (assets::kArrowLaunchWavSize > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        return false;
-    }
-    Wave wave = LoadWaveFromMemory(
-        ".wav", assets::kArrowLaunchWav, static_cast<int>(assets::kArrowLaunchWavSize)
-    );
-    if (IsWaveValid(wave)) launchSource_ = LoadSoundFromWave(wave);
-    UnloadWave(wave);
-    if (IsSoundValid(launchSource_)) {
+    launchSource_ = loadEmbeddedSound(assets::kArrowLaunchWav, assets::kArrowLaunchWavSize);
+    collisionSource_ = loadEmbeddedSound(assets::kCollisionWav, assets::kCollisionWavSize);
+    defeatSource_ = loadEmbeddedSound(assets::kDefeatWav, assets::kDefeatWavSize);
+    victorySource_ = loadEmbeddedSound(assets::kVictoryWav, assets::kVictoryWavSize);
+    if (IsSoundValid(launchSource_) && IsSoundValid(collisionSource_) &&
+        IsSoundValid(defeatSource_) && IsSoundValid(victorySource_)) {
         loaded_ = true;
         for (Sound& voice : launchVoices_) {
             voice = LoadSoundAlias(launchSource_);
@@ -33,13 +43,13 @@ bool GameAudio::load() {
                 loaded_ = false;
                 break;
             }
-            // Four fully overlapping copies of the selected B2 remain below
-            // full scale. Aliases share decoded samples, not playback cursors.
+            // Four B2 launches plus one C3 collision stay below full scale.
+            // Aliases share decoded samples, not playback cursors.
             SetSoundVolume(voice, 0.45F);
         }
         if (loaded_) return true;
     }
-    TraceLog(LOG_WARNING, "AUDIO: Could not load the embedded arrow launch sound");
+    TraceLog(LOG_WARNING, "AUDIO: Could not load the embedded sound effects");
     release();
     return false;
 }
@@ -51,6 +61,26 @@ void GameAudio::setEnabled(bool enabled) {
         return;
     }
     enabled_ = load();
+}
+
+void GameAudio::playCollision() {
+    if (!enabled_ || !loaded_) return;
+    // Reuse one voice for simultaneous or closely spaced life-loss batches.
+    PlaySound(collisionSource_);
+}
+
+void GameAudio::playDefeat() {
+    if (!enabled_ || !loaded_) return;
+    stopLaunches();
+    StopSound(victorySource_);
+    // Preserve the final impact beneath the defeat cue.
+    PlaySound(defeatSource_);
+}
+
+void GameAudio::playVictory() {
+    if (!enabled_ || !loaded_) return;
+    stopVoices();
+    PlaySound(victorySource_);
 }
 
 void GameAudio::playArrowLaunch() {
@@ -69,9 +99,16 @@ void GameAudio::playArrowLaunch() {
     nextVoice_ = (nextVoice_ + 1) % launchVoices_.size();
 }
 
-void GameAudio::stopVoices() {
+void GameAudio::stopLaunches() {
     for (const Sound voice : launchVoices_) {
         if (voice.stream.buffer != nullptr) StopSound(voice);
+    }
+}
+
+void GameAudio::stopVoices() {
+    stopLaunches();
+    for (const Sound sound : {collisionSource_, defeatSource_, victorySource_}) {
+        if (sound.stream.buffer != nullptr) StopSound(sound);
     }
 }
 
@@ -82,8 +119,10 @@ void GameAudio::release() {
         if (voice.stream.buffer != nullptr) UnloadSoundAlias(voice);
         voice = {};
     }
-    if (launchSource_.stream.buffer != nullptr) UnloadSound(launchSource_);
-    launchSource_ = {};
+    for (Sound* sound : {&launchSource_, &collisionSource_, &defeatSource_, &victorySource_}) {
+        if (sound->stream.buffer != nullptr) UnloadSound(*sound);
+        *sound = {};
+    }
     loaded_ = false;
     nextVoice_ = 0;
     if (deviceOpen_) CloseAudioDevice();
