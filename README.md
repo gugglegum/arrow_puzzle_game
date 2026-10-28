@@ -11,11 +11,17 @@ Settings and unfinished games are saved beside the executable.
 
 ## Screenshots
 
-[![A generated Arrow Puzzle level](docs/screenshots/simple-level.png)](docs/screenshots/simple-level.png)
+| Simple level (20 x 20) | Middle level (40 x 40) |
+| :---: | :---: |
+| [![Arrow Puzzle gameplay on a 20 x 20 board](docs/screenshots/simple-level.png)](docs/screenshots/simple-level.png) | [![Arrow Puzzle gameplay on a 40 x 40 board](docs/screenshots/middle-level.png)](docs/screenshots/middle-level.png) |
 
 | Main menu | Difficulty selection |
 | :---: | :---: |
 | [![Arrow Puzzle main menu](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![New game difficulty selection](docs/screenshots/new-game.png)](docs/screenshots/new-game.png) |
+
+| Settings | Victory and fireworks |
+| :---: | :---: |
+| [![Sound, board theme, and gameplay settings](docs/screenshots/settings.png)](docs/screenshots/settings.png) | [![Victory screen with colourful fireworks](docs/screenshots/victory.png)](docs/screenshots/victory.png) |
 
 ## Download
 

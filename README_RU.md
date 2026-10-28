@@ -12,11 +12,17 @@ Arrow Puzzle — минималистичная головоломка для П
 
 ## Скриншоты
 
-[![Сгенерированный уровень Arrow Puzzle](docs/screenshots/simple-level.png)](docs/screenshots/simple-level.png)
+| Уровень Simple (20 x 20) | Уровень Middle (40 x 40) |
+| :---: | :---: |
+| [![Игровое поле Arrow Puzzle размером 20 x 20](docs/screenshots/simple-level.png)](docs/screenshots/simple-level.png) | [![Игровое поле Arrow Puzzle размером 40 x 40](docs/screenshots/middle-level.png)](docs/screenshots/middle-level.png) |
 
 | Главное меню | Выбор сложности |
 | :---: | :---: |
 | [![Главное меню Arrow Puzzle](docs/screenshots/main-menu.png)](docs/screenshots/main-menu.png) | [![Выбор сложности новой игры](docs/screenshots/new-game.png)](docs/screenshots/new-game.png) |
+
+| Настройки | Победа и фейерверк |
+| :---: | :---: |
+| [![Настройки звука, темы игрового поля и правил игры](docs/screenshots/settings.png)](docs/screenshots/settings.png) | [![Экран победы с красочным фейерверком](docs/screenshots/victory.png)](docs/screenshots/victory.png) |
 
 ## Скачать
 
