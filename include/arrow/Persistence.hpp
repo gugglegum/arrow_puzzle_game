@@ -12,6 +12,7 @@ struct Settings {
     bool arrowLoops{true};
     bool flyingArrowCollisions{true};
     bool crosshairGuides{false};
+    bool sounds{false};
 
     auto operator<=>(const Settings&) const = default;
 };
@@ -54,6 +55,10 @@ public:
         bool enabled
     ) const noexcept;
     [[nodiscard]] bool setCrosshairGuides(
+        Settings& settings,
+        bool enabled
+    ) const noexcept;
+    [[nodiscard]] bool setSounds(
         Settings& settings,
         bool enabled
     ) const noexcept;

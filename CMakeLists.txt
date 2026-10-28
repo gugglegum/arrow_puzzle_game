@@ -83,8 +83,31 @@ add_custom_command(
     VERBATIM
 )
 
+set(ARROWPUZZLE_EMBEDDED_SOUND_SOURCE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/EmbeddedLaunchSound.cpp"
+)
+add_custom_command(
+    OUTPUT "${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/assets/sounds/b2-light-pistol.wav"
+        "-DOUTPUT_FILE=${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
+        "-DHEADER_NAME=AudioData.hpp"
+        "-DSYMBOL_NAME=kArrowLaunchWav"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+    DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/sounds/b2-light-pistol.wav"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+    COMMENT "Embedding arrow launch sound"
+    VERBATIM
+)
+
 add_executable(arrow_puzzle WIN32
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+    "${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
+    src/GameAudio.cpp
+    src/GameAudio.hpp
+    src/AudioData.hpp
     src/Game.cpp
     src/StaticBoardGeometry.cpp
     src/StaticBoardGeometry.hpp
@@ -166,5 +189,17 @@ if(ARROWPUZZLE_BUILD_TESTS)
     target_link_libraries(arrow_ui_text_tests PRIVATE raylib)
     if(MSVC)
         target_compile_options(arrow_ui_text_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
+    # Explicit check requiring a playback device; default core tests stay headless.
+    add_executable(arrow_audio_tests EXCLUDE_FROM_ALL
+        tests/AudioTests.cpp
+        src/GameAudio.cpp
+        "${ARROWPUZZLE_EMBEDDED_SOUND_SOURCE}"
+    )
+    target_include_directories(arrow_audio_tests PRIVATE src)
+    target_link_libraries(arrow_audio_tests PRIVATE raylib)
+    if(MSVC)
+        target_compile_options(arrow_audio_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
 endif()

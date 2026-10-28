@@ -397,6 +397,7 @@ Settings Persistence::loadSettings() const noexcept {
         bool arrowLoopsSeen = false;
         bool collisionsSeen = false;
         bool crosshairGuidesSeen = false;
+        bool soundsSeen = false;
         std::string line;
         while (std::getline(input, line)) {
             if (line.size() > kMaximumLineLength) {
@@ -432,13 +433,16 @@ Settings Persistence::loadSettings() const noexcept {
             } else if (key == "crosshair_guides") {
                 crosshairGuidesSeen = parseBool(value, settings.crosshairGuides);
                 canonical = canonical && crosshairGuidesSeen;
+            } else if (key == "sounds") {
+                soundsSeen = parseBool(value, settings.sounds);
+                canonical = canonical && soundsSeen;
             }
         }
         if (!input.eof()) {
             canonical = false;
         }
         canonical = canonical && formatSeen && versionSeen &&
-                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen;
+                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen;
         if (!formatSeen || !versionSeen) {
             settings = {};
         }
@@ -462,7 +466,8 @@ bool Persistence::saveSettings(const Settings& settings) const noexcept {
                << "flying_arrow_collisions="
                << (settings.flyingArrowCollisions ? "on" : "off") << '\n'
                << "crosshair_guides="
-               << (settings.crosshairGuides ? "on" : "off") << '\n';
+               << (settings.crosshairGuides ? "on" : "off") << '\n'
+               << "sounds=" << (settings.sounds ? "on" : "off") << '\n';
         return static_cast<bool>(output);
     });
 }
@@ -499,6 +504,16 @@ bool Persistence::setCrosshairGuides(
 ) const noexcept {
     Settings changed = settings;
     changed.crosshairGuides = enabled;
+    if (!saveSettings(changed)) {
+        return false;
+    }
+    settings = changed;
+    return true;
+}
+
+bool Persistence::setSounds(Settings& settings, bool enabled) const noexcept {
+    Settings changed = settings;
+    changed.sounds = enabled;
     if (!saveSettings(changed)) {
         return false;
     }

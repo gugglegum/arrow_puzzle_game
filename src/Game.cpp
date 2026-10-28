@@ -5,6 +5,7 @@
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
 #include "BuildVersion.hpp"
+#include "GameAudio.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "UiText.hpp"
 
@@ -179,6 +180,9 @@ struct PlayingFrameState {
     int remaining;
     bool generationInProgress;
     bool windowFocused;
+    bool soundsEnabled;
+    bool soundButtonHovered;
+    bool soundButtonPressed;
     std::optional<Cell> guideCell;
     std::string generationError;
 
@@ -232,8 +236,12 @@ void drawCenteredText(
 }
 
 Rectangle menuButtonRectangle(int index, int count) {
-    constexpr float buttonHeight = 58.0F;
     constexpr float buttonGap = 16.0F;
+    const float buttonHeight = std::min(
+        58.0F,
+        std::max(40.0F, (static_cast<float>(GetScreenHeight()) - 285.0F -
+            static_cast<float>(count - 1) * buttonGap) / static_cast<float>(count))
+    );
     const float width = std::min(
         460.0F,
         static_cast<float>(GetScreenWidth()) - 80.0F
@@ -326,6 +334,40 @@ void drawMenuHeading(UiText& font, const char* title) {
         kMenuTitleText,
         kMuted
     );
+}
+
+Rectangle soundButtonRectangle() {
+    return {static_cast<float>(GetScreenWidth()) - 218.0F, 21.0F, 44.0F, 40.0F};
+}
+
+void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed) {
+    const Rectangle bounds = soundButtonRectangle();
+    const Color fill = hovered && pressed ? Color{218, 233, 252, 255}
+        : enabled || hovered ? Color{232, 241, 253, 255}
+        : Color{249, 250, 252, 255};
+    const Color ink = enabled ? kBlue : kMuted;
+    DrawRectangleRounded(bounds, 0.22F, 8, fill);
+    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, enabled || hovered ? kBlue : kSoft);
+    const Vector2 center{bounds.x + bounds.width * 0.5F, bounds.y + bounds.height * 0.5F};
+    DrawRectangleRec({center.x - 12.0F, center.y - 4.0F, 5.0F, 8.0F}, ink);
+    const std::array<Vector2, 4> cone{{
+        {center.x - 7.0F, center.y - 4.0F},
+        {center.x - 7.0F, center.y + 4.0F},
+        {center.x + 1.0F, center.y + 10.0F},
+        {center.x + 1.0F, center.y - 10.0F}
+    }};
+    DrawTriangleFan(cone.data(), static_cast<int>(cone.size()), ink);
+    if (enabled) {
+        DrawRing({center.x + 1.0F, center.y}, 5.0F, 6.5F, -55.0F, 55.0F, 16, ink);
+        DrawRing({center.x + 1.0F, center.y}, 9.0F, 10.5F, -55.0F, 55.0F, 20, ink);
+    } else {
+        DrawLineEx({center.x + 5.0F, center.y - 4.0F}, {center.x + 12.0F, center.y + 4.0F}, 1.8F, ink);
+        DrawLineEx({center.x + 5.0F, center.y + 4.0F}, {center.x + 12.0F, center.y - 4.0F}, 1.8F, ink);
+    }
+    if (hovered) {
+        drawCenteredText(font, enabled ? "Sounds: ON" : "Sounds: OFF",
+                         center.x, 4.0F, kMenuVersionText, kMuted);
+    }
 }
 
 Vector2 cellCenter(Cell cell) {
@@ -888,6 +930,15 @@ int Game::run() {
 
     Persistence persistence(Persistence::executableDirectory());
     Settings settings = persistence.loadSettings();
+    GameAudio gameAudio;
+    gameAudio.setEnabled(settings.sounds);
+    const auto setSoundsEnabled = [&](bool enabled) {
+        if (persistence.setSounds(settings, enabled)) {
+            gameAudio.setEnabled(settings.sounds);
+        } else {
+            TraceLog(LOG_WARNING, "Could not save sound setting");
+        }
+    };
     std::optional<SavedGame> savedGame =
         persistence.loadSavedGame();
     bool resumeAvailable = savedGame.has_value();
@@ -923,6 +974,7 @@ int Game::run() {
     std::uint64_t recoveryTick = 0;
     std::optional<std::size_t> pressedArrow;
     std::optional<int> pressedMenuButton;
+    bool pressedSoundButton = false;
     int focusedMenuButton = 0;
     RenderTexture2D staticBoardLayer{};
     int staticBoardLayerWidth = 0;
@@ -1388,6 +1440,7 @@ int Game::run() {
         value.movingCollisionTint = false;
         value.history.clear();
         value.targetCells.clear();
+        gameAudio.playArrowLaunch();
         invalidateStaticBoard();
     };
 
@@ -1817,13 +1870,12 @@ int Game::run() {
         }
 
         if (screen != Screen::Playing) {
+            pressedSoundButton = false;
             const Screen menuScreen = screen;
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
                 ? 4
-                : menuScreen == Screen::NewGameMenu
-                    ? 5
-                    : 4;
+                : 5;
             const auto menuItemEnabled = [&](int index) {
                 if (index < 0 || index >= menuItemCount) {
                     return false;
@@ -1953,7 +2005,7 @@ int Game::run() {
                 } else if (
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
-                    focusedMenuButton <= 2) {
+                    focusedMenuButton <= 3) {
                     activatedMenuButton =
                         focusedMenuButton;
                     pressedMenuButton.reset();
@@ -2126,7 +2178,7 @@ int Game::run() {
                 );
             } else if (screen == Screen::SettingsMenu) {
                 drawMenuHeading(uiText, "SETTINGS");
-                constexpr int buttonCount = 4;
+                constexpr int buttonCount = 5;
                 const std::string loopsLabel =
                     std::string{"Arrow loops  ["} +
                     (settings.arrowLoops ? "ON" : "OFF") +
@@ -2182,6 +2234,13 @@ int Game::run() {
                 if (menuButton(
                         3,
                         menuButtonRectangle(3, buttonCount),
+                        settings.sounds ? "Sounds: ON" : "Sounds: OFF"
+                    )) {
+                    setSoundsEnabled(!settings.sounds);
+                }
+                if (menuButton(
+                        4,
+                        menuButtonRectangle(4, buttonCount),
                         "Back"
                     )) {
                     screen = Screen::MainMenu;
@@ -2311,25 +2370,40 @@ int Game::run() {
             IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
         const bool leftDown =
             IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+        const Vector2 mouse = GetMousePosition();
+        const bool soundButtonHovered = IsWindowFocused() &&
+            CheckCollisionPointRec(mouse, soundButtonRectangle());
+        if (!IsWindowFocused() || (!leftDown && !leftReleased)) {
+            pressedSoundButton = false;
+        }
+        if (leftPressed) {
+            pressedSoundButton = soundButtonHovered;
+        }
+        if (leftReleased) {
+            if (std::exchange(pressedSoundButton, false) && soundButtonHovered) {
+                setSoundsEnabled(!settings.sounds);
+            }
+        }
+        const bool pointerInGameplay = mouse.y > kHudHeight &&
+            mouse.y < GetScreenHeight() && mouse.x >= 0.0F && mouse.x < GetScreenWidth();
 
         if (!launchInputAvailable ||
             (!leftDown && !leftReleased)) {
             pressedArrow.reset();
         }
 
-        if (leftPressed && launchInputAvailable) {
-            const Vector2 world = GetScreenToWorld2D(
-                GetMousePosition(),
-                camera
-            );
-            pressedArrow = hitTest(world, arrows);
+        if (leftPressed) {
+            pressedArrow.reset();
+            if (launchInputAvailable && pointerInGameplay) {
+                pressedArrow = hitTest(GetScreenToWorld2D(mouse, camera), arrows);
+            }
         }
 
         if (leftReleased) {
             const std::optional<std::size_t> armedArrow =
                 std::exchange(pressedArrow, std::nullopt);
             if (armedArrow.has_value() &&
-                launchInputAvailable) {
+                launchInputAvailable && pointerInGameplay) {
                 const Vector2 world = GetScreenToWorld2D(
                     GetMousePosition(),
                     camera
@@ -2764,6 +2838,9 @@ int Game::run() {
             remaining,
             generationInProgress,
             IsWindowFocused(),
+            settings.sounds,
+            soundButtonHovered,
+            pressedSoundButton,
             guideCell,
             generationError
         };
@@ -2854,6 +2931,7 @@ int Game::run() {
             kHudText,
             kMuted
         );
+        drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton);
         for (int index = 0; index < 3; ++index) {
             drawHeart(
                 {
@@ -3096,6 +3174,7 @@ int Game::run() {
             // consuming the future keeps the worker lifetime deterministic.
         }
     }
+    gameAudio.release();
     uiText.release();
     if (staticBoardLayer.id != 0) {
         UnloadRenderTexture(staticBoardLayer);

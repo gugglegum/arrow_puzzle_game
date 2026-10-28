@@ -116,6 +116,7 @@ void testDefaultSettingsAreCreated() {
         "Flying-arrow collisions must default to on"
     );
     require(!settings.crosshairGuides, "Crosshair guides must default to off");
+    require(!settings.sounds, "Sounds must default to off");
     require(
         std::filesystem::is_regular_file(persistence.settingsPath()),
         "Loading missing settings must create settings.txt"
@@ -134,6 +135,7 @@ void testDefaultSettingsAreCreated() {
         text.find("crosshair_guides=off") != std::string::npos,
         "Default crosshair guide setting was not written"
     );
+    require(text.find("sounds=off") != std::string::npos, "Default sound setting was not written");
 }
 
 void testSettingsRoundTripAndAutomaticSetters() {
@@ -175,6 +177,41 @@ void testSettingsRoundTripAndAutomaticSetters() {
     require(persistence.loadSettings().crosshairGuides, "Crosshair guides were not persisted");
     require(persistence.setCrosshairGuides(settings, false), "Disabling crosshair guides failed");
     require(persistence.loadSettings() == arrow::Settings{}, "Crosshair guides did not stay disabled");
+    require(persistence.setSounds(settings, true), "Enabling sounds failed");
+    require(settings.sounds && persistence.loadSettings().sounds, "Sounds did not stay enabled");
+    require(persistence.setSounds(settings, false), "Disabling sounds failed");
+    require(!settings.sounds && !persistence.loadSettings().sounds, "Sounds did not stay disabled");
+}
+
+void testSoundsUpgradeAndRepair() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    writeText(persistence.settingsPath(),
+        "format=arrow-puzzle-settings\nversion=1\narrow_loops=off\n"
+        "flying_arrow_collisions=off\ncrosshair_guides=on\n");
+    const auto upgraded = persistence.loadSettings();
+    require(!upgraded.arrowLoops && !upgraded.flyingArrowCollisions && upgraded.crosshairGuides,
+            "Adding sounds changed existing preferences");
+    require(!upgraded.sounds, "Legacy settings unexpectedly enabled sounds");
+    require(readText(persistence.settingsPath()).find("sounds=off") != std::string::npos,
+            "Legacy sound preference was not written");
+
+    writeText(persistence.settingsPath(),
+        "format=arrow-puzzle-settings\nversion=1\narrow_loops=off\n"
+        "flying_arrow_collisions=on\ncrosshair_guides=on\nsounds=invalid\n");
+    const auto repaired = persistence.loadSettings();
+    require(!repaired.sounds && !repaired.arrowLoops &&
+            repaired.flyingArrowCollisions && repaired.crosshairGuides,
+            "Repairing sounds changed another preference");
+    require(readText(persistence.settingsPath()).find("sounds=off") != std::string::npos,
+            "Malformed sound setting was not repaired");
+
+    const auto blockedPath = temporary.path() / "not-a-directory";
+    writeText(blockedPath, "keep");
+    const arrow::Persistence blocked{blockedPath};
+    arrow::Settings unchanged;
+    require(!blocked.setSounds(unchanged, true) && !unchanged.sounds,
+            "Failed sound write changed the active preference");
 }
 
 void testCrosshairGuidesUpgradeAndRepair() {
@@ -427,6 +464,7 @@ int main() {
     try {
         testDefaultSettingsAreCreated();
         testSettingsRoundTripAndAutomaticSetters();
+        testSoundsUpgradeAndRepair();
         testCrosshairGuidesUpgradeAndRepair();
         testMalformedSettingsAreRepaired();
         testSavedGameRoundTrip();
