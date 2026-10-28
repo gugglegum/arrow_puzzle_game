@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(ArrowPuzzle VERSION 0.1.0 LANGUAGES CXX)
+project(ArrowPuzzle VERSION 0.2.0 LANGUAGES CXX)
 
 option(ARROWPUZZLE_BUILD_TESTS "Build Arrow Puzzle tests" ON)
 option(ARROWPUZZLE_STATIC_RUNTIME "Use the static MSVC runtime" ON)
@@ -14,6 +14,25 @@ if(MSVC AND ARROWPUZZLE_STATIC_RUNTIME)
 endif()
 include(FetchContent)
 find_package(Threads REQUIRED)
+find_package(Git QUIET)
+
+# Check Git on every build, including after a commit or a new release tag.
+# The script preserves the header's timestamp when its contents are unchanged.
+set(ARROWPUZZLE_BUILD_VERSION_HEADER
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/BuildVersion.hpp"
+)
+add_custom_target(arrow_build_version
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DOUTPUT_FILE=${ARROWPUZZLE_BUILD_VERSION_HEADER}"
+        "-DRELEASE_VERSION=${PROJECT_VERSION}"
+        "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersion.cmake"
+    BYPRODUCTS "${ARROWPUZZLE_BUILD_VERSION_HEADER}"
+    COMMENT "Updating build version"
+    VERBATIM
+)
 
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
@@ -76,8 +95,12 @@ add_executable(arrow_puzzle WIN32
     src/UiText.hpp
 )
 
+add_dependencies(arrow_puzzle arrow_build_version)
 target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib Threads::Threads)
-target_include_directories(arrow_puzzle PRIVATE src)
+target_include_directories(arrow_puzzle PRIVATE
+    src
+    "${CMAKE_CURRENT_BINARY_DIR}/generated"
+)
 
 if(MSVC)
     target_compile_options(arrow_puzzle PRIVATE /W4 /permissive- /utf-8)

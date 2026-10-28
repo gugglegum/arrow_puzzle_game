@@ -4,6 +4,7 @@
 #include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
+#include "BuildVersion.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "UiText.hpp"
 
@@ -77,6 +78,7 @@ constexpr TextStyle kMenuBrandText{34.0F, 1.1F};
 constexpr TextStyle kMenuTitleText{22.0F, 0.6F};
 constexpr TextStyle kMenuButtonText{20.0F, 0.2F};
 constexpr TextStyle kMenuHintText{15.0F, 0.1F};
+constexpr TextStyle kMenuVersionText{13.0F, 0.0F};
 
 enum class Screen {
     MainMenu,
@@ -2132,6 +2134,20 @@ int Game::run() {
                     kMuted
                 );
             }
+
+            const Vector2 versionSize = measureText(
+                uiText, build::kVersionLabel, kMenuVersionText
+            );
+            drawText(
+                uiText,
+                build::kVersionLabel,
+                {
+                    static_cast<float>(GetScreenWidth()) - versionSize.x - 22.0F,
+                    static_cast<float>(GetScreenHeight()) - versionSize.y - 16.0F
+                },
+                kMenuVersionText,
+                kMuted
+            );
 
             if (screen != menuScreen) {
                 pressedMenuButton.reset();
