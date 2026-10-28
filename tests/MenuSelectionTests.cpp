@@ -16,15 +16,23 @@ void checkMenu(int count) {
     arrow::MenuSelection selection;
     selection.updatePointer(-10, -10, std::nullopt, true);
     selection.move(1, count, enabled);
-    const int bookmark = count == 4 ? 2 : 1;
-    expect(selection, bookmark, "Down did not skip disabled rows");
+    const int nextAfterFirst = count == 4 ? 2 : 1;
+    expect(selection, nextAfterFirst, "Down did not skip disabled rows");
 
     selection.updatePointer(100, 100, count - 1, true);
-    expect(selection, count - 1, "Hover did not override the keyboard bookmark");
+    expect(selection, count - 1, "Hover did not select the pointed row");
     selection.updatePointer(100, 101, count - 1, true);
     expect(selection, count - 1, "Movement within the row changed selection");
     selection.updatePointer(20, 20, std::nullopt, true);
-    expect(selection, bookmark, "Leaving rows did not restore keyboard selection");
+    expect(selection, count - 1, "Leaving rows discarded the current selection");
+    for (int offset = 1; offset <= 12; ++offset) {
+        selection.updatePointer(20.0F + offset, 20.0F + offset, std::nullopt, true);
+        expect(selection, count - 1, "Moving through a gap changed the selected row");
+    }
+    selection.move(-1, count, enabled);
+    expect(selection, count - 2, "Navigation in a gap did not start from the last hovered row");
+    selection.updatePointer(-20, -20, std::nullopt, true);
+    expect(selection, count - 2, "Movement outside the menu discarded keyboard navigation");
 
     selection.updatePointer(100, 100, count - 1, true);
     selection.move(1, count, enabled);
@@ -33,11 +41,11 @@ void checkMenu(int count) {
     expect(selection, 0, "Stationary mouse stole keyboard selection");
     selection.move(1, count, enabled);
     selection.updatePointer(100, 100, count - 1, true);
-    expect(selection, bookmark, "Repeated keyboard navigation started from hover");
+    expect(selection, nextAfterFirst, "Repeated keyboard navigation started from hover");
     selection.updatePointer(101, 100, count - 1, true);
     expect(selection, count - 1, "New pointer movement did not reclaim selection");
     selection.updatePointer(20, 20, std::nullopt, true);
-    expect(selection, bookmark, "Hover replaced the updated keyboard bookmark");
+    expect(selection, count - 1, "Leaving the new hover changed selection");
 
     selection.updatePointer(100, 100, 0, true);
     selection.move(-1, count, enabled);
@@ -46,16 +54,15 @@ void checkMenu(int count) {
     selection.move(-1, count, enabled);
     expect(selection, count - 2, "Up restarted from stationary hover");
 
-    // Clicking a setting changes its value, not the keyboard bookmark.
+    // A click also selects its row when the pointer has stayed stationary.
     selection.updatePointer(100, 100, 0, true);
     selection.usePointer();
     expect(selection, 0, "Click did not select the row under a stationary pointer");
     selection.updatePointer(20, 20, std::nullopt, true);
-    expect(selection, count - 2, "Click discarded the keyboard bookmark");
+    expect(selection, 0, "Leaving a clicked row changed selection");
 
-    // Enter/Space activate the visible row and give control to the keyboard.
+    // Enter/Space use the same current row, without switching selection state.
     selection.updatePointer(100, 100, count - 1, true);
-    selection.useKeyboard();
     expect(selection, count - 1, "Keyboard activation selected an invisible row");
     selection.updatePointer(20, 20, std::nullopt, true);
     expect(selection, count - 1, "Keyboard activation did not keep its selected row");
@@ -67,7 +74,7 @@ void checkMenu(int count) {
 
     selection.reset();
     selection.validate(count, enabled);
-    expect(selection, 0, "Page change did not reset keyboard selection");
+    expect(selection, 0, "Page change did not reset selection");
     selection.updatePointer(100, 100, count - 1, true);
     expect(selection, count - 1, "New page ignored a stationary pointer");
 }
@@ -79,7 +86,7 @@ void checkAvailabilityChanges() {
     selection.updatePointer(100, 100, 1, true);
     const auto onlySettings = [](int index) { return index == 2; };
     selection.validate(4, onlySettings);
-    expect(selection, 2, "Disabled keyboard and hovered rows remained selected");
+    expect(selection, 2, "Disabled row remained selected");
     selection.move(1, 4, onlySettings);
     expect(selection, 2, "Navigation failed with a single enabled row");
     selection.move(-1, 4, onlySettings);
@@ -96,7 +103,7 @@ int main() {
         checkMenu(5);
         checkMenu(6);
         checkAvailabilityChanges();
-        std::cout << "Menu selection tests passed: hover/bookmark, keyboard takeover, "
+        std::cout << "Menu selection tests passed: persistent hover, gaps, keyboard navigation, "
                      "stationary pointer, click/activation, wrap, disabled rows, focus and page changes.\n";
         return 0;
     } catch (const std::exception& error) {

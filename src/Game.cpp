@@ -1917,7 +1917,6 @@ int Game::run() {
                     IsKeyPressed(KEY_SPACE);
                 if (enterPressed &&
                     menuItemEnabled(menuSelection.selected())) {
-                    menuSelection.useKeyboard();
                     activatedMenuButton =
                         menuSelection.selected();
                     pressedMenuButton.reset();
@@ -1925,7 +1924,6 @@ int Game::run() {
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
                     menuSelection.selected() <= 4) {
-                    menuSelection.useKeyboard();
                     activatedMenuButton =
                         menuSelection.selected();
                     pressedMenuButton.reset();
