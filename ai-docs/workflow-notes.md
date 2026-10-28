@@ -55,4 +55,5 @@ Keep durable observations here, accepted choices/current work in
 [status and decisions](status-and-decisions.md), and verified release evidence in
 [release history](release-history.md). Put behavior/architecture changes in the
 relevant technical guide under docs, then add only their navigation or decision
-context here. Keep raw transcripts and temporary artifacts out of this folder.
+context here. Personal scratch notes belong in [local/](local/), whose contents
+are ignored except for its .gitignore. Keep generated artifacts in build/out.

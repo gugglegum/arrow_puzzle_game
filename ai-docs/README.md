@@ -38,6 +38,8 @@ User-facing descriptions are [README.md](../README.md) and
 
 - Keep accepted decisions, constraints, source entry points, useful commands,
   and reproducible findings. Update the topic affected by a completed change.
+- Shared project notes and AGENTS.md are tracked in Git. Put personal or
+  temporary notes in [local/](local/); only its .gitignore is tracked.
 - Mark proposals, historical observations, and verification limits explicitly.
   Never turn an idea or an old benchmark into a claim about current behavior.
 - Keep transient logs, binaries, sample saves, and screenshots under ignored
