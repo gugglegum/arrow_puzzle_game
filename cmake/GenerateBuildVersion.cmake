@@ -4,9 +4,14 @@ if(NOT DEFINED SOURCE_DIR OR NOT DEFINED OUTPUT_FILE OR
 endif()
 
 set(version_label "")
+# Explicit local previews use the intended release version for screenshots,
+# without creating a tag or changing ordinary development build labels.
+if(RELEASE_PREVIEW)
+    set(version_label "v${RELEASE_VERSION}")
+endif()
 # Requiring .git here avoids describing an unrelated parent repository when
 # an unpacked source archive happens to be built inside another checkout.
-if(EXISTS "${SOURCE_DIR}/.git" AND EXISTS "${GIT_EXECUTABLE}")
+if(version_label STREQUAL "" AND EXISTS "${SOURCE_DIR}/.git" AND EXISTS "${GIT_EXECUTABLE}")
     execute_process(
         COMMAND
             "${GIT_EXECUTABLE}" -C "${SOURCE_DIR}" describe

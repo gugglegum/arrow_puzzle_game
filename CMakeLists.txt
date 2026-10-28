@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(ArrowPuzzle VERSION 0.2.0 LANGUAGES CXX)
+project(ArrowPuzzle VERSION 0.3.0 LANGUAGES CXX)
 
 option(ARROWPUZZLE_BUILD_TESTS "Build Arrow Puzzle tests" ON)
 option(ARROWPUZZLE_STATIC_RUNTIME "Use the static MSVC runtime" ON)
+option(ARROWPUZZLE_RELEASE_PREVIEW "Show the project version before creating a release tag" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,6 +28,7 @@ add_custom_target(arrow_build_version
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DOUTPUT_FILE=${ARROWPUZZLE_BUILD_VERSION_HEADER}"
         "-DRELEASE_VERSION=${PROJECT_VERSION}"
+        "-DRELEASE_PREVIEW=${ARROWPUZZLE_RELEASE_PREVIEW}"
         "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateBuildVersion.cmake"
     BYPRODUCTS "${ARROWPUZZLE_BUILD_VERSION_HEADER}"

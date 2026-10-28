@@ -5,12 +5,41 @@ Windows 2022 runner. It runs only after a `vX.Y.Z` tag is pushed or when an
 owner starts it with **Run workflow**. Ordinary branch pushes and pull requests
 do not start a build.
 
+## Previewing a release before tagging
+
+Use a separate Release build directory when preparing screenshots before a
+release tag exists. From an MSVC x64 developer shell:
+
+```powershell
+cmake -S . -B build/release-preview -G Ninja `
+    -DCMAKE_BUILD_TYPE=Release -DARROWPUZZLE_RELEASE_PREVIEW=ON
+cmake --build build/release-preview --parallel 2
+ctest --test-dir build/release-preview --output-on-failure
+.\tools\package-windows.ps1 -Version 0.3.0 `
+    -BuildDirectory build/release-preview -OutputDirectory out/release-preview
+```
+
+`ARROWPUZZLE_RELEASE_PREVIEW` displays the CMake project version (for example,
+`v0.3.0`) without creating or moving Git tags. It is off by default, so ordinary
+builds still identify themselves using the last release tag and commit count.
+GitHub Actions does not enable it: a tagged Actions build gets its version from
+the tag. A local preview has no GitHub provenance attestation; its
+`build-info.json` records that it was built locally.
+
+For 0.3.0, finish the README changes and add the new screenshots **before**
+creating the tag. Keep the changelog entry marked Unreleased until that final
+step, then set its release date and use its contents for the GitHub release
+description.
+
 ## Preparing a release
 
-1. Commit and push the intended release source, including the workflow.
+1. Finish the changelog and documentation, then commit and push the intended
+   release source, including the workflow. Check that the tag version matches
+   `project(... VERSION ...)` in `CMakeLists.txt`.
 2. Create and push a stable release tag such as `v0.3.0` on that commit.
 3. Open **Actions → Windows release** and wait for the build and tests.
-4. Review the generated draft under **Releases**, edit its notes and publish it.
+4. Review the generated draft under **Releases**, add the corresponding
+   changelog entry to its build-provenance notes, and publish it.
 
 Tag builds create a draft using `github-actions[bot]`. Repeating a build may
 update an existing draft; it never replaces assets of an already published

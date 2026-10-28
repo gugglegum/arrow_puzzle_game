@@ -7,10 +7,73 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - Unreleased
+
+Prepared for local preview. The release tag and GitHub Actions build will follow
+after the documentation screenshots are updated.
+
 ### Added
 
+- Optional **Crosshair guides**: slightly darker exposed grid dots mark the row
+  and column nearest the pointer, helping trace an arrow's path on large boards.
+- Embedded sounds for arrow launches, collisions, defeat, victory, and fireworks.
+  **Sounds** is saved in settings and can also be toggled from the gameplay HUD.
+- A back-arrow button in the upper-left corner of the gameplay HUD for returning
+  to the menu with the mouse, saving the current game for **Resume game**.
+- Large animated victory and **GAME OVER** screens, with colourful fireworks and
+  firework reports on victory.
+- Persistent **Board theme** selection: Dark by default, with Light available.
+  The board and HUD follow the selected theme; menus and result screens retain
+  their dark presentation.
+- Release and development build identifiers in the lower-right corner of menus.
+  An explicit local preview can display the upcoming version before its tag
+  exists, for preparing documentation screenshots.
+- A Windows x64 release workflow on GitHub Actions, with build metadata,
+  SHA-256 checksums, and verifiable build-provenance attestations for the EXE
+  and ZIP. It runs only for release tags or an explicit manual request.
 - Gameplay, main-menu, and difficulty-selection screenshots to the project
   documentation.
+
+### Changed
+
+- Redesigned the main menu, difficulty selection, and settings to match the
+  result screens, with a dark backdrop, illustrated buttons, and clear toggles.
+- Mouse and keyboard now share one menu selection. Hovering selects a row;
+  leaving it or crossing a gap keeps it selected. Arrow keys navigate from the
+  current row while a stationary pointer no longer overrides the keyboard.
+- All interface text uses native Windows font smoothing, including the menus,
+  HUD, counters, and controls legend.
+- Board strokes, arrowheads, and grid dots use analytic antialiasing for more
+  even line weights at small zoom levels.
+
+### Fixed
+
+- Zooming back out after zooming into a Very Hard board can once again fit the
+  entire board in the default-sized window.
+- Animated arrows are clipped below the HUD and no longer cover the title,
+  arrow counter, or lives.
+- The board draws over the optional controls legend instead of being obscured
+  by it, without reserving an extra strip of gameplay space.
+- Fullscreen uses a borderless window at the Windows desktop resolution,
+  avoiding aspect-ratio changes and brief blackouts when gameplay resumes.
+- The cursor remains visible when repeatedly switching fullscreen modes.
+
+### Performance
+
+- Cached static board geometry makes panning and zooming large boards much
+  faster, without allocating a texture covering the whole enlarged board.
+- Unchanged menus, boards, and completed result screens skip unnecessary GPU
+  redraws; input continues to be polled.
+- CPU-based frame pacing avoids driver-side VSync waits and reduces resource
+  contention when multiple copies of the game are running.
+- Finished games stop advancing gameplay and release arrow rewind histories;
+  the finite victory celebration returns to idle after it ends.
+
+### Compatibility
+
+- Existing saved games and settings remain compatible.
+- Crosshair guides and Sounds are off by default; both preferences are saved
+  beside the executable along with the board theme.
 
 ## [0.2.0] - 2026-07-29
 
@@ -86,6 +149,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Allowed an armed mouse click to be cancelled by releasing away from the
   originally pressed arrow.
 
-[Unreleased]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/gugglegum/arrow_puzzle_game/releases/tag/v0.1.0
