@@ -1,36 +1,41 @@
 # Status, accepted decisions, and open work
 
-Snapshot: 2026-10-29, preparing the user-approved 0.4.0 release. Check
+Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
 ## Released versus development
 
-0.3.0 was published from `52182f1` using GitHub Actions; see
-[release evidence](release-history.md). It includes the rendering/idle optimizations,
-antialiasing, borderless fullscreen, Windows font smoothing, version labels,
-guides, audio, HUD buttons, redesigned menus/results, board themes, and six new
-screenshots.
+0.4.0 was published from `b785f23` using GitHub Actions and marked Latest; see
+[release evidence](release-history.md) for the run, hashes, and verification.
+It includes the accepted Very Hard frontier generator, delayed Game Over,
+bilingual documentation, and updated screenshots. All four default headless
+test suites passed locally and in Actions. The downloaded release EXE and ZIP
+passed checksum/provenance verification and local startup/rendering checks.
 
-Development commit `8ebae99` adds a 1.2-second frozen fatal-collision view before
+The 0.3.0 release from `52182f1` introduced the rendering/idle optimizations,
+antialiasing, borderless fullscreen, Windows font smoothing, version labels,
+audio, HUD buttons, redesigned menus/results, board themes, and screenshots.
+
+Commit `8ebae99`, included in 0.4.0, adds a 1.2-second frozen fatal-collision view before
 Game Over. Collision audio is immediate; defeat audio follows the pause. New
 launches stop immediately, in-flight interpolation is preserved, and pending or
 finished results do not cause continuous GPU work. Timing tests at multiple
 frame rates and eight controller scenarios passed, including light/dark, self
 and moving collisions, an unrelated flying arrow, victory and idle behavior.
-These integration runs were local; do not describe the fix as already in the
-published 0.3.0 binary or already tested by a new Actions release run.
+These controller integration runs were local; Actions runs the headless timing
+tests. The fix is in the published 0.4.0 binary, not 0.3.0.
 
-The development Very Hard generator now constructs arrows from multiple
+The released Very Hard generator constructs arrows from multiple
 fronts in both directions, with bounded search and explicit perimeter-quality
 limits. Local Release tests and benchmarks passed; see
-[generator evidence](generator-0.4.md). The user accepted it and authorized the
-0.4.0 release, together with the delayed Game Over fix and bilingual docs.
-Publication is pending the tagged Actions build and artifact verification.
+[generator evidence](generator-0.4.md). The user accepted the resulting gameplay
+and requested the completed 0.4.0 release. Benchmark figures are local samples,
+not timing guarantees for every seed or machine.
 
-The last supplied development EXE was in `build/windows-msvc/arrow_puzzle.exe`.
-Its existence/version is not guaranteed on another checkout. Rebuild to deliver
-later commits; ordinary source pushes leave release artifacts unchanged.
+Use the published ZIP for the attested release binary. Local build directories
+are not guaranteed on another checkout. Rebuild to deliver later commits;
+ordinary source pushes leave release artifacts unchanged.
 
 ## Accepted product decisions
 
@@ -57,8 +62,6 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 
 - No active implementation task is assigned by this roadmap. Work on the live
   user's request; do not silently implement backlog items.
-- The Game Over delay and frontier generator are included in the 0.4.0 release
-  preparation. Record verified tagged build and publication evidence afterward.
 - Game.cpp remains large; refactor only in scoped steps that preserve event
   ordering, rendering invalidation, and testability.
 - Very Hard now uses bounded frontier construction for 0.4.0;

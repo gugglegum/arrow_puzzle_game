@@ -1,10 +1,11 @@
 # Very Hard generator work for 0.4.0
 
-Status: accepted by the user on 2026-10-29; release 0.4.0 authorized and being
-prepared. See [release history](release-history.md) for verified publication.
+Status: accepted by the user and published in 0.4.0 on 2026-10-29 (local date),
+from release commit `b785f23`. See [release history](release-history.md) for
+verified publication, Actions tests, artifact hashes, and provenance checks.
 The previous generator source was unchanged between released `52182f1` and
-the starting code snapshot `955af41`. Preserve the existing unrelated fatal
-collision delay and bilingual documentation changes when publishing this work.
+the starting code snapshot `955af41`. Release 0.4.0 also includes the existing
+fatal collision delay and bilingual documentation changes.
 
 ## Decision and implementation
 
@@ -94,6 +95,5 @@ these are not a dedicated steady-state idle-memory benchmark.
 - The 200-board run is a measured sample, not a proof that every seed succeeds.
   Work budgets and quality limits remain fixed; an exhausted seed returns the
   existing explicit error/retry UI. Linux/Android remain unverified.
-- A source push is not a release. The user authorized preparation, tag creation
-  and the GitHub release build for 0.4.0; record actual build/publication evidence
-  in release history after verification.
+- A source push is not a release. Tag `v0.4.0` identifies the verified Actions
+  build from `b785f23`; later documentation commits do not change that artifact.
