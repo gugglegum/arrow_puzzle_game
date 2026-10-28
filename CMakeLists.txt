@@ -117,6 +117,8 @@ add_executable(arrow_puzzle WIN32
     src/GameAudio.hpp
     src/EndScreen.cpp
     src/EndScreen.hpp
+    src/MenuScreen.cpp
+    src/MenuScreen.hpp
     src/AudioData.hpp
     src/Game.cpp
     src/StaticBoardGeometry.cpp

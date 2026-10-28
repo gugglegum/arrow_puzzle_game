@@ -7,6 +7,7 @@
 #include "BuildVersion.hpp"
 #include "GameAudio.hpp"
 #include "EndScreen.hpp"
+#include "MenuScreen.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "UiText.hpp"
 
@@ -76,9 +77,6 @@ constexpr TextStyle kErrorTitleText{26.0F, 0.6F};
 constexpr TextStyle kErrorActionText{18.0F, 0.1F};
 constexpr TextStyle kErrorDetailText{15.0F, 0.0F};
 constexpr TextStyle kHelpText{17.0F, 0.1F};
-constexpr TextStyle kMenuBrandText{34.0F, 1.1F};
-constexpr TextStyle kMenuTitleText{22.0F, 0.6F};
-constexpr TextStyle kMenuButtonText{20.0F, 0.2F};
 constexpr TextStyle kMenuHintText{15.0F, 0.1F};
 constexpr TextStyle kMenuVersionText{13.0F, 0.0F};
 
@@ -98,10 +96,10 @@ struct DifficultyPreset {
 };
 
 constexpr std::array<DifficultyPreset, 4> kDifficultyPresets{{
-    {"Simple (20 x 20)", 20, 20, 30, 8},
-    {"Middle (40 x 40)", 40, 40, 60, 8},
-    {"Hard (80 x 80)", 80, 80, 120, 8},
-    {"Very Hard (160 x 160)", 160, 160, 960, 8}
+    {"Simple", 20, 20, 30, 8},
+    {"Middle", 40, 40, 60, 8},
+    {"Hard", 80, 80, 120, 8},
+    {"Very Hard", 160, 160, 960, 8}
 }};
 
 enum class Motion {
@@ -240,104 +238,7 @@ void drawCenteredText(
 }
 
 Rectangle menuButtonRectangle(int index, int count) {
-    constexpr float buttonGap = 16.0F;
-    const float buttonHeight = std::min(
-        58.0F,
-        std::max(40.0F, (static_cast<float>(GetScreenHeight()) - 285.0F -
-            static_cast<float>(count - 1) * buttonGap) / static_cast<float>(count))
-    );
-    const float width = std::min(
-        460.0F,
-        static_cast<float>(GetScreenWidth()) - 80.0F
-    );
-    const float totalHeight =
-        static_cast<float>(count) * buttonHeight +
-        static_cast<float>(std::max(0, count - 1)) * buttonGap;
-    const float startY = std::max(
-        205.0F,
-        (static_cast<float>(GetScreenHeight()) - totalHeight) * 0.5F +
-            42.0F
-    );
-    return {
-        (static_cast<float>(GetScreenWidth()) - width) * 0.5F,
-        startY + static_cast<float>(index) * (buttonHeight + buttonGap),
-        width,
-        buttonHeight
-    };
-}
-
-void drawMenuButton(
-    UiText& font,
-    Rectangle bounds,
-    const char* label,
-    bool enabled,
-    bool focused,
-    bool armed
-) {
-    const bool hovered =
-        enabled && CheckCollisionPointRec(GetMousePosition(), bounds);
-    const bool pressed = hovered && armed;
-    const bool highlighted = enabled && (hovered || focused);
-    const Color fill = !enabled
-        ? Color{244, 246, 249, 255}
-        : pressed
-            ? Color{218, 233, 252, 255}
-            : highlighted
-                ? Color{232, 241, 253, 255}
-                : Color{249, 250, 252, 255};
-    const Color outline = !enabled
-        ? Color{230, 233, 238, 255}
-        : highlighted
-            ? kBlue
-            : kSoft;
-    const Color textColor = !enabled
-        ? Color{172, 179, 190, 255}
-        : highlighted
-            ? kBlue
-            : kInk;
-
-    DrawRectangleRounded(bounds, 0.18F, 8, fill);
-    DrawRectangleRoundedLinesEx(
-        bounds,
-        0.18F,
-        8,
-        highlighted ? 2.0F : 1.5F,
-        outline
-    );
-    const Vector2 textSize = measureText(
-        font,
-        label,
-        kMenuButtonText
-    );
-    drawText(
-        font,
-        label,
-        {
-            bounds.x + (bounds.width - textSize.x) * 0.5F,
-            bounds.y + (bounds.height - textSize.y) * 0.5F
-        },
-        kMenuButtonText,
-        textColor
-    );
-}
-
-void drawMenuHeading(UiText& font, const char* title) {
-    drawCenteredText(
-        font,
-        "ARROW PUZZLE",
-        static_cast<float>(GetScreenWidth()) * 0.5F,
-        78.0F,
-        kMenuBrandText,
-        kInk
-    );
-    drawCenteredText(
-        font,
-        title,
-        static_cast<float>(GetScreenWidth()) * 0.5F,
-        142.0F,
-        kMenuTitleText,
-        kMuted
-    );
+    return MenuScreen::layout(GetScreenWidth(), GetScreenHeight(), count).button(index);
 }
 
 Rectangle soundButtonRectangle() {
@@ -1919,6 +1820,8 @@ int Game::run() {
             pressedSoundButton = false;
             pressedHudMenuButton = false;
             const Screen menuScreen = screen;
+            const MenuScreen::Page menuPage = menuScreen == Screen::MainMenu ? MenuScreen::Page::Main
+                : menuScreen == Screen::SettingsMenu ? MenuScreen::Page::Settings : MenuScreen::Page::Difficulty;
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
                 ? 4
@@ -2088,32 +1991,34 @@ int Game::run() {
             ) {
                 const int id =
                     static_cast<int>(menuScreen) * 16 + index;
-                drawMenuButton(
+                std::optional<bool> toggle;
+                if (menuScreen == Screen::SettingsMenu && index < 4) {
+                    const std::array<bool, 4> values{{settings.arrowLoops, settings.flyingArrowCollisions,
+                        settings.crosshairGuides, settings.sounds}};
+                    toggle = values[index];
+                }
+                MenuScreen::drawButton(
                     uiText,
                     bounds,
                     label,
+                    menuPage,
+                    index,
                     enabled,
                     enabled &&
                         focusedMenuButton == index,
-                    pressedMenuButton == id
+                    pressedMenuButton == id,
+                    toggle
                 );
                 return enabled &&
                        activatedMenuButton == index;
             };
 
             BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawRectangleGradientV(
-                0,
-                0,
-                GetScreenWidth(),
-                GetScreenHeight(),
-                RAYWHITE,
-                Color{247, 249, 252, 255}
-            );
+            ClearBackground(Color{10, 20, 41, 255});
+            MenuScreen::drawBackground(GetScreenWidth(), GetScreenHeight());
+            MenuScreen::drawHeading(uiText, menuPage, GetScreenWidth(), GetScreenHeight(), menuItemCount);
 
             if (screen == Screen::MainMenu) {
-                drawMenuHeading(uiText, "MAIN MENU");
                 constexpr int buttonCount = 4;
                 if (menuButton(
                         0,
@@ -2156,26 +2061,19 @@ int Game::run() {
                     closeRequested = true;
                 }
                 if (generationInProgress) {
-                    drawCenteredText(
+                    MenuScreen::drawFooter(
                         uiText,
                         "Level generation is finishing in the background",
-                        static_cast<float>(GetScreenWidth()) * 0.5F,
-                        static_cast<float>(GetScreenHeight()) - 54.0F,
-                        kMenuHintText,
-                        kMuted
+                        GetScreenWidth(), GetScreenHeight(), menuItemCount
                     );
                 } else {
-                    drawCenteredText(
+                    MenuScreen::drawFooter(
                         uiText,
                         "Up / Down navigate    Enter select",
-                        static_cast<float>(GetScreenWidth()) * 0.5F,
-                        static_cast<float>(GetScreenHeight()) - 54.0F,
-                        kMenuHintText,
-                        kMuted
+                        GetScreenWidth(), GetScreenHeight(), menuItemCount
                     );
                 }
             } else if (screen == Screen::NewGameMenu) {
-                drawMenuHeading(uiText, "NEW GAME");
                 constexpr int buttonCount = 5;
                 for (int index = 0;
                      index <
@@ -2215,25 +2113,17 @@ int Game::run() {
                     )) {
                     screen = Screen::MainMenu;
                 }
-                drawCenteredText(
+                MenuScreen::drawFooter(
                     uiText,
                     "Up / Down navigate    Enter select    Esc back",
-                    static_cast<float>(GetScreenWidth()) * 0.5F,
-                    static_cast<float>(GetScreenHeight()) - 54.0F,
-                    kMenuHintText,
-                    kMuted
+                    GetScreenWidth(), GetScreenHeight(), menuItemCount
                 );
             } else if (screen == Screen::SettingsMenu) {
-                drawMenuHeading(uiText, "SETTINGS");
                 constexpr int buttonCount = 5;
-                const std::string loopsLabel =
-                    std::string{"Arrow loops  ["} +
-                    (settings.arrowLoops ? "ON" : "OFF") +
-                    "]";
                 if (menuButton(
                         0,
                         menuButtonRectangle(0, buttonCount),
-                        loopsLabel.c_str()
+                        "Arrow loops"
                     )) {
                     if (!persistence.setArrowLoops(
                             settings,
@@ -2245,16 +2135,10 @@ int Game::run() {
                         );
                     }
                 }
-                const std::string collisionLabel =
-                    std::string{"Flying arrow collisions  ["} +
-                    (settings.flyingArrowCollisions
-                         ? "ON"
-                         : "OFF") +
-                    "]";
                 if (menuButton(
                         1,
                         menuButtonRectangle(1, buttonCount),
-                        collisionLabel.c_str()
+                        "Flying arrow collisions"
                     )) {
                     if (!persistence.setFlyingArrowCollisions(
                             settings,
@@ -2266,13 +2150,10 @@ int Game::run() {
                         );
                     }
                 }
-                const std::string guidesLabel =
-                    std::string{"Crosshair guides  ["} +
-                    (settings.crosshairGuides ? "ON" : "OFF") + "]";
                 if (menuButton(
                         2,
                         menuButtonRectangle(2, buttonCount),
-                        guidesLabel.c_str()
+                        "Crosshair guides"
                     )) {
                     if (!persistence.setCrosshairGuides(settings, !settings.crosshairGuides)) {
                         TraceLog(LOG_WARNING, "Could not save crosshair guide setting");
@@ -2281,7 +2162,7 @@ int Game::run() {
                 if (menuButton(
                         3,
                         menuButtonRectangle(3, buttonCount),
-                        settings.sounds ? "Sounds: ON" : "Sounds: OFF"
+                        "Sounds"
                     )) {
                     setSoundsEnabled(!settings.sounds);
                 }
@@ -2292,14 +2173,11 @@ int Game::run() {
                     )) {
                     screen = Screen::MainMenu;
                 }
-                drawCenteredText(
+                MenuScreen::drawFooter(
                     uiText,
                     "Up / Down navigate    Enter / Space toggle"
                     "    Saved automatically",
-                    static_cast<float>(GetScreenWidth()) * 0.5F,
-                    static_cast<float>(GetScreenHeight()) - 54.0F,
-                    kMenuHintText,
-                    kMuted
+                    GetScreenWidth(), GetScreenHeight(), menuItemCount
                 );
             }
 
@@ -2314,7 +2192,7 @@ int Game::run() {
                     static_cast<float>(GetScreenHeight()) - versionSize.y - 16.0F
                 },
                 kMenuVersionText,
-                kMuted
+                Fade(MenuScreen::mutedColor(), 0.8F)
             );
 
             if (screen != menuScreen) {
