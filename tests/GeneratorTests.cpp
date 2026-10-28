@@ -48,6 +48,8 @@ struct Quality {
     std::size_t richMacroBlocks{};
     std::size_t tightSelfPassArrows{};
     std::size_t longComplexTightSelfPassArrows{};
+    std::size_t shortBorderCells{};
+    std::size_t interiorLinkedBorderCells{};
     double medianBoundingFill{};
     double lengthCoefficientOfVariation{};
 };
@@ -125,6 +127,7 @@ Quality analyze(const arrow::Board& board) {
         int maximumX = -1;
         int minimumY = board.rows();
         int maximumY = -1;
+        std::size_t borderCells = 0;
         for (std::size_t cell = 2; cell < value.cells.size(); ++cell) {
             const arrow::Cell before =
                 value.cells[cell - 1] - value.cells[cell - 2];
@@ -144,7 +147,11 @@ Quality analyze(const arrow::Board& board) {
             maximumX = std::max(maximumX, cell.x);
             minimumY = std::min(minimumY, cell.y);
             maximumY = std::max(maximumY, cell.y);
+            borderCells += cell.x == 0 || cell.y == 0 ||
+                cell.x == board.columns() - 1 || cell.y == board.rows() - 1 ? 1U : 0U;
         }
+        result.shortBorderCells += value.cells.size() <= 5 ? borderCells : 0U;
+        result.interiorLinkedBorderCells += borderCells < value.cells.size() ? borderCells : 0U;
         const int boundingArea =
             (maximumX - minimumX + 1) * (maximumY - minimumY + 1);
         boundingAreas[index] = boundingArea;
@@ -1264,6 +1271,15 @@ Quality verifyBoard(
     );
 
     Quality quality = analyze(board);
+    if (!options.allowArrowLoops) {
+        for (const auto& value : board.arrows()) {
+            require(
+                minimumSelfPassClearance(value, board.columns(), board.rows()) ==
+                    std::numeric_limits<int>::max(),
+                "loopless generation left a body cell anywhere on an exit ray"
+            );
+        }
+    }
     const std::size_t effectiveMinimumLength =
         static_cast<std::size_t>(std::clamp(
             options.minimumLength,
@@ -1408,6 +1424,38 @@ Quality verifyBoard(
         );
     }
     return quality;
+}
+
+void verifyFrontierQuality(const arrow::Board& board, const arrow::GeneratorOptions& options) {
+    const auto quality = verifyBoard(board, options);
+    const std::size_t perimeter = static_cast<std::size_t>(2 * (options.columns + options.rows) - 4);
+    require(quality.intendedOrderValid, "frontier construction lost its solution order");
+    require(quality.directionCount == 4, "frontier board lost a direction");
+    require(quality.rectangularArrows == 0, "frontier board contains a rectangular territory");
+    require(quality.shortBorderCells * 5 <= perimeter, "short arrows dominate the perimeter");
+    require(quality.interiorLinkedBorderCells * 4 >= perimeter * 3,
+            "perimeter arrows are disconnected from the interior");
+    require(quality.shortArrows * 100 >= quality.arrowCount * 30 &&
+            quality.shortArrows * 100 <= quality.arrowCount * 60 &&
+            quality.mediumArrows * 100 >= quality.arrowCount * 30 &&
+            quality.longArrows * 100 >= quality.arrowCount * 9,
+            "frontier board lost its mixed lengths");
+    if (options.columns == 160 && options.rows == 160) {
+        require(quality.initiallyRemovable >= 6 && quality.initiallyRemovable <= 10,
+                "Very Hard opening fronts are outside 6..10");
+    }
+    require(std::ranges::any_of(board.arrows(), [](const arrow::Arrow& value) {
+        return value.cells.size() % 2 == 1;
+    }), "frontier cuts were restricted to even lengths");
+}
+
+void verifySameBoard(const arrow::Board& lhs, const arrow::Board& rhs) {
+    require(lhs.arrows().size() == rhs.arrows().size(), "seed changed the arrow count");
+    for (std::size_t i = 0; i < lhs.arrows().size(); ++i) {
+        require(lhs.arrows()[i].direction == rhs.arrows()[i].direction &&
+                lhs.arrows()[i].cells == rhs.arrows()[i].cells,
+                "parallel frontier generation is not deterministic");
+    }
 }
 
 } // namespace
@@ -1642,6 +1690,27 @@ int main(int argc, char** argv) {
                 veryHardQuality.longArrows >= 250,
             "160x160 board lost its mixed arrow lengths"
         );
+
+        // Cover both orientations, wraparound cuts, singleton avoidance, opening
+        // limits and the loop policy with independent dynamic movement checks.
+        for (bool loops : {true, false}) {
+            for (std::uint32_t seed : {0U, 1U, 2U, 64U, 747U, 23'000U, 4'000'000'000U}) {
+                auto options = veryHardOptions;
+                options.seed = seed;
+                options.allowArrowLoops = loops;
+                const auto board = arrow::generateBoard(options);
+                verifyFrontierQuality(board, options);
+                if (seed == 747U) {
+                    verifySameBoard(board, arrow::generateBoard(options));
+                }
+            }
+        }
+        for (const auto options : {
+                 arrow::GeneratorOptions{128, 128, 2, 30, 42U, 4, true},
+                 arrow::GeneratorOptions{128, 160, 2, 60, 747U, 4, false},
+                 arrow::GeneratorOptions{160, 128, 2, 120, 64U, 1, true}}) {
+            verifyFrontierQuality(arrow::generateBoard(options), options);
+        }
 
         const arrow::GeneratorOptions looplessOptions{
             40,
@@ -1880,7 +1949,7 @@ int main(int argc, char** argv) {
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size()) + 6
+                   static_cast<int>(largeBoardSeeds.size()) + 25
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

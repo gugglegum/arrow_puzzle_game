@@ -51,6 +51,7 @@ FetchContent_MakeAvailable(raylib)
 add_library(arrow_core STATIC
     src/Board.cpp
     src/Generator.cpp
+    src/FrontierGenerator.cpp
     src/MotionKinematics.cpp
     src/MotionResolver.cpp
     src/Persistence.cpp
@@ -161,6 +162,19 @@ if(ARROWPUZZLE_BUILD_TESTS)
     endif()
 
     add_test(NAME arrow_tests COMMAND arrow_tests)
+
+    # Explicit measurement tool: run each seed in a fresh process. It reports
+    # generation time/peak working set separately from independent verification.
+    add_executable(arrow_generator_benchmark EXCLUDE_FROM_ALL tests/GeneratorBenchmark.cpp)
+    target_link_libraries(arrow_generator_benchmark PRIVATE arrow_core)
+    if(WIN32)
+        target_link_libraries(arrow_generator_benchmark PRIVATE psapi)
+    endif()
+    if(MSVC)
+        target_compile_options(arrow_generator_benchmark PRIVATE /W4 /permissive- /utf-8)
+    else()
+        target_compile_options(arrow_generator_benchmark PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
 
     add_executable(arrow_menu_selection_tests tests/MenuSelectionTests.cpp)
     target_include_directories(arrow_menu_selection_tests PRIVATE src)

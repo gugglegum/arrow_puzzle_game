@@ -1,7 +1,8 @@
 # Status, accepted decisions, and open work
 
-Snapshot: 2026-10-29. Code baseline: `8ebae99`. Check `git status`, recent history,
-and [CHANGELOG.md](../CHANGELOG.md) before treating this as current state.
+Snapshot: 2026-10-29, including unreleased generator work toward 0.4.0. Check
+`git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
+this as current state.
 
 ## Released versus development
 
@@ -19,6 +20,11 @@ frame rates and eight controller scenarios passed, including light/dark, self
 and moving collisions, an unrelated flying arrow, victory and idle behavior.
 These integration runs were local; do not describe the fix as already in the
 published 0.3.0 binary or already tested by a new Actions release run.
+
+The development Very Hard generator now constructs arrows from multiple
+fronts in both directions, with bounded search and explicit perimeter-quality
+limits. Local Release tests and benchmarks passed; see
+[generator evidence](generator-0.4.md). This also remains unreleased.
 
 The last supplied development EXE was in `build/windows-msvc/arrow_puzzle.exe`.
 Its existence/version is not guaranteed on another checkout. Rebuild to deliver
@@ -53,9 +59,9 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
   must deliberately choose its version and include the new changelog entry.
 - Game.cpp remains large; refactor only in scoped steps that preserve event
   ordering, rendering invalidation, and testability.
-- Very Hard compares eight parallel candidates and can have substantial
-  generation latency/transient memory use. No new generation-memory reduction
-  was established by the rendering work. Do not claim it was fixed.
+- Very Hard now uses bounded frontier construction in development toward 0.4.0;
+  see [generator work](generator-0.4.md) for the method, measurements and limits.
+  This is separate from the earlier rendering work and is not in released 0.3.0.
 - Linux/Android are unverified; even dimensions are a generator restriction.
 - A local, user-owned, untracked `TODO.txt` mentions softer visual rounding of
   arrowheads/body corners. It is an idea, not an implemented feature or an

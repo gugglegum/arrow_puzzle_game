@@ -22,6 +22,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | --- | --- | --- |
 | Overall structure, models, build and tests | [Project guide](../docs/en/PROJECT_GUIDE.md) | `Game.cpp`, `include/arrow/`, CMake and `tests/` |
 | Generation, solvability, arrow composition | [Generator guide](../docs/en/GENERATOR.md) | `Generator.cpp`, `Board.cpp` |
+| Very Hard 0.4.0 work, benchmark evidence | [Generator work](generator-0.4.md) | `FrontierGenerator.cpp`, `GeneratorBenchmark.cpp` |
 | Flight, collisions, rollback, saves | [Runtime guide](../docs/en/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
 | Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/en/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
 | Menus, themes, sound, end screens | [Runtime guide](../docs/en/RUNTIME.md) | `MenuSelection.hpp`, `EndScreen.cpp`, `GameAudio.cpp` |

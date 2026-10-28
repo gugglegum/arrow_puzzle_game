@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Reworked Very Hard generation for 0.4.0 development: construct solvable arrows
+  from both ends of available maze fragments, with bounded retries and at most
+  four workers instead of large interval/count tables. Border arrows now mostly
+  continue into the interior, with enforced length diversity, 6..10 opening
+  moves, and the same quality limits when arrow loops are disabled. Smaller
+  presets retain their existing generator.
+- Added a reproducible generator benchmark with separate generation timing,
+  peak working set, border metrics, geometry hashes, and solution verification.
 - Organized technical documentation into matching English and Russian editions
   under `docs/en` and `docs/ru`, with language switches, shared screenshots, and
   updated links from the main READMEs, agent roadmap, and release workflow.

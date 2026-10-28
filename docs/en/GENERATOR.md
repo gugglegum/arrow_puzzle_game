@@ -2,7 +2,7 @@
 
 **English** | [Русский](../ru/GENERATOR.md)
 
-The main implementation is `src/Generator.cpp`, the public interface is
+The implementations are `src/Generator.cpp` and `src/FrontierGenerator.cpp`; the public interface is
 `include/arrow/Generator.hpp`, and statistical/regression checks are in
 `tests/GeneratorTests.cpp`.
 
@@ -34,6 +34,12 @@ If no suitable candidate is found, generation throws `std::runtime_error`.
 There is deliberately no simplified fallback level.
 
 ## 2. Overall pipeline
+
+The path-cutting pipeline below remains in use for Simple, Middle, Hard, and
+custom length constraints. Development toward 0.4.0 uses frontier construction
+for boards with both sides at least 128 cells, minimum length 2, and maximum
+length at least 30. Narrow custom boards retain the path cutter. See section
+11. Saved games retain their geometry across this change.
 
 ```text
 random spanning tree over a grid of 2x2 blocks
@@ -143,7 +149,8 @@ Large rectangular S-shaped regions receive a severe penalty: they are solvable
 but look like separate territories rather than a tangle of threads.
 
 Standard 20 x 20 boards also have a strict quality floor,
-`meetsDefaultQualityFloor()`. Other sizes choose the best valid candidate by
+`meetsDefaultQualityFloor()`. Frontier boards have the additional hard limits
+described in section 11. The other sizes choose the best valid candidate by
 score and have separate test thresholds.
 
 ## 8. Parallel candidates and determinism
@@ -160,15 +167,22 @@ All four presets currently use eight candidates:
 | Simple | 20 x 20 | 30 | 8 |
 | Middle | 40 x 40 | 60 | 8 |
 | Hard | 80 x 80 | 120 | 8 |
-| Very Hard | 160 x 160 | 960 | 8 |
+| Very Hard | 160 x 160 | 960 (frontier profile caps bodies at 120) | 8 |
 
 In Game.cpp, Hard can retry the entire `generateBoard()` up to three times with
 a different seed after `runtime_error`. Other presets currently get one seed
 attempt.
 
-Very Hard may take tens of seconds: the result waits for the slowest of eight
-candidates. Do not increase parallelism blindly; measure time, peak working
-set, and memory bandwidth.
+Frontier candidates use at most four workers. Each candidate tries at most 32
+cycles, stopping at its first complete board that passes every quality limit.
+Attempts have independent RNGs; results are still compared in attempt order,
+so scheduling does not choose the board. Exhaustion is an explicit generation
+error, never a relaxed-quality fallback. Smaller presets keep their existing
+eight parallel attempts and generation behavior.
+
+The 0.3.0 Very Hard path cutter could wait tens of seconds for its slowest
+candidate and allocate hundreds of MiB in dense interval-score tables. Do not
+reintroduce that search as a fallback or increase concurrency without measuring.
 
 ## 9. Solvability and Board::canExit()
 
@@ -201,3 +215,62 @@ Particularly risky changes include:
 - sharing one RNG across parallel attempts;
 - falling back to a simple serpentine board;
 - exhaustive area-by-arrow-count work on 160 x 160 and larger boards.
+
+## 11. Large-board frontier construction (development toward 0.4.0)
+
+The random macro-tree still supplies a maze-like Hamiltonian cycle, but the
+generator no longer has to follow one global orientation or solve a giant
+arrow-count DP. `partitionFromFrontiers()` removes an escapable contiguous
+fragment from either direction, records that arrow, and updates affected
+fronts. Repeating this until the board is empty constructs the solution order.
+Only a complete partition can become a candidate.
+
+Each cell has two possible heads. For each head, compact arrays store the
+available body length, self-collision bound and currently required length.
+If an exit ray hits body offset `k` at tick `d`, a legal self-pass requires
+`length <= k + d`; with loops disabled it requires `length <= k`. Every still
+occupied ray cell must belong to the selected body; all other ray cells must
+have been removed earlier. This is a dynamic tail-vacating check, not a static
+ban on crossing the body's original cells.
+
+Cuts cannot leave a one-cell fragment on either side. Both odd and even lengths
+remain possible. Cached contiguous lengths use a `lengthLimit + 2` sentinel so
+a cut that would leave one cell can be distinguished from a longer remainder.
+After a cut, only heads along affected rows, columns and nearby cycle fragments
+are refreshed. Indexed sets contain each eligible head once; there is no growing
+queue of obsolete entries or stored reverse-ray graph. Frontier construction
+uses O(board area) working storage; the existing final quality scorer separately
+builds the dependency graph.
+
+Each selection samples 48 fronts and scores a small range of lengths. A broad
+short/medium/long profile, a penalty for short border arrows, and a preference
+for bodies connecting the edge to the interior prevent the repetitive border
+chain. Opening arrows favor longer bodies that expose useful interior paths.
+Long, nearly filled rectangular bodies are rejected. The local profile caps
+length at `min(requested maximum, 120)`; the requested maximum remains an upper
+bound, not a promised length.
+
+Every completed frontier candidate must have all four directions, a valid
+removal order, no long rectangular territories, 30..60% short arrows, at least
+30% medium arrows and 9% long arrows. At most 20% of perimeter cells may belong
+to short arrows (length <= 5); at least 75% must belong to arrows that also
+enter the interior. Opening counts must lie in the size-dependent range from
+section 6 (6..10 for Very Hard). These limits also apply with loops disabled.
+
+### Reproducing measurements
+
+Build the explicit `arrow_generator_benchmark` target in Release, then run:
+
+```powershell
+.\tools\benchmark-generator.ps1
+.\tools\benchmark-generator.ps1 -NoLoops -OutputCsv build\generator-no-loops.csv
+```
+
+Each seed runs in a new process. CSV records generation time, Windows peak
+working set in MiB, arrow and border counts, a geometry hash and independent
+solution verification. The timed region excludes that verification; memory
+is captured before it. `-1` means the peak-memory metric is unavailable.
+This measures the core process, not rendering/GPU allocations in the game.
+Use `-Executable` to compare another build on the same machine. The fixed
+regressions include multiple Very Hard seeds in both loop modes, rectangular
+boards, the length cap, odd lengths and repeatability under parallel execution.

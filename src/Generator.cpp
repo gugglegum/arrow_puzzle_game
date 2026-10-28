@@ -1,4 +1,5 @@
 #include "arrow/Generator.hpp"
+#include "FrontierGenerator.hpp"
 
 #include <algorithm>
 #include <array>
@@ -120,6 +121,8 @@ struct TangleMetrics {
     int rewardedTightSelfPassArrows{};
     int longComplexTightSelfPassArrows{};
     int tightSelfPassComplexity{};
+    int shortBorderCells{};
+    int interiorLinkedBorderCells{};
     double medianBoundingFill{};
 };
 
@@ -1476,6 +1479,7 @@ TangleMetrics measureTangle(
         int maximumX = -1;
         int minimumY = rows;
         int maximumY = -1;
+        int borderCells = 0;
         for (std::size_t position = 0;
              position < value.cells.size();
              ++position) {
@@ -1490,6 +1494,13 @@ TangleMetrics measureTangle(
             maximumX = std::max(maximumX, cell.x);
             minimumY = std::min(minimumY, cell.y);
             maximumY = std::max(maximumY, cell.y);
+            borderCells += cell.x == 0 || cell.y == 0 ||
+                cell.x == columns - 1 || cell.y == rows - 1 ? 1 : 0;
+        }
+
+        result.shortBorderCells += value.cells.size() <= 5 ? borderCells : 0;
+        if (borderCells < static_cast<int>(value.cells.size())) {
+            result.interiorLinkedBorderCells += borderCells;
         }
 
         const int boundingArea =
@@ -1844,6 +1855,10 @@ Board generateBoard(const GeneratorOptions& options) {
         options.rows == 20 &&
         minimumLength == 2 &&
         maximumLength == 30;
+    // The frontier quality profile assumes a substantial interior. Preserve
+    // the generic path cutter for narrow custom boards and length constraints.
+    const bool useFrontiers = options.columns >= 128 && options.rows >= 128 &&
+        minimumLength == 2 && maximumLength >= 30;
 
     BoardCandidate best;
     const bool supportsLabyrinth =
@@ -1879,6 +1894,44 @@ Board generateBoard(const GeneratorOptions& options) {
                 0xA77E6D5U
             };
             std::mt19937 attemptRandom(attemptSeed);
+            if (useFrontiers) {
+                // Fixed work budgets preserve reproducibility and bound retries.
+                // No whole-board count/length DP or ray cache is needed here.
+                constexpr int cycleAttempts = 32;
+                for (int retry = 0; retry < cycleAttempts; ++retry) {
+                    const auto cycle = makeLabyrinthCycle(
+                        options.columns, options.rows, attemptRandom
+                    );
+                    auto arrows = detail::partitionFromFrontiers(
+                        cycle, options.columns, options.rows, maximumLength,
+                        options.allowArrowLoops, initialChoiceTarget,
+                        maximumInitialChoices, attemptRandom
+                    );
+                    if (arrows.empty()) {
+                        continue;
+                    }
+                    const auto metrics = measureTangle(options.columns, options.rows, arrows);
+                    const int perimeter = 2 * (options.columns + options.rows) - 4;
+                    const int arrowCount = static_cast<int>(arrows.size());
+                    const bool quality = metrics.intendedOrderValid &&
+                        metrics.initiallyRemovable >= minimumInitialChoices &&
+                        metrics.initiallyRemovable <= maximumInitialChoices &&
+                        metrics.directionCount == 4 && metrics.rectangularArrows == 0 &&
+                        metrics.shortArrows * 100 >= arrowCount * 30 &&
+                        metrics.shortArrows * 100 <= arrowCount * 60 &&
+                        metrics.mediumArrows * 100 >= arrowCount * 30 &&
+                        metrics.longArrows * 100 >= arrowCount * 9 &&
+                        metrics.shortBorderCells * 5 <= perimeter &&
+                        metrics.interiorLinkedBorderCells * 4 >= perimeter * 3;
+                    if (!quality) {
+                        continue;
+                    }
+                    const int score = scoreCandidate(metrics, arrowCount, initialChoiceTarget) -
+                        metrics.shortBorderCells * 2'000 + metrics.interiorLinkedBorderCells * 500;
+                    return BoardCandidate{std::move(arrows), metrics, true, score};
+                }
+                return BoardCandidate{};
+            }
             const std::vector<Cell> cycle = makeLabyrinthCycle(
                 options.columns,
                 options.rows,
@@ -2025,7 +2078,23 @@ Board generateBoard(const GeneratorOptions& options) {
         };
 
         std::vector<std::future<BoardCandidate>> futures;
-        if (candidateAttempts > 1) {
+        std::vector<BoardCandidate> frontierCandidates;
+        if (useFrontiers && candidateAttempts > 1) {
+            frontierCandidates.resize(static_cast<std::size_t>(candidateAttempts));
+            const int workers = std::min(candidateAttempts, 4);
+            std::vector<std::future<void>> jobs;
+            for (int worker = 0; worker < workers; ++worker) {
+                jobs.push_back(std::async(std::launch::async, [&, worker] {
+                    for (int attempt = worker; attempt < candidateAttempts; attempt += workers) {
+                        frontierCandidates[attempt] = generateAttempt(attempt);
+                    }
+                }));
+            }
+            for (auto& job : jobs) {
+                job.get();
+            }
+        }
+        if (!useFrontiers && candidateAttempts > 1) {
             futures.reserve(static_cast<std::size_t>(candidateAttempts));
             for (int attempt = 0;
                  attempt < candidateAttempts;
@@ -2044,6 +2113,7 @@ Board generateBoard(const GeneratorOptions& options) {
             BoardCandidate candidate =
                 candidateAttempts == 1
                 ? generateAttempt(attempt)
+                : useFrontiers ? std::move(frontierCandidates[attempt])
                 : futures[static_cast<std::size_t>(attempt)].get();
             if (candidate.arrows.empty()) {
                 continue;

@@ -137,9 +137,12 @@ The New game menu provides four board sizes:
 - Hard: 80 x 80
 - Very Hard: 160 x 160
 
-Very Hard is experimental. Like the smaller presets, it evaluates eight
-candidates in parallel and selects the highest-scoring tangle. The animated
-generation overlay remains responsive while the candidates are compared.
+Very Hard is experimental. Development toward 0.4.0 replaces its large search
+tables with bounded construction from multiple fronts, using up to four workers
+to compare eight candidates. It favors arrows connecting the perimeter to the
+interior while retaining 6..10 opening moves. The animated generation overlay
+remains responsive while candidates are compared. Released 0.3.0 uses the older
+eight-worker path cutter.
 
 The Settings menu can prevent newly generated levels from using dynamic arrow
 loops and can disable life penalties for collisions between flying arrows.
@@ -201,7 +204,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 The helper configures the project, builds it, and runs the complete test suite.
-The generator stress test creates 1,314 boards and can take several minutes.
+The generator stress test creates 1,333 boards and can take several minutes.
 
 The resulting executable is:
 
@@ -314,11 +317,19 @@ runtime simulation, collisions, persistence, and safe change workflows.
 ## How generation works
 
 The generator builds a maze-like Hamiltonian cycle that visits every board
-cell, then uses dynamic programming to cut it into arrows with a broad length
-distribution. A cut is accepted only when its exit dependencies preserve a
-constructive solution order.
+cell. Simple, Middle and Hard use dynamic programming to cut it into arrows
+with a broad length distribution. A cut is accepted only when its exit
+dependencies preserve a constructive solution order.
 
-Ray exits and dynamic self-passes are cached once per opened cycle. Large
+In development toward 0.4.0, Very Hard removes escapable fragments from either
+direction and records that removal order as the solution. Compact per-cell
+state replaces the large count/length tables. Short arrows can occupy at most
+20% of the perimeter; at least 75% of it must belong to arrows entering the
+interior. Loopless boards meet the same quality limits. See the
+[generator guide](docs/en/GENERATOR.md#11-large-board-frontier-construction-development-toward-040)
+for the bounded search and reproducible benchmark.
+
+For the path cutter, ray exits and dynamic self-passes are cached once per opened cycle. Large
 boards use exact range-based reachability and reconstruction instead of dense
 area-by-arrow-count tables, while dependency choices are updated through a
 reverse graph. Independent candidate attempts run in parallel and are compared
@@ -326,8 +337,8 @@ in deterministic order.
 
 Multiple candidates are scored for inter-arrow contact, spatial mixing,
 direction diversity, turns, dependency structure, and length distribution.
-All four presets compare eight candidates. Independent candidates are
-generated in parallel before the highest-scoring tangle is selected.
+All four presets compare up to eight candidates. Independent candidates are
+generated in parallel before the highest-scoring eligible tangle is selected.
 `GeneratorOptions::candidateAttempts` is the internal quality/time control that
 can later be exposed as a menu setting.
 

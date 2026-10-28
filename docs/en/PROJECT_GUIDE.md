@@ -205,7 +205,7 @@ Full CTest runs four test suites:
 ctest --test-dir build\windows-msvc --output-on-failure
 ```
 
-The default generator test checks 1,314 boards and special motion regressions.
+The default generator test checks 1,333 boards and special motion regressions.
 It is deliberately substantial and may take tens of seconds.
 
 For a quick reproducible range:
@@ -281,8 +281,9 @@ After editing:
 
 - Game.cpp is a large controller. Extract UI, rendering, or simulation modules
   in small testable steps rather than an unrelated rewrite.
-- Very Hard runs eight independent candidates with `std::async` and can take
-  tens of seconds; the slowest candidate determines completion time.
+- Very Hard uses bounded frontier construction with up to four workers in
+  development toward 0.4.0. The 0.3.0 generator had substantial time/memory
+  spikes. See the generator guide for current limits and the benchmark tool.
 - The generator needs even board dimensions.
 - Linux and Android are not built or verified in CI.
 - The root may contain the user's TODO.txt. Do not delete or rewrite this
