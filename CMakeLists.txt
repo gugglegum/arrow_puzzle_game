@@ -108,12 +108,15 @@ arrow_embed_sound(b2-light-pistol.wav kArrowLaunchWav)
 arrow_embed_sound(c3-metal-clack.wav kCollisionWav)
 arrow_embed_sound(d4-retro-fail.wav kDefeatWav)
 arrow_embed_sound(v3-glass-chord.wav kVictoryWav)
+arrow_embed_sound(firework-burst.wav kFireworkWav)
 
 add_executable(arrow_puzzle WIN32
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
     ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES}
     src/GameAudio.cpp
     src/GameAudio.hpp
+    src/EndScreen.cpp
+    src/EndScreen.hpp
     src/AudioData.hpp
     src/Game.cpp
     src/StaticBoardGeometry.cpp
@@ -175,6 +178,21 @@ if(ARROWPUZZLE_BUILD_TESTS)
         NAME arrow_persistence_tests
         COMMAND arrow_persistence_tests
     )
+
+    # State/timing tests need no window. An optional output directory enables
+    # explicit screenshots on a machine with a graphics context.
+    add_executable(arrow_end_screen_tests
+        tests/EndScreenTests.cpp
+        src/EndScreen.cpp
+        src/UiText.cpp
+        "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+    )
+    target_include_directories(arrow_end_screen_tests PRIVATE src)
+    target_link_libraries(arrow_end_screen_tests PRIVATE raylib)
+    if(MSVC)
+        target_compile_options(arrow_end_screen_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME arrow_end_screen_tests COMMAND arrow_end_screen_tests)
 
     # Explicit GPU check: keep the default core tests runnable without a display.
     add_executable(arrow_render_tests EXCLUDE_FROM_ALL

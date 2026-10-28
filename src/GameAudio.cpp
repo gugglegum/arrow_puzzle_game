@@ -34,8 +34,9 @@ bool GameAudio::load() {
     collisionSource_ = loadEmbeddedSound(assets::kCollisionWav, assets::kCollisionWavSize);
     defeatSource_ = loadEmbeddedSound(assets::kDefeatWav, assets::kDefeatWavSize);
     victorySource_ = loadEmbeddedSound(assets::kVictoryWav, assets::kVictoryWavSize);
+    fireworkSource_ = loadEmbeddedSound(assets::kFireworkWav, assets::kFireworkWavSize);
     if (IsSoundValid(launchSource_) && IsSoundValid(collisionSource_) &&
-        IsSoundValid(defeatSource_) && IsSoundValid(victorySource_)) {
+        IsSoundValid(defeatSource_) && IsSoundValid(victorySource_) && IsSoundValid(fireworkSource_)) {
         loaded_ = true;
         for (Sound& voice : launchVoices_) {
             voice = LoadSoundAlias(launchSource_);
@@ -46,6 +47,16 @@ bool GameAudio::load() {
             // Four B2 launches plus one C3 collision stay below full scale.
             // Aliases share decoded samples, not playback cursors.
             SetSoundVolume(voice, 0.45F);
+        }
+        if (loaded_) {
+            for (Sound& voice : fireworkVoices_) {
+                voice = LoadSoundAlias(fireworkSource_);
+                if (!IsSoundValid(voice)) {
+                    loaded_ = false;
+                    break;
+                }
+                SetSoundVolume(voice, 0.45F);
+            }
         }
         if (loaded_) return true;
     }
@@ -73,15 +84,31 @@ void GameAudio::playDefeat() {
     if (!enabled_ || !loaded_) return;
     stopLaunches();
     StopSound(victorySource_);
+    stopFireworks();
     // Preserve the final impact beneath the defeat cue.
     PlaySound(defeatSource_);
 }
 
 void GameAudio::playVictory() {
+    nextFirework_ = 0;
     if (!enabled_ || !loaded_) return;
     stopVoices();
     PlaySound(victorySource_);
 }
+
+void GameAudio::playFirework() {
+    const std::size_t index = nextFirework_++;
+    if (!enabled_ || !loaded_) return;
+    constexpr std::array<float, 5> pitches{1.0F, 0.94F, 1.06F, 0.98F, 1.04F};
+    constexpr std::array<float, 5> pans{0.65F, 0.35F, 0.5F, 0.6F, 0.4F};
+    const Sound voice = fireworkVoices_[index % fireworkVoices_.size()];
+    StopSound(voice);
+    SetSoundPitch(voice, pitches[index % pitches.size()]);
+    SetSoundPan(voice, pans[index % pans.size()]);
+    PlaySound(voice);
+}
+
+void GameAudio::stop() { stopVoices(); }
 
 void GameAudio::playArrowLaunch() {
     if (!enabled_ || !loaded_) return;
@@ -107,8 +134,15 @@ void GameAudio::stopLaunches() {
 
 void GameAudio::stopVoices() {
     stopLaunches();
+    stopFireworks();
     for (const Sound sound : {collisionSource_, defeatSource_, victorySource_}) {
         if (sound.stream.buffer != nullptr) StopSound(sound);
+    }
+}
+
+void GameAudio::stopFireworks() {
+    for (const Sound voice : fireworkVoices_) {
+        if (voice.stream.buffer != nullptr) StopSound(voice);
     }
 }
 
@@ -119,12 +153,17 @@ void GameAudio::release() {
         if (voice.stream.buffer != nullptr) UnloadSoundAlias(voice);
         voice = {};
     }
-    for (Sound* sound : {&launchSource_, &collisionSource_, &defeatSource_, &victorySource_}) {
+    for (Sound& voice : fireworkVoices_) {
+        if (voice.stream.buffer != nullptr) UnloadSoundAlias(voice);
+        voice = {};
+    }
+    for (Sound* sound : {&launchSource_, &collisionSource_, &defeatSource_, &victorySource_, &fireworkSource_}) {
         if (sound->stream.buffer != nullptr) UnloadSound(*sound);
         *sound = {};
     }
     loaded_ = false;
     nextVoice_ = 0;
+    nextFirework_ = 0;
     if (deviceOpen_) CloseAudioDevice();
     deviceOpen_ = false;
 }

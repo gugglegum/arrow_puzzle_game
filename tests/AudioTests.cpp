@@ -72,6 +72,8 @@ int main(int argc, char** argv) {
              arrow::assets::kDefeatWavSize, 45120, &arrow::GameAudio::playDefeat},
             {"v3-glass-chord.wav", arrow::assets::kVictoryWav,
              arrow::assets::kVictoryWavSize, 53760, &arrow::GameAudio::playVictory},
+            {"firework-burst.wav", arrow::assets::kFireworkWav,
+             arrow::assets::kFireworkWavSize, 46080, &arrow::GameAudio::playFirework},
         };
         require(!audio.ready() && !IsAudioDeviceReady(), "Audio opened before being enabled");
         for (const Effect& effect : effects) (audio.*effect.play)();
@@ -150,6 +152,18 @@ int main(int argc, char** argv) {
         resetCapture();
         waitForPlayback(1100);
         require(nonzeroSamples > 1000 && peak < 1.0F, "Final impact and defeat did not mix cleanly");
+        resetCapture();
+        audio.playVictory();
+        for (int index = 0; index < 12; ++index) audio.playFirework();
+        waitForPlayback(1250);
+        require(nonzeroSamples > 1000 && peak < 1.0F, "Firework voices clipped or stayed silent");
+        audio.playFirework();
+        waitForPlayback(30);
+        audio.stop();
+        waitForPlayback(30);
+        resetCapture();
+        waitForPlayback(150);
+        require(nonzeroSamples == 0 && audio.ready(), "Pausing did not stop effects while keeping audio ready");
         for (int index = 0; index < 12; ++index) {
             audio.setEnabled(true);
             audio.setEnabled(false);
@@ -164,7 +178,7 @@ int main(int argc, char** argv) {
         attached = false;
         audio.release();
         require(!audio.ready() && !IsAudioDeviceReady(), "Audio resources did not close");
-        std::cout << "Audio tests passed: four exact embedded WAVs, all effects, lazy init, overlap, mute, re-enable, cleanup.\n"
+        std::cout << "Audio tests passed: five exact embedded WAVs, fireworks, all effects, lazy init, overlap, mute, pause, re-enable, cleanup.\n"
                   << "Mixer peaks: single=" << singlePeak << " four=" << overlapPeak
                   << " collision+four=" << combinedPeak << " bound=" << maximumGameplayPeak << '\n';
         return 0;

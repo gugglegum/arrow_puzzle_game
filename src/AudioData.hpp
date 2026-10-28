@@ -12,5 +12,7 @@ extern const unsigned char kDefeatWav[];
 extern const std::size_t kDefeatWavSize;
 extern const unsigned char kVictoryWav[];
 extern const std::size_t kVictoryWavSize;
+extern const unsigned char kFireworkWav[];
+extern const std::size_t kFireworkWavSize;
 
 } // namespace arrow::assets

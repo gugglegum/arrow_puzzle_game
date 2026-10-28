@@ -21,20 +21,26 @@ public:
     void playCollision();
     void playDefeat();
     void playVictory();
+    void playFirework();
+    void stop();
     void release();
     [[nodiscard]] bool ready() const noexcept;
 
 private:
     bool load();
     void stopLaunches();
+    void stopFireworks();
     void stopVoices();
 
     Sound launchSource_{};
     Sound collisionSource_{};
     Sound defeatSource_{};
     Sound victorySource_{};
+    Sound fireworkSource_{};
     std::array<Sound, 4> launchVoices_{};
+    std::array<Sound, 3> fireworkVoices_{};
     std::size_t nextVoice_{};
+    std::size_t nextFirework_{};
     bool deviceOpen_{};
     bool loaded_{};
     bool enabled_{};

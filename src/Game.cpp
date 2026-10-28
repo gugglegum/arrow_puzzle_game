@@ -6,6 +6,7 @@
 #include "arrow/Persistence.hpp"
 #include "BuildVersion.hpp"
 #include "GameAudio.hpp"
+#include "EndScreen.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "UiText.hpp"
 
@@ -74,7 +75,6 @@ constexpr TextStyle kOverlayDetailText{17.0F, 0.1F};
 constexpr TextStyle kErrorTitleText{26.0F, 0.6F};
 constexpr TextStyle kErrorActionText{18.0F, 0.1F};
 constexpr TextStyle kErrorDetailText{15.0F, 0.0F};
-constexpr TextStyle kBannerText{25.0F, 0.1F};
 constexpr TextStyle kHelpText{17.0F, 0.1F};
 constexpr TextStyle kMenuBrandText{34.0F, 1.1F};
 constexpr TextStyle kMenuTitleText{22.0F, 0.6F};
@@ -185,6 +185,8 @@ struct PlayingFrameState {
     bool soundButtonPressed;
     bool menuButtonHovered;
     bool menuButtonPressed;
+    std::optional<int> endButtonHovered;
+    std::optional<int> endButtonPressed;
     std::optional<Cell> guideCell;
     std::string generationError;
 
@@ -952,6 +954,7 @@ int Game::run() {
     Persistence persistence(Persistence::executableDirectory());
     Settings settings = persistence.loadSettings();
     GameAudio gameAudio;
+    EndScreen endScreen;
     gameAudio.setEnabled(settings.sounds);
     const auto setSoundsEnabled = [&](bool enabled) {
         if (persistence.setSounds(settings, enabled)) {
@@ -965,7 +968,6 @@ int Game::run() {
     bool resumeAvailable = savedGame.has_value();
     Screen screen = Screen::MainMenu;
     bool activeGame = false;
-    bool gameResultAnnounced = false;
 
     std::uint32_t seed = unsignedFromEnvironment(
         "ARROWPUZZLE_SEED"
@@ -998,6 +1000,7 @@ int Game::run() {
     std::optional<int> pressedMenuButton;
     bool pressedSoundButton = false;
     bool pressedHudMenuButton = false;
+    std::optional<int> pressedEndButton;
     int focusedMenuButton = 0;
     RenderTexture2D staticBoardLayer{};
     int staticBoardLayerWidth = 0;
@@ -1070,7 +1073,8 @@ int Game::run() {
         staticBoardGeometryDirty = true;
     };
     auto resetRuntime = [&](const SavedGame* restored = nullptr) {
-        gameResultAnnounced = false;
+        endScreen.reset();
+        pressedEndButton.reset();
         arrows.clear();
         arrows.reserve(board.arrows().size());
         for (std::size_t index = 0;
@@ -1275,6 +1279,9 @@ int Game::run() {
             return;
         }
         options.allowArrowLoops = settings.arrowLoops;
+        endScreen.reset();
+        pressedEndButton.reset();
+        gameAudio.stop();
         currentGeneratorOptions = options;
         generationError.clear();
         generationOverlayRendered = false;
@@ -1398,6 +1405,9 @@ int Game::run() {
 
     const auto returnToMainMenu = [&]() {
         (void)persistCurrentGame();
+        gameAudio.stop();
+        endScreen.reset();
+        pressedEndButton.reset();
         generationError.clear();
         pressedArrow.reset();
         pressedMenuButton.reset();
@@ -2330,7 +2340,7 @@ int Game::run() {
         };
 
         const float wheel = GetMouseWheelMove();
-        if (!generationBlocksInput && wheel != 0.0F) {
+        if (!generationBlocksInput && !endScreen.visible() && wheel != 0.0F) {
             const Vector2 mouse = GetMousePosition();
             const Vector2 before = GetScreenToWorld2D(mouse, camera);
             camera.zoom = std::clamp(
@@ -2345,6 +2355,7 @@ int Game::run() {
         }
 
         if (!generationBlocksInput &&
+            !endScreen.visible() &&
             IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
             const Vector2 movement = GetMouseDelta();
             if (movement.x != 0.0F || movement.y != 0.0F) {
@@ -2369,7 +2380,7 @@ int Game::run() {
             }
         );
         if (IsKeyPressed(KEY_R) &&
-            !anyArrowInMotion &&
+            (!anyArrowInMotion || endScreen.visible()) &&
             !generationInProgress) {
             currentGeneratorOptions.seed = seed++;
             currentGeneratorOptions.allowArrowLoops =
@@ -2396,6 +2407,7 @@ int Game::run() {
 
         const bool launchInputAvailable =
             IsWindowFocused() &&
+            !endScreen.visible() &&
             lives > 0 &&
             !generationInProgress &&
             generationError.empty() &&
@@ -2412,13 +2424,17 @@ int Game::run() {
             CheckCollisionPointRec(mouse, soundButtonRectangle());
         const bool hudMenuButtonHovered = IsWindowFocused() &&
             CheckCollisionPointRec(mouse, hudMenuButtonRectangle());
+        const std::optional<int> endButtonHovered = IsWindowFocused()
+            ? endScreen.buttonAt(mouse, GetScreenWidth(), GetScreenHeight(), kHudHeight) : std::nullopt;
         if (!IsWindowFocused() || (!leftDown && !leftReleased)) {
             pressedSoundButton = false;
             pressedHudMenuButton = false;
+            pressedEndButton.reset();
         }
         if (leftPressed) {
             pressedSoundButton = soundButtonHovered;
             pressedHudMenuButton = hudMenuButtonHovered;
+            pressedEndButton = endButtonHovered;
         }
         if (leftReleased) {
             if (std::exchange(pressedHudMenuButton, false) && hudMenuButtonHovered) {
@@ -2427,6 +2443,16 @@ int Game::run() {
             }
             if (std::exchange(pressedSoundButton, false) && soundButtonHovered) {
                 setSoundsEnabled(!settings.sounds);
+            }
+            const std::optional<int> endAction = std::exchange(pressedEndButton, std::nullopt);
+            if (endAction.has_value() && endAction == endButtonHovered) {
+                if (*endAction == 0) {
+                    currentGeneratorOptions.seed = seed++;
+                    startGeneration(currentGeneratorOptions);
+                } else {
+                    returnToMainMenu();
+                }
+                continue;
             }
         }
         const bool pointerInGameplay = mouse.y > kHudHeight &&
@@ -2865,15 +2891,19 @@ int Game::run() {
             arrows,
             [](const RuntimeArrow& value) { return value.present; }
         ));
-        if (activeGame && !generationBlocksInput && !gameResultAnnounced) {
+        if (activeGame && !generationBlocksInput && !endScreen.visible()) {
             if (lives <= 0) {
-                gameResultAnnounced = true;
+                endScreen.show(EndScreen::Outcome::Defeat);
+                pressedArrow.reset();
                 gameAudio.playDefeat();
             } else if (remaining == 0) {
-                gameResultAnnounced = true;
+                endScreen.show(EndScreen::Outcome::Victory);
+                pressedArrow.reset();
                 gameAudio.playVictory();
             }
         }
+        const EndScreen::Update endAnimation = endScreen.update(delta);
+        for (int index = 0; index < endAnimation.fireworks; ++index) gameAudio.playFirework();
         if (activeGame &&
             (remaining == 0 || lives <= 0) &&
             resumeAvailable &&
@@ -2883,7 +2913,7 @@ int Game::run() {
         }
 
         const std::optional<Cell> guideCell =
-            settings.crosshairGuides && !generationBlocksInput
+            settings.crosshairGuides && !generationBlocksInput && !endScreen.visible()
                 ? hoveredGridCell(board, camera) : std::nullopt;
         const PlayingFrameState playingFrame{
             GetScreenWidth(),
@@ -2897,10 +2927,13 @@ int Game::run() {
             pressedSoundButton,
             hudMenuButtonHovered,
             pressedHudMenuButton,
+            endButtonHovered,
+            pressedEndButton,
             guideCell,
             generationError
         };
         if (automatedScreenshot.empty() &&
+            !endAnimation.changed &&
             delta < 0.1F &&
             !generationInProgress &&
             !anyArrowInMotion &&
@@ -3124,45 +3157,9 @@ int Game::run() {
                 kErrorDetailText,
                 kMuted
             );
-        } else if (remaining == 0) {
-            const char* text =
-                "FIELD CLEARED!  Press R for a new puzzle or Esc for menu";
-            const Vector2 textSize = measureText(
-                uiText,
-                text,
-                kBannerText
-            );
-            DrawRectangleRounded(
-                {
-                    GetScreenWidth() * 0.5F -
-                        textSize.x * 0.5F -
-                        24.0F,
-                    GetScreenHeight() - 84.0F,
-                    textSize.x + 48.0F,
-                    52.0F
-                },
-                0.25F,
-                8,
-                Fade(RAYWHITE, 0.94F)
-            );
-            drawCenteredText(
-                uiText,
-                text,
-                static_cast<float>(GetScreenWidth()) * 0.5F,
-                static_cast<float>(GetScreenHeight()) - 70.0F,
-                kBannerText,
-                kBlue
-            );
-        } else if (lives == 0) {
-            const char* text = "NO LIVES LEFT  -  Press R to restart";
-            drawCenteredText(
-                uiText,
-                text,
-                static_cast<float>(GetScreenWidth()) * 0.5F,
-                static_cast<float>(GetScreenHeight()) - 48.0F,
-                kBannerText,
-                kRed
-            );
+        } else if (endScreen.visible()) {
+            endScreen.draw(uiText, GetScreenWidth(), GetScreenHeight(), kHudHeight,
+                           endButtonHovered, pressedEndButton);
         }
 
         EndDrawing();
