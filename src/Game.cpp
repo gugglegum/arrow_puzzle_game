@@ -5,7 +5,7 @@
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
 #include "StaticBoardGeometry.hpp"
-#include "UiFontData.hpp"
+#include "UiText.hpp"
 
 #include <raylib.h>
 
@@ -64,7 +64,6 @@ struct TextStyle {
     float spacing;
 };
 
-constexpr int kUiFontRasterSize = 64;
 constexpr TextStyle kBrandText{24.0F, 0.8F};
 constexpr TextStyle kHudText{19.0F, 0.4F};
 constexpr TextStyle kOverlayTitleText{24.0F, 0.6F};
@@ -183,12 +182,11 @@ struct PlayingFrameState {
 };
 
 Vector2 measureText(
-    Font font,
+    UiText& font,
     const char* text,
     TextStyle style
 ) {
-    return MeasureTextEx(
-        font,
+    return font.measure(
         text,
         style.size,
         style.spacing
@@ -196,14 +194,13 @@ Vector2 measureText(
 }
 
 void drawText(
-    Font font,
+    UiText& font,
     const char* text,
     Vector2 position,
     TextStyle style,
     Color color
 ) {
-    DrawTextEx(
-        font,
+    font.draw(
         text,
         position,
         style.size,
@@ -213,7 +210,7 @@ void drawText(
 }
 
 void drawCenteredText(
-    Font font,
+    UiText& font,
     const char* text,
     float centerX,
     float y,
@@ -254,7 +251,7 @@ Rectangle menuButtonRectangle(int index, int count) {
 }
 
 void drawMenuButton(
-    Font font,
+    UiText& font,
     Rectangle bounds,
     const char* label,
     bool enabled,
@@ -308,7 +305,7 @@ void drawMenuButton(
     );
 }
 
-void drawMenuHeading(Font font, const char* title) {
+void drawMenuHeading(UiText& font, const char* title) {
     drawCenteredText(
         font,
         "ARROW PUZZLE",
@@ -836,54 +833,7 @@ int Game::run() {
     SetTargetFPS(0);
     SetExitKey(KEY_NULL);
 
-    const Font defaultFont = GetFontDefault();
-    const int uiFontDataSize =
-        assets::kUiFontDataSize <=
-                static_cast<std::size_t>(
-                    std::numeric_limits<int>::max()
-                )
-            ? static_cast<int>(assets::kUiFontDataSize)
-            : 0;
-    Font uiFont = LoadFontFromMemory(
-        ".ttf",
-        assets::kUiFontData,
-        uiFontDataSize,
-        kUiFontRasterSize,
-        nullptr,
-        0
-    );
-    const bool ownsUiFont =
-        uiFont.texture.id != defaultFont.texture.id;
-    if (ownsUiFont) {
-        SetTextureFilter(
-            uiFont.texture,
-            TEXTURE_FILTER_BILINEAR
-        );
-    } else {
-        uiFont = defaultFont;
-        TraceLog(
-            LOG_WARNING,
-            "Could not load the embedded UI font"
-        );
-    }
-
-    std::array<int, 38> hudCodepoints{' ', '?'};
-    for (int index = 0; index < 10; ++index) hudCodepoints[2 + index] = '0' + index;
-    for (int index = 0; index < 26; ++index) hudCodepoints[12 + index] = 'A' + index;
-    const auto loadHudFont = [&](int size) {
-        Font font = LoadFontFromMemory(
-            ".ttf", assets::kUiFontData, uiFontDataSize, size,
-            hudCodepoints.data(), static_cast<int>(hudCodepoints.size())
-        );
-        if (font.texture.id == 0 || font.texture.id == defaultFont.texture.id) {
-            return uiFont;
-        }
-        SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
-        return font;
-    };
-    // Rasterize at the displayed sizes so minification cannot skip thin strokes.
-    const Font hudBrandFont = loadHudFont(static_cast<int>(kBrandText.size));
-    const Font hudCountFont = loadHudFont(static_cast<int>(kHudText.size));
+    UiText uiText;
 
     Persistence persistence(Persistence::executableDirectory());
     Settings settings = persistence.loadSettings();
@@ -1988,7 +1938,7 @@ int Game::run() {
                 const int id =
                     static_cast<int>(menuScreen) * 16 + index;
                 drawMenuButton(
-                    uiFont,
+                    uiText,
                     bounds,
                     label,
                     enabled,
@@ -2012,7 +1962,7 @@ int Game::run() {
             );
 
             if (screen == Screen::MainMenu) {
-                drawMenuHeading(uiFont, "MAIN MENU");
+                drawMenuHeading(uiText, "MAIN MENU");
                 constexpr int buttonCount = 4;
                 if (menuButton(
                         0,
@@ -2056,7 +2006,7 @@ int Game::run() {
                 }
                 if (generationInProgress) {
                     drawCenteredText(
-                        uiFont,
+                        uiText,
                         "Level generation is finishing in the background",
                         static_cast<float>(GetScreenWidth()) * 0.5F,
                         static_cast<float>(GetScreenHeight()) - 54.0F,
@@ -2065,7 +2015,7 @@ int Game::run() {
                     );
                 } else {
                     drawCenteredText(
-                        uiFont,
+                        uiText,
                         "Up / Down navigate    Enter select",
                         static_cast<float>(GetScreenWidth()) * 0.5F,
                         static_cast<float>(GetScreenHeight()) - 54.0F,
@@ -2074,7 +2024,7 @@ int Game::run() {
                     );
                 }
             } else if (screen == Screen::NewGameMenu) {
-                drawMenuHeading(uiFont, "NEW GAME");
+                drawMenuHeading(uiText, "NEW GAME");
                 constexpr int buttonCount = 5;
                 for (int index = 0;
                      index <
@@ -2115,7 +2065,7 @@ int Game::run() {
                     screen = Screen::MainMenu;
                 }
                 drawCenteredText(
-                    uiFont,
+                    uiText,
                     "Up / Down navigate    Enter select    Esc back",
                     static_cast<float>(GetScreenWidth()) * 0.5F,
                     static_cast<float>(GetScreenHeight()) - 54.0F,
@@ -2123,7 +2073,7 @@ int Game::run() {
                     kMuted
                 );
             } else if (screen == Screen::SettingsMenu) {
-                drawMenuHeading(uiFont, "SETTINGS");
+                drawMenuHeading(uiText, "SETTINGS");
                 constexpr int buttonCount = 3;
                 const std::string loopsLabel =
                     std::string{"Arrow loops  ["} +
@@ -2173,7 +2123,7 @@ int Game::run() {
                     screen = Screen::MainMenu;
                 }
                 drawCenteredText(
-                    uiFont,
+                    uiText,
                     "Up / Down navigate    Enter / Space toggle"
                     "    Saved automatically",
                     static_cast<float>(GetScreenWidth()) * 0.5F,
@@ -2755,7 +2705,7 @@ int Game::run() {
             const char* help =
                 "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   Esc menu";
             drawCenteredText(
-                uiFont,
+                uiText,
                 help,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(GetScreenHeight()) - 30.0F,
@@ -2786,12 +2736,12 @@ int Game::run() {
             kSoft
         );
         const Vector2 brandSize = measureText(
-            hudBrandFont,
+            uiText,
             "ARROW PUZZLE",
             kBrandText
         );
         drawText(
-            hudBrandFont,
+            uiText,
             "ARROW PUZZLE",
             {
                 28.0F,
@@ -2807,12 +2757,12 @@ int Game::run() {
                 ? "GENERATION FAILED"
                 : "ARROWS  " + std::to_string(remaining);
         const Vector2 countSize = measureText(
-            hudCountFont,
+            uiText,
             countText.c_str(),
             kHudText
         );
         drawText(
-            hudCountFont,
+            uiText,
             countText.c_str(),
             {
                 std::round(static_cast<float>(GetScreenWidth()) * 0.5F -
@@ -2882,7 +2832,7 @@ int Game::run() {
             );
             const char* title = "GENERATING LEVEL";
             drawCenteredText(
-                uiFont,
+                uiText,
                 title,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 43.0F,
@@ -2892,7 +2842,7 @@ int Game::run() {
             const char* detail =
                 "Searching for an interesting puzzle...";
             drawCenteredText(
-                uiFont,
+                uiText,
                 detail,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 79.0F,
@@ -2915,7 +2865,7 @@ int Game::run() {
                 2;
             const char* title = "GENERATION FAILED";
             drawCenteredText(
-                uiFont,
+                uiText,
                 title,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) - 58.0F,
@@ -2925,7 +2875,7 @@ int Game::run() {
             const char* retry =
                 "Press R to try another level  /  Esc for menu";
             drawCenteredText(
-                uiFont,
+                uiText,
                 retry,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) - 10.0F,
@@ -2939,7 +2889,7 @@ int Game::run() {
                 errorDetail += "...";
             }
             drawCenteredText(
-                uiFont,
+                uiText,
                 errorDetail.c_str(),
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) + 31.0F,
@@ -2950,7 +2900,7 @@ int Game::run() {
             const char* text =
                 "FIELD CLEARED!  Press R for a new puzzle or Esc for menu";
             const Vector2 textSize = measureText(
-                uiFont,
+                uiText,
                 text,
                 kBannerText
             );
@@ -2968,7 +2918,7 @@ int Game::run() {
                 Fade(RAYWHITE, 0.94F)
             );
             drawCenteredText(
-                uiFont,
+                uiText,
                 text,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(GetScreenHeight()) - 70.0F,
@@ -2978,7 +2928,7 @@ int Game::run() {
         } else if (lives == 0) {
             const char* text = "NO LIVES LEFT  -  Press R to restart";
             drawCenteredText(
-                uiFont,
+                uiText,
                 text,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(GetScreenHeight()) - 48.0F,
@@ -3037,7 +2987,7 @@ int Game::run() {
                 kBlue
             );
             drawCenteredText(
-                uiFont,
+                uiText,
                 "FINISHING LEVEL GENERATION",
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 43.0F,
@@ -3045,7 +2995,7 @@ int Game::run() {
                 kInk
             );
             drawCenteredText(
-                uiFont,
+                uiText,
                 "The game will close automatically...",
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 79.0F,
@@ -3061,16 +3011,7 @@ int Game::run() {
             // consuming the future keeps the worker lifetime deterministic.
         }
     }
-    if (hudBrandFont.texture.id != uiFont.texture.id) {
-        UnloadFont(hudBrandFont);
-    }
-    if (hudCountFont.texture.id != uiFont.texture.id &&
-        hudCountFont.texture.id != hudBrandFont.texture.id) {
-        UnloadFont(hudCountFont);
-    }
-    if (ownsUiFont) {
-        UnloadFont(uiFont);
-    }
+    uiText.release();
     if (staticBoardLayer.id != 0) {
         UnloadRenderTexture(staticBoardLayer);
     }

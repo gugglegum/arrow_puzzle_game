@@ -72,6 +72,8 @@ add_executable(arrow_puzzle WIN32
     src/BoardCoverageShader.hpp
     src/main.cpp
     src/UiFontData.hpp
+    src/UiText.cpp
+    src/UiText.hpp
 )
 
 target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib Threads::Threads)
@@ -130,5 +132,16 @@ if(ARROWPUZZLE_BUILD_TESTS)
     target_link_libraries(arrow_render_tests PRIVATE raylib)
     if(MSVC)
         target_compile_options(arrow_render_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
+    add_executable(arrow_ui_text_tests EXCLUDE_FROM_ALL
+        tests/UiTextTests.cpp
+        src/UiText.cpp
+        "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+    )
+    target_include_directories(arrow_ui_text_tests PRIVATE src)
+    target_link_libraries(arrow_ui_text_tests PRIVATE raylib)
+    if(MSVC)
+        target_compile_options(arrow_ui_text_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
 endif()
