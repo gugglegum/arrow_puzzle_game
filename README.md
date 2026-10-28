@@ -35,7 +35,7 @@ dependencies.
 Release builds are compiled and tested by **GitHub Actions**. The ZIP includes
 build metadata and SHA-256 checksums are supplied with the download; the EXE
 and ZIP have GitHub build-provenance attestations. See the
-[release verification guide](docs/RELEASING.md#verifying-a-download).
+[release verification guide](docs/en/RELEASING.md#verifying-a-download).
 Changes since 0.2.0 are listed in the [changelog](CHANGELOG.md#030---2026-10-29).
 
 The current build is not digitally signed, so Windows SmartScreen may display
@@ -297,7 +297,9 @@ src/EndScreen.cpp    Result cards and finite victory celebration
 src/GameAudio.cpp    Optional embedded sound effects
 tests/               Core, persistence, menus, and result-screen tests
 tools/               Windows build and packaging helpers
-docs/                Developer guides and screenshots
+docs/en/             English developer guides
+docs/ru/             Russian developer guides
+docs/screenshots/    Shared screenshots
 .github/workflows/   Release-only GitHub Actions build and provenance
 ```
 
@@ -306,7 +308,7 @@ docs/                Developer guides and screenshots
 links only `arrow_core`.
 
 Detailed developer and AI-assistant documentation is indexed in
-[`docs/README.md`](docs/README.md). It covers the architecture, generator,
+[`docs/en/README.md`](docs/en/README.md). It covers the architecture, generator,
 runtime simulation, collisions, persistence, and safe change workflows.
 
 ## How generation works

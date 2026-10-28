@@ -1,8 +1,8 @@
 # Working observations for agents
 
 [AGENTS.md](../AGENTS.md) owns repository working rules. The
-[project guide](../docs/PROJECT_GUIDE.md) owns build commands, test targets and
-the validation matrix; the [runtime guide](../docs/RUNTIME.md) documents screenshot
+[project guide](../docs/en/PROJECT_GUIDE.md) owns build commands, test targets and
+the validation matrix; the [runtime guide](../docs/en/RUNTIME.md) documents screenshot
 hooks. Use those references instead of maintaining duplicate procedures here.
 
 ## Useful habits from previous work
@@ -55,5 +55,6 @@ Keep durable observations here, accepted choices/current work in
 [status and decisions](status-and-decisions.md), and verified release evidence in
 [release history](release-history.md). Put behavior/architecture changes in the
 relevant technical guide under docs, then add only their navigation or decision
-context here. Personal scratch notes belong in [local/](local/), whose contents
+context here. Keep matching docs/en and docs/ru pages aligned when facts change.
+Personal scratch notes belong in [local/](local/), whose contents
 are ignored except for its .gitignore. Keep generated artifacts in build/out.

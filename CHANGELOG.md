@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Organized technical documentation into matching English and Russian editions
+  under `docs/en` and `docs/ru`, with language switches, shared screenshots, and
+  updated links from the main READMEs, agent roadmap, and release workflow.
+
 ### Fixed
 
 - Hold the final collision on screen for 1.2 seconds before showing GAME OVER.

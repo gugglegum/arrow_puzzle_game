@@ -39,6 +39,7 @@ later commits; ordinary source pushes leave release artifacts unchanged.
 | Sounds/guides | Optional, off by default, persisted; HUD shares sound preference | Surprise sound at startup or replay on redraw/unmute |
 | Results | Finite effects; preserve the fatal pose before delayed defeat | Immediate Game Over hiding the mistake; endless finished-game work |
 | Release trust | Build in Actions, bot-created release, hashes and provenance | Claiming a local EXE is the attested Actions artifact |
+| Documentation | Mirrored docs/en and docs/ru with shared screenshots; English-first AI navigation | Diverging technical manuals in ai-docs or duplicated images |
 
 User feedback confirmed that large-board panning, antialiasing, and multi-instance
 responsiveness improved. Historical resource-pressure freezes are a reason to

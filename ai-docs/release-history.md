@@ -1,7 +1,7 @@
 # Recorded release evidence
 
 For the release procedure, version labels, preview builds, packaging, and
-provenance policy, use [docs/RELEASING.md](../docs/RELEASING.md) and the actual
+provenance policy, use [docs/en/RELEASING.md](../docs/en/RELEASING.md) and the actual
 [version script](../cmake/GenerateBuildVersion.cmake). This page stores evidence
 from completed releases, not a second procedure or a claim about a future build.
 

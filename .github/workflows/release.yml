@@ -132,6 +132,6 @@ jobs:
             test "$draft" = 'true' || { echo 'Published release assets are never replaced. Use a new tag.' >&2; exit 1; }
             gh release upload "$RELEASE_TAG" release-files/* --clobber
           else
-            printf 'Built and tested by GitHub Actions from commit `%s`.\n\nBuild log: %s/%s/actions/runs/%s\n\nThe ZIP and its ArrowPuzzle.exe have GitHub build-provenance attestations. See docs/RELEASING.md for verification instructions.\n' "$SOURCE_COMMIT" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
+            printf 'Built and tested by GitHub Actions from commit `%s`.\n\nBuild log: %s/%s/actions/runs/%s\n\nThe ZIP and its ArrowPuzzle.exe have GitHub build-provenance attestations. See docs/en/RELEASING.md for verification instructions.\n' "$SOURCE_COMMIT" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
             gh release create "$RELEASE_TAG" release-files/* --verify-tag --draft --title "Arrow Puzzle $RELEASE_TAG" --notes-file release-notes.md
           fi

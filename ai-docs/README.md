@@ -20,16 +20,17 @@ tests, Git history, and the current instructions settle discrepancies.
 
 | Task | Read | Main implementation |
 | --- | --- | --- |
-| Overall structure, models, build and tests | [Project guide](../docs/PROJECT_GUIDE.md) | `Game.cpp`, `include/arrow/`, CMake and `tests/` |
-| Generation, solvability, arrow composition | [Generator guide](../docs/GENERATOR.md) | `Generator.cpp`, `Board.cpp` |
-| Flight, collisions, rollback, saves | [Runtime guide](../docs/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
-| Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
-| Menus, themes, sound, end screens | [Runtime guide](../docs/RUNTIME.md) | `MenuSelection.hpp`, `EndScreen.cpp`, `GameAudio.cpp` |
-| Release procedure and verification | [Release guide](../docs/RELEASING.md) | `cmake/`, `tools/`, `.github/workflows/` |
+| Overall structure, models, build and tests | [Project guide](../docs/en/PROJECT_GUIDE.md) | `Game.cpp`, `include/arrow/`, CMake and `tests/` |
+| Generation, solvability, arrow composition | [Generator guide](../docs/en/GENERATOR.md) | `Generator.cpp`, `Board.cpp` |
+| Flight, collisions, rollback, saves | [Runtime guide](../docs/en/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
+| Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/en/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
+| Menus, themes, sound, end screens | [Runtime guide](../docs/en/RUNTIME.md) | `MenuSelection.hpp`, `EndScreen.cpp`, `GameAudio.cpp` |
+| Release procedure and verification | [Release guide](../docs/en/RELEASING.md) | `cmake/`, `tools/`, `.github/workflows/` |
 | Previously verified release evidence | [Release history](release-history.md) | Tagged source and Actions run |
 
-Technical facts and procedures live in [docs](../docs/README.md), mostly in Russian,
-and serve both human developers and agents. This folder adds navigation, decisions,
+Technical facts and procedures live in [English docs](../docs/en/README.md), with
+a matching [Russian edition](../docs/ru/README.md), and serve both developers and
+agents. Keep both editions aligned. This folder adds navigation, decisions,
 status and working observations; do not maintain a second architecture manual here.
 User-facing descriptions are [README.md](../README.md) and
 [README_RU.md](../README_RU.md). Avoid copying whole guides into these notes.

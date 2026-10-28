@@ -1,20 +1,14 @@
-# Техническая документация Arrow Puzzle
+# Arrow Puzzle documentation
 
-Эти документы описывают устройство, разработку и выпуск игры. Это общая
-техническая документация для разработчиков и ИИ-ассистентов.
+Choose a language / Выберите язык:
 
-В исходном репозитории сначала прочитайте `AGENTS.md` и краткую англоязычную
-дорожную карту `ai-docs/README.md`; документы ниже содержат подробные пояснения.
+- [English](en/README.md)
+- [Русский](ru/README.md)
 
-- [PROJECT_GUIDE.md](PROJECT_GUIDE.md) — назначение проекта, архитектура,
-  сборка, тесты и правила безопасного внесения изменений.
-- [GENERATOR.md](GENERATOR.md) — устройство конструктивного генератора,
-  его инварианты, метрики качества и особенности производительности.
-- [RUNTIME.md](RUNTIME.md) — игровой цикл, плавное движение, коллизии,
-  отрисовка, меню, настройки и сохранения.
-- [RELEASING.md](RELEASING.md) — сборка релизов через GitHub Actions,
-  локальная подготовка, упаковка и проверка происхождения EXE и ZIP.
-- [screenshots/](screenshots/) — изображения для основных README-файлов.
+Both editions cover the same architecture, generator, runtime, development,
+and release procedures. English is the primary edition; the Russian translation
+is maintained alongside it. Matching pages link to each other.
 
-Пользовательское описание игры находится в корневых
-[README.md](../README.md) и [README_RU.md](../README_RU.md).
+Images are shared in [screenshots/](screenshots/). Keep technical documentation
+in these language sections; agent-specific navigation and project memory stay
+in `ai-docs/` in the source repository.

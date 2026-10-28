@@ -1,5 +1,7 @@
 # Конструктивный генератор уровней
 
+[English](../en/GENERATOR.md) | **Русский**
+
 Основная реализация находится в `src/Generator.cpp`, публичный интерфейс — в
 `include/arrow/Generator.hpp`, статистические и регрессионные проверки — в
 `tests/GeneratorTests.cpp`.

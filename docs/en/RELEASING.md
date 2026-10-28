@@ -1,5 +1,7 @@
 # Windows releases built by GitHub Actions
 
+**English** | [Русский](../ru/RELEASING.md)
+
 The **Windows release** workflow builds the executable on a GitHub-hosted
 Windows 2022 runner. It runs only after a `vX.Y.Z` tag is pushed or when an
 owner starts it with **Run workflow**. Ordinary branch pushes and pull requests
