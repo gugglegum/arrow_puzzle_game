@@ -396,6 +396,7 @@ Settings Persistence::loadSettings() const noexcept {
         bool versionSeen = false;
         bool arrowLoopsSeen = false;
         bool collisionsSeen = false;
+        bool crosshairGuidesSeen = false;
         std::string line;
         while (std::getline(input, line)) {
             if (line.size() > kMaximumLineLength) {
@@ -428,13 +429,16 @@ Settings Persistence::loadSettings() const noexcept {
                 collisionsSeen =
                     parseBool(value, settings.flyingArrowCollisions);
                 canonical = canonical && collisionsSeen;
+            } else if (key == "crosshair_guides") {
+                crosshairGuidesSeen = parseBool(value, settings.crosshairGuides);
+                canonical = canonical && crosshairGuidesSeen;
             }
         }
         if (!input.eof()) {
             canonical = false;
         }
         canonical = canonical && formatSeen && versionSeen &&
-                    arrowLoopsSeen && collisionsSeen;
+                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen;
         if (!formatSeen || !versionSeen) {
             settings = {};
         }
@@ -456,7 +460,9 @@ bool Persistence::saveSettings(const Settings& settings) const noexcept {
                << "arrow_loops="
                << (settings.arrowLoops ? "on" : "off") << '\n'
                << "flying_arrow_collisions="
-               << (settings.flyingArrowCollisions ? "on" : "off") << '\n';
+               << (settings.flyingArrowCollisions ? "on" : "off") << '\n'
+               << "crosshair_guides="
+               << (settings.crosshairGuides ? "on" : "off") << '\n';
         return static_cast<bool>(output);
     });
 }
@@ -480,6 +486,19 @@ bool Persistence::setFlyingArrowCollisions(
 ) const noexcept {
     Settings changed = settings;
     changed.flyingArrowCollisions = enabled;
+    if (!saveSettings(changed)) {
+        return false;
+    }
+    settings = changed;
+    return true;
+}
+
+bool Persistence::setCrosshairGuides(
+    Settings& settings,
+    bool enabled
+) const noexcept {
+    Settings changed = settings;
+    changed.crosshairGuides = enabled;
     if (!saveSettings(changed)) {
         return false;
     }

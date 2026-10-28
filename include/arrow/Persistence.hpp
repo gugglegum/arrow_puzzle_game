@@ -11,6 +11,7 @@ namespace arrow {
 struct Settings {
     bool arrowLoops{true};
     bool flyingArrowCollisions{true};
+    bool crosshairGuides{false};
 
     auto operator<=>(const Settings&) const = default;
 };
@@ -49,6 +50,10 @@ public:
         bool enabled
     ) const noexcept;
     [[nodiscard]] bool setFlyingArrowCollisions(
+        Settings& settings,
+        bool enabled
+    ) const noexcept;
+    [[nodiscard]] bool setCrosshairGuides(
         Settings& settings,
         bool enabled
     ) const noexcept;

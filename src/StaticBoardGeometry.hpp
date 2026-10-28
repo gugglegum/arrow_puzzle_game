@@ -26,6 +26,11 @@ public:
     // or uploading new persistent meshes each frame.
     void beginDynamic(float zoom);
     void endDynamic();
+    // Subtract the supplied RGB difference from an existing primitive, using
+    // its pixel coverage once. This recolours cached dots without thickening
+    // their antialiased edges or changing destination alpha.
+    void beginDarkening(float zoom);
+    void endDarkening();
     void release();
 
     [[nodiscard]] std::size_t gpuBytes() const noexcept;

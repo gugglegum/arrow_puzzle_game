@@ -126,6 +126,61 @@ void checkCoverage(RenderTexture2D target) {
     }
 }
 
+void checkDotRecolouring(RenderTexture2D target) {
+    const RenderTexture2D reference = LoadRenderTexture(kWidth, kHeight);
+    arrow::StaticBoardGeometry geometry;
+    constexpr Color base{195, 202, 214, 255};
+    constexpr Color highlighted{148, 158, 176, 255};
+    constexpr Color difference{47, 44, 38, 255};
+    for (float zoom : {0.05F, 0.139434F, 0.25F, 1.0F, 3.5F}) {
+        for (int phase = 0; phase <= 8; ++phase) {
+            const Camera2D camera{{phase / 8.0F, phase / 11.0F}, {}, 0.0F, zoom};
+            const Vector2 center{64.0F / zoom, 48.0F / zoom};
+            const auto render = [&](RenderTexture2D destination, bool overlay) {
+                BeginTextureMode(destination);
+                ClearBackground({248, 250, 253, 255});
+                BeginMode2D(camera);
+                geometry.beginDynamic(zoom);
+                geometry.addCircle(center, 3.2F, overlay ? base : highlighted);
+                geometry.endDynamic();
+                if (overlay) {
+                    geometry.beginDarkening(zoom);
+                    geometry.addCircle(center, 3.2F, difference);
+                    geometry.endDarkening();
+                }
+                // Normal blending must be restored for subsequent moving arrows.
+                geometry.beginDynamic(zoom);
+                geometry.addCircle({100.0F / zoom, 48.0F / zoom}, 3.2F, BLUE);
+                geometry.endDynamic();
+                EndMode2D();
+                EndTextureMode();
+            };
+            render(reference, false);
+            render(target, true);
+            Image expected = LoadImageFromTexture(reference.texture);
+            Image actual = LoadImageFromTexture(target.texture);
+            Color* expectedPixels = LoadImageColors(expected);
+            Color* actualPixels = LoadImageColors(actual);
+            bool matches = true;
+            for (int index = 0; index < kWidth * kHeight; ++index) {
+                const Color a = actualPixels[index];
+                const Color e = expectedPixels[index];
+                matches &= std::abs(a.r - e.r) <= 1 && std::abs(a.g - e.g) <= 1 &&
+                           std::abs(a.b - e.b) <= 1 && a.a == e.a;
+            }
+            UnloadImageColors(expectedPixels);
+            UnloadImageColors(actualPixels);
+            UnloadImage(expected);
+            UnloadImage(actual);
+            if (!matches) {
+                throw std::runtime_error("Dot highlighting changed antialiasing or subsequent blending");
+            }
+        }
+    }
+    geometry.release();
+    UnloadRenderTexture(reference);
+}
+
 } // namespace
 
 int main() {
@@ -136,7 +191,8 @@ int main() {
     int result = 0;
     try {
         checkCoverage(target);
-        std::cout << "Rendering tests passed: 2870 coverage samples and streaming batch flush.\n";
+        checkDotRecolouring(target);
+        std::cout << "Rendering tests passed: 2870 coverage samples, streaming batch flush and 45 dot recolouring samples.\n";
     } catch (const std::exception& error) {
         std::cerr << "Rendering test failure: " << error.what() << '\n';
         result = 1;

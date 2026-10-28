@@ -59,6 +59,7 @@ constexpr Color kRed{238, 67, 74, 255};
 constexpr Color kSoft{226, 232, 241, 255};
 constexpr Color kMuted{104, 115, 132, 255};
 constexpr Color kGridDot{195, 202, 214, 255};
+constexpr Color kGridGuideDot{148, 158, 176, 255};
 
 struct TextStyle {
     float size;
@@ -178,6 +179,7 @@ struct PlayingFrameState {
     int remaining;
     bool generationInProgress;
     bool windowFocused;
+    std::optional<Cell> guideCell;
     std::string generationError;
 
     bool operator==(const PlayingFrameState&) const = default;
@@ -554,10 +556,11 @@ void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value) {
 void cacheIdleBoardGeometry(
     StaticBoardGeometry& geometry,
     const Board& board,
-    std::span<const RuntimeArrow> arrows
+    std::span<const RuntimeArrow> arrows,
+    std::vector<std::uint8_t>& occupied
 ) {
     geometry.begin();
-    std::vector<std::uint8_t> occupied(
+    occupied.assign(
         static_cast<std::size_t>(board.columns()) * board.rows(),
         0
     );
@@ -586,6 +589,52 @@ void cacheIdleBoardGeometry(
         }
     }
     geometry.finish();
+}
+
+std::optional<Cell> hoveredGridCell(const Board& board, Camera2D camera) {
+    const Vector2 mouse = GetMousePosition();
+    if (!IsWindowFocused() || !IsCursorOnScreen() ||
+        mouse.x < 0.0F || mouse.x >= GetScreenWidth() ||
+        mouse.y <= kHudHeight || mouse.y >= GetScreenHeight()) {
+        return std::nullopt;
+    }
+    const Vector2 world = GetScreenToWorld2D(mouse, camera);
+    // Cell boundaries are halfway between dot centres. Selection is independent
+    // of arrow hit-testing, so hovering an arrow also reveals the empty axes.
+    const Cell cell{
+        static_cast<int>(std::floor((world.x - kBoardPadding) / kCellSize)),
+        static_cast<int>(std::floor((world.y - kBoardPadding) / kCellSize))
+    };
+    return board.isInside(cell) ? std::optional{cell} : std::nullopt;
+}
+
+void drawGridGuides(
+    StaticBoardGeometry& geometry,
+    const Board& board,
+    std::span<const std::uint8_t> occupied,
+    Cell selected,
+    float zoom
+) {
+    if (occupied.size() != static_cast<std::size_t>(board.columns()) * board.rows()) {
+        return;
+    }
+    constexpr Color difference{
+        kGridDot.r - kGridGuideDot.r,
+        kGridDot.g - kGridGuideDot.g,
+        kGridDot.b - kGridGuideDot.b,
+        255
+    };
+    geometry.beginDarkening(zoom);
+    const auto drawEmptyDot = [&](Cell cell) {
+        if (occupied[static_cast<std::size_t>(cell.y) * board.columns() + cell.x] == 0) {
+            geometry.addCircle(cellCenter(cell), kGridDotRadius, difference);
+        }
+    };
+    for (int x = 0; x < board.columns(); ++x) drawEmptyDot({x, selected.y});
+    for (int y = 0; y < board.rows(); ++y) {
+        if (y != selected.y) drawEmptyDot({selected.x, y});
+    }
+    geometry.endDarkening();
 }
 
 bool allOutside(const RuntimeArrow& value, const Board& board) {
@@ -880,6 +929,7 @@ int Game::run() {
     int staticBoardLayerHeight = 0;
     bool staticBoardLayerDirty = true;
     StaticBoardGeometry staticBoardGeometry;
+    std::vector<std::uint8_t> idleBoardOccupancy;
     bool staticBoardGeometryDirty = true;
     int cursorRefreshFrames = 0;
     const auto restoreCursor = []() {
@@ -1655,7 +1705,7 @@ int Game::run() {
         }
 
         if (staticBoardGeometryDirty) {
-            cacheIdleBoardGeometry(staticBoardGeometry, board, arrows);
+            cacheIdleBoardGeometry(staticBoardGeometry, board, arrows, idleBoardOccupancy);
             staticBoardGeometryDirty = false;
         }
 
@@ -1773,7 +1823,7 @@ int Game::run() {
                 ? 4
                 : menuScreen == Screen::NewGameMenu
                     ? 5
-                    : 3;
+                    : 4;
             const auto menuItemEnabled = [&](int index) {
                 if (index < 0 || index >= menuItemCount) {
                     return false;
@@ -1903,7 +1953,7 @@ int Game::run() {
                 } else if (
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
-                    focusedMenuButton <= 1) {
+                    focusedMenuButton <= 2) {
                     activatedMenuButton =
                         focusedMenuButton;
                     pressedMenuButton.reset();
@@ -2076,7 +2126,7 @@ int Game::run() {
                 );
             } else if (screen == Screen::SettingsMenu) {
                 drawMenuHeading(uiText, "SETTINGS");
-                constexpr int buttonCount = 3;
+                constexpr int buttonCount = 4;
                 const std::string loopsLabel =
                     std::string{"Arrow loops  ["} +
                     (settings.arrowLoops ? "ON" : "OFF") +
@@ -2117,9 +2167,21 @@ int Game::run() {
                         );
                     }
                 }
+                const std::string guidesLabel =
+                    std::string{"Crosshair guides  ["} +
+                    (settings.crosshairGuides ? "ON" : "OFF") + "]";
                 if (menuButton(
                         2,
                         menuButtonRectangle(2, buttonCount),
+                        guidesLabel.c_str()
+                    )) {
+                    if (!persistence.setCrosshairGuides(settings, !settings.crosshairGuides)) {
+                        TraceLog(LOG_WARNING, "Could not save crosshair guide setting");
+                    }
+                }
+                if (menuButton(
+                        3,
+                        menuButtonRectangle(3, buttonCount),
                         "Back"
                     )) {
                     screen = Screen::MainMenu;
@@ -2692,6 +2754,9 @@ int Game::run() {
             savedGame.reset();
         }
 
+        const std::optional<Cell> guideCell =
+            settings.crosshairGuides && !generationBlocksInput
+                ? hoveredGridCell(board, camera) : std::nullopt;
         const PlayingFrameState playingFrame{
             GetScreenWidth(),
             GetScreenHeight(),
@@ -2699,6 +2764,7 @@ int Game::run() {
             remaining,
             generationInProgress,
             IsWindowFocused(),
+            guideCell,
             generationError
         };
         if (automatedScreenshot.empty() &&
@@ -2806,6 +2872,9 @@ int Game::run() {
             std::max(0, GetScreenHeight() - gameplayTop)
         );
         BeginMode2D(camera);
+        if (guideCell.has_value()) {
+            drawGridGuides(staticBoardGeometry, board, idleBoardOccupancy, *guideCell, camera.zoom);
+        }
         staticBoardGeometry.beginDynamic(camera.zoom);
         for (const RuntimeArrow& value : arrows) {
             if (value.present &&

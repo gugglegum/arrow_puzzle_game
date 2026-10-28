@@ -115,6 +115,7 @@ void testDefaultSettingsAreCreated() {
         settings.flyingArrowCollisions,
         "Flying-arrow collisions must default to on"
     );
+    require(!settings.crosshairGuides, "Crosshair guides must default to off");
     require(
         std::filesystem::is_regular_file(persistence.settingsPath()),
         "Loading missing settings must create settings.txt"
@@ -128,6 +129,10 @@ void testDefaultSettingsAreCreated() {
     require(
         text.find("arrow_loops=on") != std::string::npos,
         "Default arrow-loop setting was not written"
+    );
+    require(
+        text.find("crosshair_guides=off") != std::string::npos,
+        "Default crosshair guide setting was not written"
     );
 }
 
@@ -165,6 +170,42 @@ void testSettingsRoundTripAndAutomaticSetters() {
         persistence.loadSettings() == arrow::Settings{},
         "Automatic setters did not persist both defaults"
     );
+    require(persistence.setCrosshairGuides(settings, true), "Crosshair guide auto-save failed");
+    require(settings.crosshairGuides, "Crosshair guide setter did not update caller");
+    require(persistence.loadSettings().crosshairGuides, "Crosshair guides were not persisted");
+    require(persistence.setCrosshairGuides(settings, false), "Disabling crosshair guides failed");
+    require(persistence.loadSettings() == arrow::Settings{}, "Crosshair guides did not stay disabled");
+}
+
+void testCrosshairGuidesUpgradeAndRepair() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    writeText(persistence.settingsPath(),
+        "format=arrow-puzzle-settings\nversion=1\n"
+        "arrow_loops=off\nflying_arrow_collisions=off\n");
+    const arrow::Settings upgraded = persistence.loadSettings();
+    require(!upgraded.arrowLoops && !upgraded.flyingArrowCollisions,
+            "Adding crosshair guides changed legacy preferences");
+    require(!upgraded.crosshairGuides, "Legacy settings unexpectedly enabled crosshair guides");
+    require(readText(persistence.settingsPath()).find("crosshair_guides=off") != std::string::npos,
+            "Legacy settings were not upgraded");
+
+    writeText(persistence.settingsPath(),
+        "format=arrow-puzzle-settings\nversion=1\n"
+        "arrow_loops=off\nflying_arrow_collisions=on\ncrosshair_guides=invalid\n");
+    const arrow::Settings repaired = persistence.loadSettings();
+    require(!repaired.arrowLoops && repaired.flyingArrowCollisions && !repaired.crosshairGuides,
+            "Malformed crosshair guides changed other preferences");
+    require(readText(persistence.settingsPath()).find("crosshair_guides=off") != std::string::npos,
+            "Invalid crosshair guide preference was not repaired");
+
+    const auto blockedPath = temporary.path() / "not-a-directory";
+    writeText(blockedPath, "keep");
+    const arrow::Persistence blocked{blockedPath};
+    arrow::Settings unchanged;
+    require(!blocked.setCrosshairGuides(unchanged, true), "Unwritable setting falsely succeeded");
+    require(!unchanged.crosshairGuides, "Failed write changed the active preference");
+    require(readText(blockedPath) == "keep", "Failed settings write changed an unrelated file");
 }
 
 void testMalformedSettingsAreRepaired() {
@@ -386,6 +427,7 @@ int main() {
     try {
         testDefaultSettingsAreCreated();
         testSettingsRoundTripAndAutomaticSetters();
+        testCrosshairGuidesUpgradeAndRepair();
         testMalformedSettingsAreRepaired();
         testSavedGameRoundTrip();
         testInvalidGamesAreRejectedWithoutDestroyingOldSave();
