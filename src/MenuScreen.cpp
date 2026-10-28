@@ -184,26 +184,26 @@ void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int
 }
 
 void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, Page page,
-                            int index, bool enabled, bool focused, bool armed,
+                            int index, bool enabled, bool selected, bool armed,
                             std::optional<bool> toggle, const char* choice) {
-    const bool hovered = enabled && CheckCollisionPointRec(GetMousePosition(), bounds);
-    const bool pressed = hovered && armed;
-    const bool highlighted = enabled && (hovered || focused);
+    const bool highlighted = enabled && selected;
+    const bool pressed = highlighted && armed;
     const bool primary = page == Page::Main && index == 0;
+    const bool primarySelected = primary && highlighted;
     const Color accent = primary ? kGold : kCyan;
     Color fill{20, 33, 54, 255};
-    if (enabled && primary) {
-        fill = pressed ? Color{227, 191, 103, 255} : highlighted ? Color{255, 226, 153, 255} : kGold;
+    if (primarySelected) {
+        fill = pressed ? Color{227, 191, 103, 255} : Color{255, 226, 153, 255};
     } else if (enabled) {
         fill = pressed ? Color{43, 64, 90, 255} : highlighted ? Color{34, 54, 80, 255} : Color{26, 43, 67, 255};
     }
-    const Color ink = !enabled ? Color{127, 147, 179, 255} : primary ? Color{28, 34, 48, 255} : kLight;
-    const Color secondary = !enabled ? Color{105, 125, 156, 255} : primary ? Color{81, 72, 51, 255} : kQuiet;
+    const Color ink = !enabled ? Color{127, 147, 179, 255} : primarySelected ? Color{28, 34, 48, 255} : kLight;
+    const Color secondary = !enabled ? Color{105, 125, 156, 255} : primarySelected ? Color{81, 72, 51, 255} : kQuiet;
     DrawRectangleRounded(bounds, 0.22F, 10, fill);
     DrawRectangleRoundedLinesEx(bounds, 0.22F, 10, highlighted ? 1.5F : 1.0F,
-        primary ? kGold : highlighted ? Fade(accent, 0.8F) : Color{50, 69, 96, 255});
+        primarySelected ? kGold : highlighted ? Fade(accent, 0.8F) : Color{50, 69, 96, 255});
     const Vector2 center{bounds.x + 32, bounds.y + bounds.height * 0.5F};
-    icon(page, index, center, enabled ? primary ? ink : highlighted ? accent : kQuiet : secondary);
+    icon(page, index, center, enabled ? primarySelected ? ink : highlighted ? accent : kQuiet : secondary);
     const char* detail = description(page, index, enabled);
     const bool compact = bounds.height < 57;
     const float titleSize = compact ? 16.0F : 19.0F;
@@ -235,8 +235,8 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
         }
     } else if (enabled && (page == Page::Main || index < 4)) {
         const Vector2 chevron{bounds.x + bounds.width - 28, center.y};
-        DrawLineEx({chevron.x - 3, chevron.y - 5}, {chevron.x + 2, chevron.y}, 1.6F, primary ? ink : kQuiet);
-        DrawLineEx({chevron.x + 2, chevron.y}, {chevron.x - 3, chevron.y + 5}, 1.6F, primary ? ink : kQuiet);
+        DrawLineEx({chevron.x - 3, chevron.y - 5}, {chevron.x + 2, chevron.y}, 1.6F, primarySelected ? ink : kQuiet);
+        DrawLineEx({chevron.x + 2, chevron.y}, {chevron.x - 3, chevron.y + 5}, 1.6F, primarySelected ? ink : kQuiet);
     }
 }
 

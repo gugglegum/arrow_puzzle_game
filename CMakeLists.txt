@@ -119,6 +119,7 @@ add_executable(arrow_puzzle WIN32
     src/EndScreen.hpp
     src/MenuScreen.cpp
     src/MenuScreen.hpp
+    src/MenuSelection.hpp
     src/AudioData.hpp
     src/BoardPalette.hpp
     src/Game.cpp
@@ -158,6 +159,15 @@ if(ARROWPUZZLE_BUILD_TESTS)
     endif()
 
     add_test(NAME arrow_tests COMMAND arrow_tests)
+
+    add_executable(arrow_menu_selection_tests tests/MenuSelectionTests.cpp)
+    target_include_directories(arrow_menu_selection_tests PRIVATE src)
+    if(MSVC)
+        target_compile_options(arrow_menu_selection_tests PRIVATE /W4 /permissive- /utf-8)
+    else()
+        target_compile_options(arrow_menu_selection_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME arrow_menu_selection_tests COMMAND arrow_menu_selection_tests)
 
     add_executable(
         arrow_persistence_tests

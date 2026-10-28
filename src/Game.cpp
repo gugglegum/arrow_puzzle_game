@@ -8,6 +8,7 @@
 #include "GameAudio.hpp"
 #include "EndScreen.hpp"
 #include "MenuScreen.hpp"
+#include "MenuSelection.hpp"
 #include "BoardPalette.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "UiText.hpp"
@@ -153,7 +154,7 @@ struct MenuFrameState {
     Screen screen;
     int width;
     int height;
-    int focusedButton;
+    int selectedButton;
     std::optional<int> pressedButton;
     std::optional<int> hoveredButton;
     Settings settings;
@@ -897,7 +898,7 @@ int Game::run() {
     bool pressedSoundButton = false;
     bool pressedHudMenuButton = false;
     std::optional<int> pressedEndButton;
-    int focusedMenuButton = 0;
+    MenuSelection menuSelection;
     RenderTexture2D staticBoardLayer{};
     int staticBoardLayerWidth = 0;
     int staticBoardLayerHeight = 0;
@@ -1309,7 +1310,7 @@ int Game::run() {
         pressedMenuButton.reset();
         pressedSoundButton = false;
         pressedHudMenuButton = false;
-        focusedMenuButton = 0;
+        menuSelection.reset();
         screen = Screen::MainMenu;
     };
 
@@ -1802,7 +1803,7 @@ int Game::run() {
                 returnToMainMenu();
             } else if (screen != Screen::MainMenu) {
                 pressedMenuButton.reset();
-                focusedMenuButton = 0;
+                menuSelection.reset();
                 screen = Screen::MainMenu;
             } else {
                 closeRequested = true;
@@ -1837,48 +1838,6 @@ int Game::run() {
                 }
                 return true;
             };
-            const auto firstEnabledMenuItem = [&]() {
-                for (int index = 0;
-                     index < menuItemCount;
-                     ++index) {
-                    if (menuItemEnabled(index)) {
-                        return index;
-                    }
-                }
-                return 0;
-            };
-            if (focusedMenuButton < 0 ||
-                focusedMenuButton >= menuItemCount ||
-                !menuItemEnabled(focusedMenuButton)) {
-                focusedMenuButton = firstEnabledMenuItem();
-            }
-            const auto moveMenuFocus = [&](int direction) {
-                for (int distance = 1;
-                     distance <= menuItemCount;
-                     ++distance) {
-                    const int candidate =
-                        (focusedMenuButton +
-                         direction * distance +
-                         menuItemCount * menuItemCount) %
-                        menuItemCount;
-                    if (menuItemEnabled(candidate)) {
-                        focusedMenuButton = candidate;
-                        return;
-                    }
-                }
-            };
-
-            const bool keyboardUp = IsKeyPressed(KEY_UP);
-            const bool keyboardDown = IsKeyPressed(KEY_DOWN);
-            if (keyboardUp) {
-                moveMenuFocus(-1);
-                pressedMenuButton.reset();
-            }
-            if (keyboardDown) {
-                moveMenuFocus(1);
-                pressedMenuButton.reset();
-            }
-
             const bool mouseDown =
                 IsMouseButtonDown(MOUSE_BUTTON_LEFT);
             const bool mousePressed =
@@ -1906,30 +1865,43 @@ int Game::run() {
                     return std::nullopt;
                 };
 
+            const bool windowFocused = IsWindowFocused();
+            const Vector2 mousePosition = GetMousePosition();
+            const std::optional<int> hoveredMenuButton =
+                windowFocused && IsCursorOnScreen()
+                ? menuItemAtPoint(mousePosition) : std::nullopt;
+            menuSelection.updatePointer(mousePosition.x, mousePosition.y,
+                hoveredMenuButton, windowFocused && IsCursorOnScreen());
+            menuSelection.validate(menuItemCount, menuItemEnabled);
+            if (windowFocused && IsKeyPressed(KEY_UP)) {
+                menuSelection.move(-1, menuItemCount, menuItemEnabled);
+                pressedMenuButton.reset();
+            }
+            if (windowFocused && IsKeyPressed(KEY_DOWN)) {
+                menuSelection.move(1, menuItemCount, menuItemEnabled);
+                pressedMenuButton.reset();
+            }
+
             std::optional<int> activatedMenuButton;
-            if (!IsWindowFocused()) {
+            if (!windowFocused) {
                 pressedMenuButton.reset();
             } else {
                 if (mousePressed) {
-                    const std::optional<int> hovered =
-                        menuItemAtPoint(GetMousePosition());
-                    if (hovered.has_value()) {
-                        focusedMenuButton = *hovered;
+                    menuSelection.usePointer();
+                    if (hoveredMenuButton.has_value()) {
                         pressedMenuButton =
                             static_cast<int>(menuScreen) * 16 +
-                            *hovered;
+                            *hoveredMenuButton;
                     } else {
                         pressedMenuButton.reset();
                     }
                 }
                 if (mouseReleased) {
-                    const std::optional<int> hovered =
-                        menuItemAtPoint(GetMousePosition());
-                    if (hovered.has_value() &&
+                    if (hoveredMenuButton.has_value() &&
                         pressedMenuButton ==
                             static_cast<int>(menuScreen) * 16 +
-                                *hovered) {
-                        activatedMenuButton = *hovered;
+                                *hoveredMenuButton) {
+                        activatedMenuButton = *hoveredMenuButton;
                     }
                     pressedMenuButton.reset();
                 }
@@ -1944,30 +1916,33 @@ int Game::run() {
                 const bool spacePressed =
                     IsKeyPressed(KEY_SPACE);
                 if (enterPressed &&
-                    menuItemEnabled(focusedMenuButton)) {
+                    menuItemEnabled(menuSelection.selected())) {
+                    menuSelection.useKeyboard();
                     activatedMenuButton =
-                        focusedMenuButton;
+                        menuSelection.selected();
                     pressedMenuButton.reset();
                 } else if (
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
-                    focusedMenuButton <= 4) {
+                    menuSelection.selected() <= 4) {
+                    menuSelection.useKeyboard();
                     activatedMenuButton =
-                        focusedMenuButton;
+                        menuSelection.selected();
                     pressedMenuButton.reset();
                 }
             }
+            const int selectedMenuButton = menuSelection.selected();
             const MenuFrameState menuFrame{
                 menuScreen,
                 GetScreenWidth(),
                 GetScreenHeight(),
-                focusedMenuButton,
+                selectedMenuButton,
                 pressedMenuButton,
-                menuItemAtPoint(GetMousePosition()),
+                hoveredMenuButton,
                 settings,
                 resumeAvailable,
                 generationInProgress,
-                IsWindowFocused()
+                windowFocused
             };
             if (automatedScreenshot.empty() &&
                 delta < 0.1F &&
@@ -2005,8 +1980,8 @@ int Game::run() {
                     index,
                     enabled,
                     enabled &&
-                        focusedMenuButton == index,
-                    pressedMenuButton == id,
+                        selectedMenuButton == index,
+                    pressedMenuButton == id && hoveredMenuButton == index,
                     toggle,
                     choice
                 );
@@ -2207,7 +2182,7 @@ int Game::run() {
 
             if (screen != menuScreen) {
                 pressedMenuButton.reset();
-                focusedMenuButton = 0;
+                menuSelection.reset();
             }
             EndDrawing();
             lastDrawnScreen = menuScreen;
