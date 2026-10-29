@@ -41,13 +41,37 @@ different machine.
 | CMake/Ninja absent from PATH | The build helper also checks the standard CLion installation |
 | Fresh compiler detection fails in Debug with a PDB-service error | `-DCMAKE_TRY_COMPILE_CONFIGURATION=Release` worked for an isolated Release configure |
 | Persistence tests cannot atomically replace files in default TEMP | Use a fresh workspace `build/` directory for child-process TEMP/TMP |
-| LNK1104 or access denial on an existing output | Check process paths, locks and permissions; an isolated output or the normal approval mechanism may solve it |
+| LNK1104 or access denial on an existing output | Match the running EXE to the output path; AGENTS.md authorizes stopping that process and rebuilding in place. Check permissions if no matching process exists |
 | Local GitHub CLI call has a transient TLS/permission error | Retry/check the actual error before changing credentials or declaring the service unavailable |
 
 Do not infer that the user's game is running from an access-denied message or
-kill a process by name. Own QA processes can be tracked by PID; user processes
-need the appropriate task authorization. Prefer CMake targets over ad-hoc
-manual linking, which has exposed raylib/Windows symbol-order conflicts.
+stop unrelated copies by process name. Identify the exact EXE/PID first and use
+the standing permission in AGENTS.md when it blocks that build output. Prefer
+CMake targets over ad-hoc manual linking, which has exposed raylib/Windows
+symbol-order conflicts.
+
+## Local build artifacts
+
+- Reuse `build/windows-msvc` for normal Release builds. The Debug preset uses
+  `build/windows-msvc-debug`; CLion may instead use `cmake-build-debug`. Inspect
+  the active IDE profile before keeping or deleting duplicate Debug trees.
+- Use a separate compiler tree only for an actual configuration or instrumented
+  source difference. A settings/screenshot fixture usually needs just a copy of
+  the primary EXE and its own working directory, not another full build.
+- An ignored folder is not necessarily disposable. Inspect settings, saved games
+  and user-named backups; local QA harness sources/scripts and audio experiments
+  are not all tracked. Preserve useful data before an authorized cleanup.
+- `out/audio-previews` contains the original procedural generators and rejected
+  sound variants. Selected sounds are tracked under `assets/sounds`, but the
+  remaining experiments need their own archive if they are to be retained.
+- Several local build caches refer to `build/windows-msvc/_deps/raylib-src`.
+  Keep that shared source cache while those trees are used. Separate Debug
+  trees can contain their own large, otherwise reproducible dependency clones;
+  recreating deleted clones requires downloading the pinned revision again.
+- A recently delivered QA EXE can be newer than the primary EXE. Rebuild and
+  verify the primary before removing the only checked copy of a recent change.
+- Keep machine-specific inventories and proposed cleanup lists in ignored
+  `ai-docs/local`. A request for an inventory does not authorize deletion.
 
 ## Agent-memory maintenance
 
