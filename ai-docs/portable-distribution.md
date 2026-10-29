@@ -146,6 +146,15 @@ portable design using adjacent data must account for third-party
 managers moving only the AppImage, rather than assuming the whole portable
 directory moves with it. No manager settings or game behavior were changed.
 
+The user subsequently confirmed the executable-bit explanation and integrated
+the image: it disappeared from Downloads and appeared under Games in the menu.
+Mint's generic Uninstall then reported no associated package and offered to
+remove only the menu item. Prefer Gear Lever's own Remove action while its
+desktop entry still exists: upstream removes the AppImage, desktop entry and
+icon. ArrowPuzzle's XDG settings/save directories are independent and remain
+unless separately deleted. This is removal guidance, not a deletion performed
+by this chat.
+
 ## Sources checked
 
 - [AppImage quickstart](https://docs.appimage.org/introduction/quickstart.html)
