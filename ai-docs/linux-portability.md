@@ -7,9 +7,14 @@ Use [the maintained Linux guide](../docs/en/LINUX.md), `tools/build-linux.sh`
 and the `linux` / `linux-debug` presets. Windows remains the main platform;
 Linux changes are transferred through GitHub, with separate local build trees.
 No release or tag was created. Development tar/AppImage packaging and
-pre-release CI are implemented. [Hosted run 40951331410](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40951331410)
-passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on `65a823f`,
-including Linux rendering/text and tar smoke tests. Earlier CI exposed an MSVC
+pre-release CI are implemented. [Final implementation run 40952766100](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40952766100)
+passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on `54845a2`,
+including Linux rendering/text, tar and AppImage smoke tests. The downloaded
+Ubuntu 22.04 Actions artifact was independently SHA-256-verified and passed all
+seven AppImage scenarios again on Mint/VMware. It requires GLIBC 2.35 and
+GLIBCXX 3.4.29, versus GLIBC 2.38 / GLIBCXX 3.4.31 for this VM's GCC 13 build.
+These are measured symbol requirements, not a promise for every desktop.
+Earlier CI exposed an MSVC
 single-attempt test assumption and STRING-vs-FILEPATH compiler metadata parsing;
 both were fixed. A bounded one-candidate failure is valid; aggregate comparisons
 use successful paired seeds while all eight-candidate boards retain their floors.
@@ -56,7 +61,9 @@ use successful paired seeds while all eight-candidate boards retain their floors
   no eligible candidate means explicit failure. Tail-pass candidate comparison
   uses the aggregate fixed-seed sample, retaining all per-board floors.
 
-Local evidence is ignored under `out/linux-qa` and `build/linux` and is not
+Local evidence is ignored under `out/linux-qa` and `build/linux`; the downloaded
+Actions package is in `out/github-linux-54845a2`. The final native implementation
+and local packages were rebuilt from clean source. This evidence is not
 required for a fresh checkout. System sudo needs a password in this VM;
 official Ubuntu development packages were downloaded and extracted under
 `build/linux-deps` instead of installed system-wide. The local CMake cache

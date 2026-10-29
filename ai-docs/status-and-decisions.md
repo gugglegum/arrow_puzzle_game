@@ -225,7 +225,9 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 
 - Native Linux x86-64 now builds and passes all five default suites on Mint
   22.3/VMware with X11. XDG persistence, glyph/render/audio checks, standalone
-  save/resume and EWMH fullscreen are implemented; see [Linux progress](linux-portability.md).
+  save/resume and EWMH fullscreen are implemented. Windows/MSVC and Linux
+  GCC/Clang development CI passed; tar.gz and AppImage packages are checked,
+  including a downloaded Actions AppImage on Mint. See [Linux progress](linux-portability.md).
   No Linux release exists; broader desktop coverage remains outstanding.
 
 - Rounded rendering is accepted and its earlier commit/push hold is lifted.
