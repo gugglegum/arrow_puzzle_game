@@ -7,11 +7,22 @@ this as current state.
 ## Application icon design direction (2026-10-29)
 
 Design exploration only; no icon has been accepted for integration. The user
-prefers the three bent pale arrows concept over generic colorful arrow logos.
+prefers bent pale arrows from gameplay over generic colorful arrow logos.
 The icon should resemble the actual dark game board and preserve its rules:
 fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
 separate nonintersecting paths with one head each, and gray dots at every
 unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
+
+Latest request: five variants on a 4-by-4 grid, exactly two visible arrows
+per icon, retaining the slimmer game-like strokes and open composition.
+The comparison contains diagonal Ls, a short return plus L, two upper-corner
+Ls, a long return plus short L, and a step-shaped arrow plus short L.
+Variants 1/3 occupy 8 nodes; 2/4/5 occupy 9. Each has an explicit full initial
+16-node board and a verified two-arrow removal prefix, leaving the displayed
+dots. All five passed independent geometry checks and the deterministic
+renderer movement simulation. Master stroke width is 52/1024 on a 240/1024
+grid step, with optical strengthening at 16/24 px. This remains a design
+comparison, not integration or a production runtime test.
 
 The user rejected the 7-by-7 proposal: its arrows became thin visual noise
 at small sizes, and arbitrary empty nodes did not plausibly result from play.
@@ -37,7 +48,7 @@ Surface and arrow colors use the dark `BoardPalette.hpp` palette; dots are
 slightly brighter for small-icon visibility. The preview includes a filled
 initial-board diagram showing which arrow vacated the three nodes.
 The user accepted that draft's solvability but rejected its visual density,
-heavy strokes, and M-like silhouette. The next request is five different
+heavy strokes, and M-like silhouette. The following round explored five
 5-by-5 arrangements with more empty space and slimmer lines closer to gameplay.
 The resulting comparison contains: (1) two opposite L arrows, (2) three short
 L arrows pointing left/right/up, (3) two arrows forming an open frame,
