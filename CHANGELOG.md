@@ -7,7 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-30
+
 ### Added
+
+- An application icon with two rounded, grid-aligned arrows, embedded in the
+  Windows executable and used for the game window and Linux AppImage.
 
 - Common Windows/Linux release preparation with tar.gz/AppImage, per-platform
   build-provenance bundles, an attested combined SHA-256 manifest, and guarded
@@ -217,7 +222,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Allowed an armed mouse click to be cancelled by releasing away from the
   originally pressed arrow.
 
-[Unreleased]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gugglegum/arrow_puzzle_game/compare/v0.1.0...v0.2.0

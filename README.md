@@ -5,11 +5,11 @@
 Arrow Puzzle is a minimalist desktop puzzle game about untangling a board of
 arrows. It is written in C++20 with raylib for Windows and Linux.
 
-Version **0.4.0** makes Very Hard generation faster, less memory-hungry, and more
-varied around the perimeter. It offers 20 x 20, 40 x 40, 80 x 80, and experimental
-160 x 160 boards, dark and light board themes, optional sounds, and animated
-result screens.
-Settings and unfinished games are saved beside the executable.
+Version **0.5.0** adds native Linux packages, rounded arrows, an application icon,
+and touchpad-friendly board controls. It offers 20 x 20, 40 x 40, 80 x 80, and
+experimental 160 x 160 boards, dark and light board themes, optional sounds,
+and animated result screens. Windows saves settings and unfinished games beside
+the executable; Linux uses the user's XDG config and data directories.
 
 ## Screenshots
 
@@ -37,11 +37,17 @@ extract the ZIP archive, and run `ArrowPuzzle.exe`. The executable is
 standalone; the accompanying text files are license notices, not runtime
 dependencies.
 
-Release builds are compiled and tested by **GitHub Actions**. The ZIP includes
-build metadata and SHA-256 checksums are supplied with the download; the EXE
-and ZIP have GitHub build-provenance attestations. See the
+The 0.5.0 release also includes Linux x86-64 tar.gz and AppImage packages.
+See [Linux startup and data locations](docs/en/LINUX.md) for requirements and
+AppImage startup without FUSE. A draft is visible only to repository maintainers
+until it is published.
+
+Release builds are compiled and tested by **GitHub Actions**. Packages include
+build metadata, with a common SHA-256 manifest supplied alongside the downloads.
+The packages, unpacked executables and manifest have GitHub build-provenance
+attestations. See the
 [release verification guide](docs/en/RELEASING.md#verifying-a-download).
-Changes since 0.3.0 are listed in the [changelog](CHANGELOG.md#040---2026-10-29).
+Changes since 0.4.0 are listed in the [changelog](CHANGELOG.md#050---2026-10-30).
 
 The current build is not digitally signed, so Windows SmartScreen may display
 an unknown-publisher warning.

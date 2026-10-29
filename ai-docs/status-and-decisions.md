@@ -4,6 +4,18 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Common Windows/Linux 0.5.0 draft preparation (2026-10-30)
+
+The user now explicitly requested one common draft with Windows and Linux,
+including verification of all files, checksums and provenance. Publication is
+not authorized. Version 0.5.0 is the next minor version after published 0.4.0
+and covers the native Linux port plus the accepted post-0.4.0 work. Prepare
+the matching CMake version/changelog, push a new annotated v0.5.0 tag, and use
+the draft-only Release workflow. Preserve all published tags and assets.
+Record the actual run, draft identity and downloaded-file verification in
+release-history.md after the workflow finishes; this request alone is not
+evidence that a draft already exists.
+
 ## Application icon design direction (2026-10-30)
 
 The user selected the symmetric 4-by-4 layout with two one-bend arrows, then
