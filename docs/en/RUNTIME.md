@@ -311,9 +311,9 @@ board_theme=dark|light
 
 A missing or noncanonical file is repaired with safe values. Menu changes are
 written immediately and update in-memory Settings only after a successful write.
-Loops and flying collisions default to on, guides and sounds to off, and theme
-to Dark. Missing new keys receive these defaults while valid old preferences
-are retained; the format version remains 1.
+Loops, flying collisions, guides, and sounds default to on, and theme to Dark.
+Missing keys receive these defaults while valid old preferences, including
+explicit off values, are retained; the format version remains 1.
 
 ### savegame.txt
 

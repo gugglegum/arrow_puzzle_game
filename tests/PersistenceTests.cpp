@@ -1,5 +1,6 @@
 #include "arrow/Persistence.hpp"
 
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -115,8 +116,8 @@ void testDefaultSettingsAreCreated() {
         settings.flyingArrowCollisions,
         "Flying-arrow collisions must default to on"
     );
-    require(!settings.crosshairGuides, "Crosshair guides must default to off");
-    require(!settings.sounds, "Sounds must default to off");
+    require(settings.crosshairGuides, "Crosshair guides must default to on");
+    require(settings.sounds, "Sounds must default to on");
     require(settings.boardTheme == arrow::BoardTheme::Dark, "Board theme must default to dark");
     require(
         std::filesystem::is_regular_file(persistence.settingsPath()),
@@ -133,11 +134,51 @@ void testDefaultSettingsAreCreated() {
         "Default arrow-loop setting was not written"
     );
     require(
-        text.find("crosshair_guides=off") != std::string::npos,
+        text.find("flying_arrow_collisions=on") != std::string::npos,
+        "Default flying-arrow collision setting was not written"
+    );
+    require(
+        text.find("crosshair_guides=on") != std::string::npos,
         "Default crosshair guide setting was not written"
     );
-    require(text.find("sounds=off") != std::string::npos, "Default sound setting was not written");
+    require(text.find("sounds=on") != std::string::npos, "Default sound setting was not written");
     require(text.find("board_theme=dark") != std::string::npos, "Default board theme was not written");
+}
+
+void testMissingSettingsUseDefaultsAndPreserveExplicitOff() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    constexpr std::array<std::string_view, 4> keys{{
+        "arrow_loops", "flying_arrow_collisions", "crosshair_guides", "sounds"
+    }};
+    constexpr std::array<bool arrow::Settings::*, 4> members{{
+        &arrow::Settings::arrowLoops, &arrow::Settings::flyingArrowCollisions,
+        &arrow::Settings::crosshairGuides, &arrow::Settings::sounds
+    }};
+
+    for (unsigned missing = 0; missing < 16; ++missing) {
+        std::string contents = "format=arrow-puzzle-settings\nversion=1\nboard_theme=light\n";
+        arrow::Settings expected;
+        expected.boardTheme = arrow::BoardTheme::Light;
+        for (std::size_t index = 0; index < keys.size(); ++index) {
+            if ((missing & (1U << index)) == 0) {
+                contents += std::string(keys[index]) + "=off\n";
+                expected.*members[index] = false;
+            }
+        }
+        writeText(persistence.settingsPath(), contents);
+        require(persistence.loadSettings() == expected,
+                "Missing keys must default to on without changing explicit off values or theme");
+        require(persistence.loadSettings() == expected,
+                "Repaired settings did not retain defaults and explicit off values");
+        const std::string repaired = readText(persistence.settingsPath());
+        for (std::size_t index = 0; index < keys.size(); ++index) {
+            const std::string assignment = std::string(keys[index]) +
+                (expected.*members[index] ? "=on\n" : "=off\n");
+            require(repaired.find(assignment) != std::string::npos,
+                    "A missing or explicit setting was not saved canonically");
+        }
+    }
 }
 
 void testSettingsRoundTripAndAutomaticSetters() {
@@ -174,15 +215,16 @@ void testSettingsRoundTripAndAutomaticSetters() {
         persistence.loadSettings() == arrow::Settings{},
         "Automatic setters did not persist both defaults"
     );
+    require(persistence.setCrosshairGuides(settings, false), "Disabling crosshair guides failed");
+    require(!settings.crosshairGuides && persistence.loadSettings() == settings,
+            "Crosshair guides did not stay disabled");
     require(persistence.setCrosshairGuides(settings, true), "Crosshair guide auto-save failed");
     require(settings.crosshairGuides, "Crosshair guide setter did not update caller");
-    require(persistence.loadSettings().crosshairGuides, "Crosshair guides were not persisted");
-    require(persistence.setCrosshairGuides(settings, false), "Disabling crosshair guides failed");
-    require(persistence.loadSettings() == arrow::Settings{}, "Crosshair guides did not stay disabled");
-    require(persistence.setSounds(settings, true), "Enabling sounds failed");
-    require(settings.sounds && persistence.loadSettings().sounds, "Sounds did not stay enabled");
+    require(persistence.loadSettings() == settings, "Crosshair guides were not persisted");
     require(persistence.setSounds(settings, false), "Disabling sounds failed");
     require(!settings.sounds && !persistence.loadSettings().sounds, "Sounds did not stay disabled");
+    require(persistence.setSounds(settings, true), "Enabling sounds failed");
+    require(settings.sounds && persistence.loadSettings().sounds, "Sounds did not stay enabled");
     require(persistence.setBoardTheme(settings, arrow::BoardTheme::Light), "Choosing a light board failed");
     require(settings.boardTheme == arrow::BoardTheme::Light && persistence.loadSettings() == settings,
             "Light board theme did not persist");
@@ -232,25 +274,25 @@ void testSoundsUpgradeAndRepair() {
     const auto upgraded = persistence.loadSettings();
     require(!upgraded.arrowLoops && !upgraded.flyingArrowCollisions && upgraded.crosshairGuides,
             "Adding sounds changed existing preferences");
-    require(!upgraded.sounds, "Legacy settings unexpectedly enabled sounds");
-    require(readText(persistence.settingsPath()).find("sounds=off") != std::string::npos,
+    require(upgraded.sounds, "Missing sounds must default to on");
+    require(readText(persistence.settingsPath()).find("sounds=on") != std::string::npos,
             "Legacy sound preference was not written");
 
     writeText(persistence.settingsPath(),
         "format=arrow-puzzle-settings\nversion=1\narrow_loops=off\n"
         "flying_arrow_collisions=on\ncrosshair_guides=on\nsounds=invalid\n");
     const auto repaired = persistence.loadSettings();
-    require(!repaired.sounds && !repaired.arrowLoops &&
+    require(repaired.sounds && !repaired.arrowLoops &&
             repaired.flyingArrowCollisions && repaired.crosshairGuides,
             "Repairing sounds changed another preference");
-    require(readText(persistence.settingsPath()).find("sounds=off") != std::string::npos,
+    require(readText(persistence.settingsPath()).find("sounds=on") != std::string::npos,
             "Malformed sound setting was not repaired");
 
     const auto blockedPath = temporary.path() / "not-a-directory";
     writeText(blockedPath, "keep");
     const arrow::Persistence blocked{blockedPath};
     arrow::Settings unchanged;
-    require(!blocked.setSounds(unchanged, true) && !unchanged.sounds,
+    require(!blocked.setSounds(unchanged, false) && unchanged.sounds,
             "Failed sound write changed the active preference");
 }
 
@@ -263,25 +305,25 @@ void testCrosshairGuidesUpgradeAndRepair() {
     const arrow::Settings upgraded = persistence.loadSettings();
     require(!upgraded.arrowLoops && !upgraded.flyingArrowCollisions,
             "Adding crosshair guides changed legacy preferences");
-    require(!upgraded.crosshairGuides, "Legacy settings unexpectedly enabled crosshair guides");
-    require(readText(persistence.settingsPath()).find("crosshair_guides=off") != std::string::npos,
+    require(upgraded.crosshairGuides, "Missing crosshair guides must default to on");
+    require(readText(persistence.settingsPath()).find("crosshair_guides=on") != std::string::npos,
             "Legacy settings were not upgraded");
 
     writeText(persistence.settingsPath(),
         "format=arrow-puzzle-settings\nversion=1\n"
         "arrow_loops=off\nflying_arrow_collisions=on\ncrosshair_guides=invalid\n");
     const arrow::Settings repaired = persistence.loadSettings();
-    require(!repaired.arrowLoops && repaired.flyingArrowCollisions && !repaired.crosshairGuides,
+    require(!repaired.arrowLoops && repaired.flyingArrowCollisions && repaired.crosshairGuides,
             "Malformed crosshair guides changed other preferences");
-    require(readText(persistence.settingsPath()).find("crosshair_guides=off") != std::string::npos,
+    require(readText(persistence.settingsPath()).find("crosshair_guides=on") != std::string::npos,
             "Invalid crosshair guide preference was not repaired");
 
     const auto blockedPath = temporary.path() / "not-a-directory";
     writeText(blockedPath, "keep");
     const arrow::Persistence blocked{blockedPath};
     arrow::Settings unchanged;
-    require(!blocked.setCrosshairGuides(unchanged, true), "Unwritable setting falsely succeeded");
-    require(!unchanged.crosshairGuides, "Failed write changed the active preference");
+    require(!blocked.setCrosshairGuides(unchanged, false), "Unwritable setting falsely succeeded");
+    require(unchanged.crosshairGuides, "Failed write changed the active preference");
     require(readText(blockedPath) == "keep", "Failed settings write changed an unrelated file");
 }
 
@@ -503,6 +545,7 @@ void testRemoveSavedGameIsIdempotent() {
 int main() {
     try {
         testDefaultSettingsAreCreated();
+        testMissingSettingsUseDefaultsAndPreserveExplicitOff();
         testSettingsRoundTripAndAutomaticSetters();
         testBoardThemeUpgradeAndRepair();
         testSoundsUpgradeAndRepair();

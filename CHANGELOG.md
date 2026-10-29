@@ -17,6 +17,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Arrow loops, Flying arrow collisions, Crosshair guides, and Sounds now default
+  to ON when settings.txt or the corresponding key is missing. Saved OFF
+  preferences remain unchanged.
 - Rounded arrowhead vertices and 90-degree body bends, with matching geometry
   during flight and rewind. Analytic pixel coverage preserves thin strokes;
   merged moving segments and integrated end caps reduce geometry storage.

@@ -13,8 +13,8 @@ enum class BoardTheme { Light, Dark };
 struct Settings {
     bool arrowLoops{true};
     bool flyingArrowCollisions{true};
-    bool crosshairGuides{false};
-    bool sounds{false};
+    bool crosshairGuides{true};
+    bool sounds{true};
     BoardTheme boardTheme{BoardTheme::Dark};
 
     auto operator<=>(const Settings&) const = default;

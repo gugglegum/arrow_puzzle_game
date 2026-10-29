@@ -169,7 +169,10 @@ retry instead of falling back to a simpler board.
 
 **Crosshair guides** highlight exposed dots along the row and column nearest
 the pointer. **Sounds** enables the embedded effects; the HUD speaker button
-changes the same preference. Both options are off by default. **Board theme**
+changes the same preference. All four options (Arrow loops, Flying arrow
+collisions, Crosshair guides, and Sounds) default to ON when `settings.txt` or
+the corresponding key is missing; explicitly saved OFF values are preserved.
+**Board theme**
 defaults to Dark and can be switched to Light; it affects the board and HUD,
 while menus and result screens stay dark. These preferences are also saved in
 `settings.txt` and remain compatible with older settings files.

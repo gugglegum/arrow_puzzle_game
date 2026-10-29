@@ -17,6 +17,12 @@ The 0.3.0 release from `52182f1` introduced the rendering/idle optimizations,
 antialiasing, borderless fullscreen, Windows font smoothing, version labels,
 audio, HUD buttons, redesigned menus/results, board themes, and screenshots.
 
+Post-0.4.0 settings defaults are ON for all four boolean options, including
+Sounds and Crosshair guides. Missing files/keys use those defaults; existing
+explicit OFF values are preserved. Persistence checks cover all 16 combinations
+of missing keys and explicit OFF, upgrades, malformed values and failed writes.
+A standalone fresh-start Settings capture confirmed all four ON switches.
+
 The user accepted rounded arrowheads and curved 90-degree bends after reviewing
 their appearance and local performance/memory measurements, then authorized
 commit/push. This is post-0.4.0 development; see
@@ -76,7 +82,7 @@ ordinary source pushes leave release artifacts unchanged.
 | Fullscreen | Desktop-resolution borderless window, restored cursor | Exclusive mode caused resolution/aspect problems and brief blackouts |
 | HUD/legend | Protected HUD, back arrow at left, board above legend | Gameplay over HUD or reserving another bottom gameplay strip |
 | Board navigation | Wheel/MMB plus LMB drag from arrows or empty space; Ctrl +/- centred zoom and Ctrl+0 fit | A drag must never launch an arrow, even after returning to its origin; tolerate up to 6 screen pixels of click jitter |
-| Sounds/guides | Optional, off by default, persisted; HUD shares sound preference | Surprise sound at startup or replay on redraw/unmute |
+| Settings defaults | Arrow loops, flying collisions, guides and sounds default to ON for missing files/keys; explicit OFF is retained; HUD shares sound preference | Overwriting existing preferences or replaying effects on redraw/unmute |
 | Results | Finite effects; preserve the fatal pose before delayed defeat | Immediate Game Over hiding the mistake; endless finished-game work |
 | Release trust | Build in Actions, bot-created release, hashes and provenance | Claiming a local EXE is the attested Actions artifact |
 | Documentation | Mirrored docs/en and docs/ru with shared screenshots; English-first AI navigation | Diverging technical manuals in ai-docs or duplicated images |
