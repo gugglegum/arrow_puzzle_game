@@ -20,6 +20,50 @@ and Wayland sessions through XWayland. Produce a tar archive first, then an
 AppImage if the desired user experience is downloading one executable file.
 Native Wayland and Flatpak are useful follow-up targets, with separate checks.
 
+## Current development environment and handoff
+
+Updated 2026-10-30 from the user's follow-up. This supersedes the earlier
+recommendation to use WSL2 for regular Linux development.
+
+- The user already actively uses **Linux Mint 22.3 in VMware**. Use that VM as
+  the primary environment for native Linux compilation, debugging, and desktop
+  smoke checks. Windows remains the Windows development/validation environment.
+- VMware availability and performance take priority. WSL2 is not part of this
+  workflow. Do not enable Hyper-V/Virtual Machine Platform, install WSL2, or
+  change VMware/host virtualization settings as a port prerequisite.
+- The user reports that the Windows game runs adequately through Wine inside
+  the VM, except for approximately 0.5 seconds of audio delay. This is a user
+  observation, not an independently reproduced test suite or native-build
+  validation. The tested commit/Wine version and latency cause are unknown.
+  Compare the native Linux build in the same VM before attributing the delay to
+  the game, Wine, guest audio, or VMware's audio path.
+- GitHub Actions should provide build/test checks **before release**: on branch
+  pushes, pull requests, and manual runs, with downloadable development
+  artifacts. Keep publishing separate and gated by the release procedure.
+  The current `release.yml` builds only Windows and triggers on version tags or
+  manual dispatch; general development checks are not configured yet.
+- Use separate repository clones in Windows and Linux, and transfer source
+  changes through GitHub. Before switching, commit/push the completed scoped
+  changes; in the destination checkout, inspect status and use
+  `git pull --ff-only` on the intended branch when it is safe to do so. Preserve
+  dirty files and resolve divergence deliberately. Keep CMake caches, binaries,
+  dependencies, and build directories local to each OS.
+- Continue practical port work in a chat whose working directory is the Linux
+  checkout, so compiler/test output and the actual runtime environment are
+  available there. A fresh chat should read `AGENTS.md`, `ai-docs/README.md`,
+  this assessment, and relevant developer guides. Git synchronizes the tracked
+  files and notes; do not assume it transfers this conversation's transcript.
+
+First Linux-chat task: inspect the current checkout and Mint's compiler/CMake,
+display session, and OpenGL capabilities; produce and test a native build using
+the existing raylib/core; fix demonstrated portability issues; add repeatable
+Linux build instructions/presets and pre-release CI. Retain the agreed X11/
+XWayland-first and tar-then-AppImage scope. Use the existing persistence/font/
+fullscreen findings below, and preserve Windows behavior. Neither a new release
+nor a successful native Linux run has been produced by this handoff. Mint/VMware
+testing alone also does not establish bare-metal performance or compatibility
+with older distributions; choose a release-library baseline separately.
+
 ## Evidence and required work
 
 | Area | Existing implementation | Consequence / proposed action |
@@ -119,7 +163,7 @@ not commands successfully executed by this assessment.
 | Flatpak / possible Flathub publication | Consistent runtime, desktop integration, and update distribution | Manifest, application ID, icon, desktop file, metadata, runtime maintenance, and deliberate display/audio/GPU permissions; publication is a separate action |
 | `.deb` / `.rpm` | Native package-manager integration | Separate distribution/version dependency policies and maintenance; not necessary for the first release |
 | Build from source | Low packaging effort for technical users | Requires toolchain/development dependencies; does not give ordinary players a ready application |
-| Existing Windows EXE under Wine | Quick compatibility experiment without porting | Requires Wine; this game's rendering, GDI text, audio, and save behavior remain unverified there; not native Linux support |
+| Existing Windows EXE under Wine | User reports adequate operation in Mint/VMware on 2026-10-30 | Approximately 0.5-second audio delay reported; no comprehensive regression evidence or native Linux validation |
 
 Static raylib does not mean a fully static Linux executable. Declare the
 supported libc/C++ runtime baseline and inspect the resulting ELF dependencies;
@@ -136,10 +180,11 @@ An X11-only build needs the X11 socket; Wayland plus fallback-X11 permission is
 appropriate only after the app actually supports native Wayland. Installed
 games can remain offline; downloading dependencies/packages/updates is separate.
 
-Linux CI, a local Linux machine, or a VM can produce the binary. WSL2 can be
-useful for compile/test iteration on Windows, but WSLg/VM graphics are not
-substitutes for final desktop graphics/audio/fullscreen testing. Containers are
-useful build environments, rather than an end-user launch requirement.
+The existing Mint/VMware VM is the chosen local Linux build/debug environment.
+Linux CI provides repeatable development artifacts and automated checks before
+release. VM graphics/audio tests are useful but do not establish bare-metal
+latency or performance. Containers can be build environments rather than an
+end-user launch requirement. WSL2 is excluded from the current workflow above.
 
 ## Proposed milestones and acceptance evidence
 

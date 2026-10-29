@@ -231,7 +231,11 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 - Very Hard now uses bounded frontier construction for 0.4.0;
   see [generator work](generator-0.4.md) for the method, measurements and limits.
   This is separate from the earlier rendering work and is not in released 0.3.0.
-- Linux/Android are unverified; even dimensions are a generator restriction.
+- Native Linux/Android builds remain unverified; even dimensions are a generator
+  restriction. Linux development should use the user's Mint 22.3 VMware VM;
+  WSL2 is excluded to preserve the VMware setup. The user reports adequate Wine
+  operation with approximately 0.5-second audio delay. Keep this observation
+  separate from native support; see the [Linux workflow and handoff](linux-portability.md#current-development-environment-and-handoff).
 - A local, user-owned, untracked `TODO.txt` mentions softer visual rounding of
   arrowheads/body corners. The accepted renderer implements that live request;
   preserve the file unless asked otherwise.
