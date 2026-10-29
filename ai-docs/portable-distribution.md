@@ -117,6 +117,17 @@ meant by screenshots; no request to add, remove, or automatically take them was
 made. Routing all permanent game-owned outputs consistently is a future
 portable-mode requirement, not a change already made here.
 
+The user then said they did not recall requesting screenshot functionality.
+The complete, non-shallow Git history places both `KEY_F12` and
+`TakeScreenshot("arrow-puzzle-screenshot.png")`, as well as the README control
+entry, in root commit `d5ebdb911b857a8dcd5c5bb3dc4ff58038816245`
+(`Initial commit`, 2026-07-28). This establishes when the feature entered the
+repository, not who requested it or whether it was authorized. No user request
+for this feature appears in the current conversation. Do not treat its existing
+code/documentation as evidence of acceptance or as a requirement to retain it.
+The explicit F12 product shortcut and the separate automated QA capture hooks
+are distinct concerns; this follow-up did not request a behavior change.
+
 This discussion does not authorize changing the prepared 0.5.0 draft, its tag,
 attested packages, or publication state. Treat any later implementation and
 release packaging as a separate scoped change.
