@@ -13,18 +13,29 @@ fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
 separate nonintersecting paths with one head each, and gray dots at every
 unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
 
-A subsequent vector proposal uses a 7-by-7 grid with the following head-first
-vertices (expand each straight segment into unit cells):
+The user rejected the 7-by-7 proposal: its arrows became thin visual noise
+at small sizes, and arbitrary empty nodes did not plausibly result from play.
+Initial game boards are completely occupied. Icon dots must represent nodes
+vacated by actual arrows that can legally leave that fully occupied board.
+The user explicitly requested a 5-by-5 revision with larger arrow silhouettes.
 
-- A: `(0,0), (4,0), (4,2)`, direction left.
-- B: `(3,2), (3,6), (0,6), (0,4), (1,4), (1,2), (0,2)`, direction up.
-- C: `(6,3), (5,3), (5,6), (6,6)`, direction right.
+The current 5-by-5 vector proposal uses these head-first vertices (expand
+each straight segment into unit cells):
 
-Read-only checking against `Board::canExit` semantics found 27 occupied nodes,
-22 free nodes, no overlaps/self-intersections, and a complete A-B-C solution.
-B initially depends on A; C can exit independently. This is a proposal, not
-a selected production asset or a runtime test. The preview uses the dark
-palette from `BoardPalette.hpp`; 16-32 px versions strengthen strokes/dots.
+- A: `(0,0), (3,0), (3,3), (4,3)`, direction left, 8 cells.
+- B: `(1,1), (1,3), (2,3), (2,1)`, direction up, 6 cells.
+- C: `(4,4), (0,4), (0,1)`, direction right, 8 cells.
+- Already removed R: `(4,0), (4,2)`, direction up, 3 cells.
+
+Read-only simulation of `Board::canExit` semantics confirmed all 25 initial
+nodes are covered exactly once, R can exit immediately, and R-A-B-C solves
+the board. B depends on A; C exits independently. The three dots at `(4,0)`,
+`(4,1)`, `(4,2)` are exactly R's former cells. This remains a proposal, not
+a selected production asset or a runtime test. Strokes are substantially
+thicker than the rejected draft; 16-24 px versions strengthen them further.
+Surface and arrow colors use the dark `BoardPalette.hpp` palette; dots are
+slightly brighter for small-icon visibility. The preview includes a filled
+initial-board diagram showing which arrow vacated the three nodes.
 `cacheIdleBoardGeometry` defines free-node dot placement. Arrow head cell
 centers align to the grid; triangle tips extend beyond those centers.
 
