@@ -95,6 +95,31 @@ This discussion does not authorize changing the prepared 0.5.0 draft, its tag,
 attested packages, or publication state. Treat any later implementation and
 release packaging as a separate scoped change.
 
+## Gear Lever desktop-launch observation (2026-10-30)
+
+The user reports that the first double-click of the AppImage in Nemo opens a
+Gear Lever window showing the correct Arrow Puzzle icon/name, with Launch and
+Move to the app menu buttons. After Launch, subsequent Nemo double-clicks start
+the game directly, while opening the search result in the desktop menu brings
+back Gear Lever. The screenshot confirms the manager's two-button presentation;
+it does not reveal the installed Gear Lever version or the search result type.
+
+Upstream Gear Lever's current `AppDetails.on_secondary_action_button_clicked`
+calls `set_trusted()` before running. `AppImageListElement.set_trusted()` sets
+file permissions to `0755`. This supports the explanation that Nemo can execute
+the file directly after the first managed launch. The menu-search route may
+instead open a file/recent-document result through its MIME handler. That part
+remains an inference until the actual result/launcher and command are inspected
+inside the Linux session; do not diagnose a game or AppImage defect from it.
+
+Gear Lever's integration copies the image into its managed location, creates a
+user `.desktop` entry and icon files, and can delete the original depending on
+the move setting. Launch and menu integration are distinct actions. Manager
+files/settings are separate from ArrowPuzzle's own persistence policy. A future
+portable design using adjacent data/markers must account for third-party
+managers moving only the AppImage, rather than assuming the whole portable
+directory moves with it. No manager settings or game behavior were changed.
+
 ## Sources checked
 
 - [AppImage quickstart](https://docs.appimage.org/introduction/quickstart.html)
@@ -102,3 +127,6 @@ release packaging as a separate scoped change.
 - [AppImage portable mode](https://docs.appimage.org/user-guide/portable-mode.html)
 - [Outer image and inner mount environment variables](https://docs.appimage.org/packaging-guide/environment-variables.html)
 - [Exact pinned runtime implementation](https://github.com/AppImage/type2-runtime/blob/caf24f9/src/runtime/runtime.c)
+- [Gear Lever overview](https://gearlever.mijorus.it/docs/overview/)
+- [Gear Lever launch button implementation](https://github.com/mijorus/gearlever/blob/master/src/AppDetails.py)
+- [Gear Lever executable permissions and menu integration](https://github.com/mijorus/gearlever/blob/master/src/providers/AppImageProvider.py)
