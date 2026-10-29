@@ -5,6 +5,56 @@ provenance policy, use [docs/en/RELEASING.md](../docs/en/RELEASING.md) and the a
 [version script](../cmake/GenerateBuildVersion.cmake). This page stores evidence
 from completed releases, not a second procedure or a claim about a future build.
 
+## 0.5.0 draft (2026-10-30)
+
+- The user authorized a common Windows/Linux draft and file/provenance
+  verification, explicitly excluding publication. The draft exists as
+  **Arrow Puzzle v0.5.0**, created by `github-actions[bot]`, release ID
+  `428459388`. The authenticated release page still shows **Draft** after
+  saving its release notes. No publication was performed.
+- Current [draft link](https://github.com/gugglegum/arrow_puzzle_game/releases/tag/untagged-50194b5b61b957f06641).
+  GitHub regenerated its temporary `untagged-*` URL when the notes were saved;
+  use the repository Releases page if another save makes this link stale.
+- Tag/source commit: `fe0f6973745a2d27a298865c6c709b7b4060e8c8`.
+  Annotated v0.5.0 tag object: `44caae05b69507fa873e5510a9f0ce7c01b3816e`.
+  CMake/package version is `0.5.0`; both executable labels are `v0.5.0`.
+- [Release run 40965820527](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40965820527)
+  succeeded in all five jobs, including common draft creation. Windows and
+  Linux full headless suites passed, followed by Linux rendering/text, tar
+  and FUSE-free AppImage smoke checks and attestation verification.
+  [Development run 40965794922](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40965794922)
+  also passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang.
+- Ten attached files were verified: the Windows ZIP, Linux tar.gz/AppImage,
+  SHA256SUMS.txt, three platform-specific build-info JSON files and the Windows,
+  Linux and checksum Sigstore bundles. GitHub additionally lists two automatic
+  source archives, so the page's Assets counter is 12.
+- The downloaded common Actions artifact (ID `12937529369`) has SHA-256
+  `26324bc62102b05c30dc109e522572007ddccdcb8ee1a9a80a3f2aacd4013789`.
+  All ten contained file hashes match the authenticated draft page's attached
+  asset digests, including after the release notes were saved. This establishes
+  that the verified workflow files are the draft's exact bytes.
+- All five SHA256SUMS subjects passed: three packages and both unpacked
+  executables. ZIP/tar internal metadata match the attached JSON; all metadata
+  records the clean source commit, `refs/tags/v0.5.0`, version and run above.
+  The AppImage records the same Linux binary and input tar archive.
+- Independent `gh attestation verify --bundle` checks passed for the Windows
+  ZIP/EXE, Linux tar/executable/AppImage and common checksum manifest. Each
+  required the exact source commit, tag ref, repository, release.yml identity
+  and GitHub-hosted runners. No Authenticode signing is implied.
+- The user downloaded `ArrowPuzzle-0.5.0-linux-x64.AppImage` into Downloads.
+  That actual download was separately hashed and compared byte-for-byte with
+  the verified artifact. SHA-256:
+  `bb2b360dba868bf5e9d423248b7175ebc2e669e153b5adfc27122e6ebd4602ab`.
+  Linux tar SHA-256:
+  `2e809588a07affed50ec3a9d71789111d8503146a3e73155a83a9e937474c310`.
+  Windows ZIP SHA-256:
+  `832431a0b89e44d71511b2d5489bccb4080916245faadc749ca205e884b85dfa`.
+- The four published releases retain their original IDs, publication state,
+  asset IDs, names, sizes and digests. Latest remains published 0.4.0.
+  Evidence, inventory, signatures and verification results are ignored under
+  `out/release-validation-v0.5.0`. The GitHub connector cannot see this draft;
+  its presence/status/asset digests were checked in the authenticated browser.
+
 ## 0.4.0
 
 - Published release: [v0.4.0](https://github.com/gugglegum/arrow_puzzle_game/releases/tag/v0.4.0),

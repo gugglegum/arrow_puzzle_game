@@ -9,12 +9,16 @@ this as current state.
 The user now explicitly requested one common draft with Windows and Linux,
 including verification of all files, checksums and provenance. Publication is
 not authorized. Version 0.5.0 is the next minor version after published 0.4.0
-and covers the native Linux port plus the accepted post-0.4.0 work. Prepare
-the matching CMake version/changelog, push a new annotated v0.5.0 tag, and use
-the draft-only Release workflow. Preserve all published tags and assets.
-Record the actual run, draft identity and downloaded-file verification in
-release-history.md after the workflow finishes; this request alone is not
-evidence that a draft already exists.
+and covers the native Linux port plus the accepted post-0.4.0 work. The matching
+CMake version/changelog and bilingual README updates are committed in `fe0f697`;
+the annotated v0.5.0 tag points to that source. Release run `40965820527`
+succeeded, creating common draft `428459388` with ten verified attachments.
+Five manifest subjects and six provenance subjects passed independent checks;
+the user's downloaded AppImage matches the attested file byte-for-byte. The
+draft has release notes and remains unpublished. All four published releases
+are unchanged. See [release evidence](release-history.md#050-draft-2026-10-30)
+for the current temporary draft URL, hashes and verification limits. Do not
+move the tag or change published assets; publication requires a new request.
 
 ## Application icon design direction (2026-10-30)
 

@@ -6,7 +6,7 @@ The native build and desktop port are implemented on the shared source tree.
 Use [the maintained Linux guide](../docs/en/LINUX.md), `tools/build-linux.sh`
 and the `linux` / `linux-debug` presets. Windows remains the main platform;
 Linux changes are transferred through GitHub, with separate local build trees.
-No release or tag was created. Development tar/AppImage packaging and
+The initial port work created no release or tag. Development tar/AppImage packaging and
 pre-release CI are implemented. [Final implementation run 40952766100](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40952766100)
 passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on `54845a2`,
 including Linux rendering/text, tar and AppImage smoke tests. The downloaded
@@ -117,6 +117,15 @@ Ignored evidence and the downloaded common files are under
 GitHub CLI verification needed both GH_CONFIG_DIR and XDG_CACHE_HOME redirected
 there; the default read-only cache prevented Sigstore verifier initialization.
 These are verification-process overrides, not game settings or system changes.
+
+The user subsequently authorized a common versioned draft. The tagged 0.5.0
+Release run `40965820527` passed both platforms and created draft `428459388`
+with ten Windows/Linux/checksum/metadata/provenance files. Their attachment
+digests, five manifest subjects and six signed provenance subjects were
+verified; the user's downloaded AppImage also matches exactly. Publication
+remains unauthorized and the four existing public releases are unchanged.
+See [release history](release-history.md#050-draft-2026-10-30) for the complete
+evidence and current draft URL. This supersedes the earlier no-new-tag scope.
 
 ## Historical pre-implementation assessment
 
