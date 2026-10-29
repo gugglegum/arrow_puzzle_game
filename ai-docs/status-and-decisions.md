@@ -13,7 +13,17 @@ fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
 separate nonintersecting paths with one head each, and gray dots at every
 unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
 
-Latest request: five variants on a 4-by-4 grid, exactly two visible arrows
+Latest request: extend the tails of 4-by-4 variant 1 so they wrap around each
+other and finish in different directions; also compare a compact 3-by-3 board.
+The revised 4-by-4 head-first paths are A `(0,0),(2,0),(2,2),(3,2)` left,
+B `(3,3),(1,3),(1,1),(0,1)` right: 12 occupied nodes and 4 dots left by two
+removed two-cell vertical arrows. The compact 3-by-3 paths are A
+`(0,0),(2,0),(2,1)` left and B `(2,2),(1,2),(1,1)` right: 7 occupied nodes
+and 2 dots left by a removed vertical arrow at `(0,2),(0,1)` exiting down.
+Both passed independent and renderer-based movement/coverage validation;
+neither has been selected for application integration.
+
+The preceding round requested five variants on a 4-by-4 grid, exactly two visible arrows
 per icon, retaining the slimmer game-like strokes and open composition.
 The comparison contains diagonal Ls, a short return plus L, two upper-corner
 Ls, a long return plus short L, and a step-shaped arrow plus short L.
