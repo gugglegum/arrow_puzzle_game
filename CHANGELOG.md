@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Rounded arrowhead vertices and 90-degree body bends, with matching geometry
+  during flight and rewind. Analytic pixel coverage preserves thin strokes;
+  merged moving segments and integrated end caps reduce geometry storage.
+
 ## [0.4.0] - 2026-10-29
 
 ### Added

@@ -17,6 +17,11 @@ The 0.3.0 release from `52182f1` introduced the rendering/idle optimizations,
 antialiasing, borderless fullscreen, Windows font smoothing, version labels,
 audio, HUD buttons, redesigned menus/results, board themes, and screenshots.
 
+The user accepted rounded arrowheads and curved 90-degree bends after reviewing
+their appearance and local performance/memory measurements, then authorized
+commit/push. This is post-0.4.0 development; see
+[rounding evidence](rounded-arrows.md). No new release was requested.
+
 Commit `8ebae99`, included in 0.4.0, adds a 1.2-second frozen fatal-collision view before
 Game Over. Collision audio is immediate; defeat audio follows the pause. New
 launches stop immediately, in-flight interpolation is preserved, and pending or
@@ -44,6 +49,7 @@ ordinary source pushes leave release artifacts unchanged.
 | Distribution | Free standalone offline game; no ads, accounts, telemetry | Runtime service or asset dependencies |
 | Generator | Dense, varied, constructively solvable tangles; explicit failure | Boring serpentine/S-shaped fallback or relaxed quality just to succeed |
 | Performance | Bounded memory, cached geometry, sleeping/polling while idle | Full geometry every camera frame, huge supersampled textures, driver VSync waits |
+| Arrow appearance | Rounded head vertices and curved 90-degree bends; retain cached analytic coverage | Extra per-frame static traversal or a large raster cache |
 | Themes | Dark board/HUD default, Light optional; menus/results always dark | Switching all screens to Light was considered but not selected |
 | Menu selection | One persistent current item shared by mouse/keys | Restoring a separate keyboard bookmark on mouse exit caused gap flicker |
 | Fonts | Embedded Inter with native Windows smoothing throughout UI | Scaled/blurred text and mixed unsmoothed labels |
@@ -60,8 +66,9 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 
 ## Open work and limitations
 
-- No active implementation task is assigned by this roadmap. Work on the live
-  user's request; do not silently implement backlog items.
+- Rounded rendering is accepted and its earlier commit/push hold is lifted.
+  Integrated-GPU performance remains unmeasured: OpenGL 3.3 Core is required;
+  modern iGPUs are expected to cope, but RTX 5070 timings are not iGPU timings.
 - Game.cpp remains large; refactor only in scoped steps that preserve event
   ordering, rendering invalidation, and testability.
 - Very Hard now uses bounded frontier construction for 0.4.0;
@@ -69,8 +76,8 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
   This is separate from the earlier rendering work and is not in released 0.3.0.
 - Linux/Android are unverified; even dimensions are a generator restriction.
 - A local, user-owned, untracked `TODO.txt` mentions softer visual rounding of
-  arrowheads/body corners. It is an idea, not an implemented feature or an
-  instruction to change geometry now. Preserve the file unless asked otherwise.
+  arrowheads/body corners. The accepted renderer implements that live request;
+  preserve the file unless asked otherwise.
 
 ## Continuity discipline
 

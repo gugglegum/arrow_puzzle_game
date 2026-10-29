@@ -127,11 +127,38 @@ void StaticBoardGeometry::addLine(
     addQuad(bounds, color, from.x == to.x ? 6.0F : 0.0F);
 }
 
+void StaticBoardGeometry::addCappedLine(
+    Vector2 from, Vector2 to, float thickness, Color color, bool capStart, bool capEnd
+) {
+    if (!capStart && !capEnd) {
+        addLine(from, to, thickness, color);
+        return;
+    }
+    if (from.x != to.x && from.y != to.y) {
+        throw std::invalid_argument("Static board segments must be orthogonal");
+    }
+    const bool vertical = from.x == to.x;
+    const bool increasing = vertical ? to.y >= from.y : to.x >= from.x;
+    const bool capLow = increasing ? capStart : capEnd;
+    const bool capHigh = increasing ? capEnd : capStart;
+    const float half = thickness*0.5F;
+    const float low = (vertical ? std::min(from.y,to.y) : std::min(from.x,to.x)) -
+                      (capLow ? half : 0.0F);
+    const float high = (vertical ? std::max(from.y,to.y) : std::max(from.x,to.x)) +
+                       (capHigh ? half : 0.0F);
+    const Rectangle bounds = vertical
+        ? Rectangle{from.x-half,low,thickness,high-low}
+        : Rectangle{low,from.y-half,high-low,thickness};
+    addQuad(bounds, color, 15.0F + (vertical ? 1.0F : 0.0F) +
+                          (capLow ? 2.0F : 0.0F) + (capHigh ? 4.0F : 0.0F));
+}
+
 void StaticBoardGeometry::addTriangle(
     Vector2 a,
     Vector2 b,
     Vector2 c,
-    Color color
+    Color color,
+    bool rounded
 ) {
     // Board arrowheads are cardinal isosceles triangles, with a as the tip.
     const Vector2 direction{a.x - (b.x+c.x)*0.5F, a.y - (b.y+c.y)*0.5F};
@@ -142,7 +169,30 @@ void StaticBoardGeometry::addTriangle(
     const float top = std::min({a.y, b.y, c.y});
     const float right = std::max({a.x, b.x, c.x});
     const float bottom = std::max({a.y, b.y, c.y});
-    addQuad({left, top, right-left, bottom-top}, color, kind);
+    addQuad({left, top, right-left, bottom-top}, color, kind + (rounded ? 9.0F : 0.0F));
+}
+
+void StaticBoardGeometry::addBend(
+    Vector2 corner,
+    Vector2 incoming,
+    Vector2 outgoing,
+    float radius,
+    float thickness,
+    Color color
+) {
+    const Vector2 center{corner.x - incoming.x*radius + outgoing.x*radius,
+                         corner.y - incoming.y*radius + outgoing.y*radius};
+    const Vector2 sign{incoming.x - outgoing.x, incoming.y - outgoing.y};
+    // Include one radius of each tangent straight run in the same quad.
+    const float outer = radius*2 + thickness*0.5F;
+    const float kind = sign.y > 0.0F
+        ? (sign.x > 0.0F ? 7.0F : 8.0F)
+        : (sign.x < 0.0F ? 9.0F : 10.0F);
+    // Use the unused fraction of the existing shape tag, with no new vertex
+    // attributes, to retain the radius when a moving tail shortens a bend.
+    addQuad({center.x + std::min(sign.x, 0.0F)*outer - sign.x*radius,
+             center.y + std::min(sign.y, 0.0F)*outer - sign.y*radius, outer, outer},
+            color, kind + 0.25F*radius/outer);
 }
 
 void StaticBoardGeometry::flush() {

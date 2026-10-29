@@ -128,6 +128,7 @@ add_executable(arrow_puzzle WIN32
     src/Game.cpp
     src/StaticBoardGeometry.cpp
     src/StaticBoardGeometry.hpp
+    src/ArrowStroke.hpp
     src/BoardCoverageShader.hpp
     src/main.cpp
     src/UiFontData.hpp

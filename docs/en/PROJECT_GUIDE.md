@@ -29,6 +29,12 @@ The current stack is:
 Windows x64 is the only verified platform. Linux and Android are future targets,
 so isolate platform-specific code and avoid unnecessary Windows-only dependencies.
 
+The current Windows renderer requires an OpenGL 3.3 Core context and GLSL 330,
+with a graphics driver that exposes them. A discrete GPU is not required;
+integrated graphics meeting these requirements can run the same renderer.
+Actual integrated-GPU frame rates have not been measured. Large-board
+generation runs on the CPU, independently of the graphics API.
+
 ## 2. Product principles and required behavior
 
 Preserve these user decisions when making changes:
@@ -77,6 +83,7 @@ src/
   Persistence.cpp          Versioned text formats and atomic replacement
   Game.cpp                 raylib, UI, input, camera, animation, main loop
   StaticBoardGeometry.*    Geometry caching and analytic antialiasing
+  ArrowStroke.hpp          Shared rounded strokes for idle/flight/rewind
   BoardPalette.hpp         Board and HUD palettes
   MenuScreen.*             Menu presentation
   MenuSelection.hpp        Shared mouse/keyboard selection

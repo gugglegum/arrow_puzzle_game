@@ -11,6 +11,7 @@
 #include "MenuSelection.hpp"
 #include "BoardPalette.hpp"
 #include "StaticBoardGeometry.hpp"
+#include "ArrowStroke.hpp"
 #include "UiText.hpp"
 
 #include <raylib.h>
@@ -458,24 +459,9 @@ void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const B
         color = palette.error;
     }
 
-    for (std::size_t index = 1; index < points.size(); ++index) {
-        geometry.addLine(
-            points[index - 1],
-            points[index],
-            kArrowThickness,
-            color
-        );
-        geometry.addCircle(
-            points[index],
-            kArrowThickness * 0.5F,
-            color
-        );
-    }
-    geometry.addCircle(
-        points.front(),
-        kArrowThickness * 0.5F,
-        color
-    );
+    addArrowStroke(geometry, points.size(),
+                   [&points](std::size_t index) { return points[index]; },
+                   kArrowThickness, color);
 
     const ArrowHeadTriangle head = arrowHeadTriangle(
         points.front(),
@@ -485,7 +471,8 @@ void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const B
         head.tip,
         head.left,
         head.right,
-        color
+        color,
+        true
     );
 }
 
@@ -495,21 +482,11 @@ void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, co
     }
     const Color color = value.failed ? palette.error : palette.ink;
     const Vector2 head = cellCenter(value.cells.front());
-    Vector2 segmentStart = head;
-    geometry.addCircle(head, kArrowThickness * 0.5F, color);
-    for (std::size_t index = 1; index < value.cells.size(); ++index) {
-        const bool endOfRun = index + 1 == value.cells.size() ||
-            value.cells[index] - value.cells[index - 1] !=
-                value.cells[index + 1] - value.cells[index];
-        if (endOfRun) {
-            const Vector2 point = cellCenter(value.cells[index]);
-            geometry.addLine(segmentStart, point, kArrowThickness, color);
-            geometry.addCircle(point, kArrowThickness * 0.5F, color);
-            segmentStart = point;
-        }
-    }
+    addArrowStroke(geometry, value.cells.size(),
+                   [&value](std::size_t index) { return cellCenter(value.cells[index]); },
+                   kArrowThickness, color);
     const ArrowHeadTriangle triangle = arrowHeadTriangle(head, value.direction);
-    geometry.addTriangle(triangle.tip, triangle.left, triangle.right, color);
+    geometry.addTriangle(triangle.tip, triangle.left, triangle.right, color, true);
 }
 
 void cacheIdleBoardGeometry(
@@ -536,8 +513,8 @@ void cacheIdleBoardGeometry(
     }
     for (int y = 0; y < board.rows(); ++y) {
         for (int x = 0; x < board.columns(); ++x) {
-            // An idle stroke completely covers its grid dot. Exposed dots are
-            // restored when launching an arrow invalidates the geometry.
+            // Keep the lattice beneath idle arrows hidden, including at bends.
+            // Launching restores these dots as the arrow vacates its path.
             if (occupied[static_cast<std::size_t>(y) * board.columns() + x] == 0) {
                 geometry.addCircle(cellCenter({x, y}), kGridDotRadius, palette.dot);
             }

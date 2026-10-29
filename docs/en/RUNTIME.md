@@ -178,9 +178,21 @@ There is no extra high-resolution raster copy. Zoom is passed through
 without rebuilding meshes. Lines filter their side edges; round joints cover
 internal segment ends, which are not filtered again, avoiding pale seams.
 
-Straight sections of idle arrows are merged. Grid dots fully covered by idle
-arrows are omitted from the mesh. Launching an arrow restores its dots to the
-static cache so they appear as its body moves away. Flying arrows use the same
+`ArrowStroke.hpp` merges straight runs for idle, flying and rewinding arrows
+without allocating another path. Its 90-degree bends use quarter-circle strokes
+with an 8-world-unit centreline radius (1.25 times the stroke thickness), reduced
+continuously for short head/tail runs. The same quad includes tangent straight
+stubs, keeping its raster boundaries away from the curve even at zoom 0.05.
+Each bend replaces one join quad; round end caps are integrated into the
+first/last run instead of overlapping discs.
+Arrowheads round all three vertices with a 1.6-world-unit radius, still using
+one quad. Their exact coverage is integrated as straight-sided and circular
+strips, with no per-fragment polygon arrays or new vertex buffers/textures.
+Simulation cells, collisions and hit targets retain their original geometry.
+
+Grid dots belonging to idle arrows are omitted from the mesh, including at
+bends. Launching an arrow restores its dots to the static cache so they appear
+as its body moves away. Flying arrows use the same
 shader through `beginDynamic()` / `endDynamic()` and raylib's streamed batch;
 they do not get new persistent meshes every frame. HUD and overlays draw
 separately. All gameplay, including flight, is clipped below the HUD separator.
@@ -221,9 +233,13 @@ cmake --build build/windows-msvc --target arrow_render_tests
 .\build\windows-msvc\arrow_render_tests.exe
 ```
 
-It checks 2,870 subpixel shape placements across five zooms, both cached and
-streamed rendering, and streaming-batch overflow. It inspects pixels read back
-from the GPU.
+It checks 5,412 subpixel primitive placements and 1,968 complete rounded-stroke
+placements, with analytical area references and zooms down to 0.05. Another
+336 comparisons cover cached/streamed short tails and merged straight cells,
+including vanishing
+inner bend radii. Geometry byte budgets, streaming-batch overflow, and 90 guide
+recolouring placements across both themes are checked too. The tests inspect
+pixels read back from the GPU; they do not establish performance on other GPUs.
 
 `forwardPolyline()` and `trimPolylineTail()` preserve orthogonal corners:
 animation extends the head and trims the tail without diagonal warping.

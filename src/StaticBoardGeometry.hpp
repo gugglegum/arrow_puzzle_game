@@ -19,7 +19,12 @@ public:
     void begin();
     void addCircle(Vector2 center, float radius, Color color);
     void addLine(Vector2 from, Vector2 to, float thickness, Color color);
-    void addTriangle(Vector2 a, Vector2 b, Vector2 c, Color color);
+    void addCappedLine(Vector2 from, Vector2 to, float thickness, Color color,
+                       bool capStart, bool capEnd);
+    void addTriangle(Vector2 a, Vector2 b, Vector2 c, Color color, bool rounded = false);
+    // One quad replaces the old round join; directions are cardinal unit vectors.
+    void addBend(Vector2 corner, Vector2 incoming, Vector2 outgoing,
+                 float radius, float thickness, Color color);
     void finish();
     void draw(float zoom) const;
     // Reuse the same coverage shader for animated primitives without creating
