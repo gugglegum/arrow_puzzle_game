@@ -13,7 +13,22 @@ fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
 separate nonintersecting paths with one head each, and gray dots at every
 unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
 
-Latest request: extend the tails of 4-by-4 variant 1 so they wrap around each
+Latest request: make the 4-by-4 pair symmetric with one bend each, and render
+the user's 3-by-3 ASCII sketch. The new 4-by-4 pair is A
+`(0,0),(2,0),(2,2)` left and B `(3,3),(1,3),(1,1)` right, exact 180-degree
+counterparts. Two removed three-cell vertical arrows explain its six dots.
+The literal ASCII is A `(0,2),(0,0),(1,0)` down and B
+`(2,0),(2,1),(1,1),(1,2)` up, with one dot at `(2,2)`. It is solvable under
+Board movement rules but cannot result from complete removals on a generated
+full board: the generator enforces arrow length >= 2. It also requires even
+board dimensions, so all 3-by-3 designs are miniature icon illustrations,
+not actual generator output. The comparison preserves the literal sketch
+and adds a nearby alternative with B shortened to `(2,0),(2,1),(1,1)`;
+its two adjacent dots can be explained by one removed two-cell arrow.
+Keep the literal-art exception explicit rather than silently changing the
+user's sketch or claiming generator-faithful reachability.
+
+Previous request: extend the tails of 4-by-4 variant 1 so they wrap around each
 other and finish in different directions; also compare a compact 3-by-3 board.
 The revised 4-by-4 head-first paths are A `(0,0),(2,0),(2,2),(3,2)` left,
 B `(3,3),(1,3),(1,1),(0,1)` right: 12 occupied nodes and 4 dots left by two
