@@ -102,7 +102,8 @@ another arrow's speed.
 - Event-driven cell collision checks that prevent high-speed tunnelling
 - Dark board theme by default, with a persistent Light option
 - Windowed and borderless fullscreen at the desktop resolution
-- Pointer-centred zoom and fast middle-button panning on large boards
+- Pointer-centred wheel zoom, keyboard zoom/fit, and left/middle-button panning
+  on large boards, including laptops with a touchpad
 - Analytic antialiasing for arrows and grid dots at small zoom levels
 - Native Windows font smoothing with the embedded Inter typeface
 - Optional launch, collision, defeat, victory, and firework sounds
@@ -117,8 +118,11 @@ another arrow's speed.
 
 | Input | Action |
 | --- | --- |
-| Left mouse button | Launch an idle arrow |
+| Left mouse button click | Launch an idle arrow on release |
+| Left mouse button + drag | Pan the board, starting on an arrow or empty space |
 | Mouse wheel | Zoom at the pointer |
+| Ctrl + + / Ctrl + - | Zoom at the centre of the visible gameplay area |
+| Ctrl + 0 | Fit and centre the whole board in the window |
 | Middle mouse button + drag | Pan the board |
 | Up / Down | Move the current menu selection |
 | Enter | Activate the selected menu item |
@@ -129,6 +133,13 @@ another arrow's speed.
 | Escape | Leave fullscreen, return to the menu, or close the main menu |
 | R | Generate a new board when no arrow is moving |
 | F12 | Save `arrow-puzzle-screenshot.png` in the working directory |
+
+Ctrl + = also zooms in without Shift. The numeric keypad's +, - and 0 work
+with either Ctrl key; holding a zoom shortcut repeats it. A left-button drag
+starts after moving more than 6 screen pixels and cancels the arrow launch
+for that press, even if you return to the starting point before releasing.
+Small pointer movements still count as a click when released over the same
+arrow. Presses on the top-panel buttons keep their normal button behaviour.
 
 New arrows may be launched while other arrows are moving forward. Input is
 temporarily locked while collided arrows are paused or rewinding.

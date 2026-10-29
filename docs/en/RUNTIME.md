@@ -131,20 +131,43 @@ Do not merge forward debt and recovery debt: their time scales and rules differ.
 
 ## 8. Input
 
-An arrow launch has two input events:
+`BoardPointerGesture` separates a left-button click from board panning:
 
-1. `MOUSE_BUTTON_LEFT` pressed performs a hit test and stores `pressedArrow`.
-2. Release repeats the hit test and launches only if the indices match.
+1. A press in the gameplay area starts a gesture and arms the hit-tested arrow
+   if launch input is available. A press on empty space can also start a drag.
+   `GetGestureDragVector()` recovers the actual press position when the press
+   and subsequent movement arrive in the same native event poll. Use that
+   origin for both board hit testing and top-panel/result button presses.
+2. Movement more than 6 screen pixels from the press position starts panning.
+   The first pan includes the full initial displacement; later pans use pointer
+   deltas divided by camera zoom. Crossing the threshold permanently cancels
+   the launch for this press, including when the pointer returns to its origin.
+3. The release position is processed for movement too. Release launches only
+   if the gesture never became a drag and the hit-tested arrow still matches.
 
-Moving the pointer away before release cancels an accidental click. Launch
-input is blocked during rewind, collision pause, moving hit-stop, generation,
-and after the last life is lost.
+Small pointer jitter does not move the board. Top-panel and result buttons
+keep their separate press/release handling and do not start board gestures.
+Focus loss, a screen/board change, a missing button release, or middle-button
+panning clears the gesture. Wheel/keyboard camera navigation cancels its
+pending launch. Launch input is blocked during rewind, collision pause, moving
+hit-stop, generation, and after the last life is lost; this does not prevent
+left-button panning while camera input is available.
 
 Camera controls:
 
 - Wheel zooms around the pointer.
-- Middle-button drag pans the board.
+- Ctrl + + / Ctrl + - zoom around the centre of the visible gameplay area.
+  Ctrl + = works without Shift; either Ctrl key and keypad + / - are supported.
+  Zoom shortcuts also accept key-repeat events when held. The ordered key-down
+  queue preserves short Ctrl chords pressed and released between frames.
+- Ctrl + 0 (including keypad 0) reuses `resetCamera()` to fit and centre the
+  complete board for the current window size.
+- Left-button drag pans from either an arrow or empty space; middle-button
+  panning remains available and takes priority when both buttons are held.
 - Zoom is bounded to 0.05..3.5 so Very Hard can fit the window again after zooming in.
+- Camera input requires window focus and is blocked during generation/errors
+  and while a result screen is visible. Unchanged zoom at a bound does not
+  invalidate the cached board image.
 - F11 or Left Alt+Enter switches a borderless fullscreen window at the desktop
   resolution, without entering an exclusive display mode.
 
@@ -196,7 +219,9 @@ as its body moves away. Flying arrows use the same
 shader through `beginDynamic()` / `endDynamic()` and raylib's streamed batch;
 they do not get new persistent meshes every frame. HUD and overlays draw
 separately. All gameplay, including flight, is clipped below the HUD separator.
-The controls legend draws behind the board and does not cover arrows.
+The controls legend draws behind the board and does not cover arrows. It uses
+one row at the bottom edge; a compact version keeps launch, pan, zoom and fit
+visible if the complete text does not fit the window width.
 
 `BoardPalette` supplies Dark/Light board and HUD colors. Crosshair guides draw
 only exposed dots in the chosen row and column: subtractive color in Light,

@@ -22,6 +22,26 @@ their appearance and local performance/memory measurements, then authorized
 commit/push. This is post-0.4.0 development; see
 [rounding evidence](rounded-arrows.md). No new release was requested.
 
+Touchpad controls are accepted post-0.4.0 work: LMB click/drag separation,
+centred Ctrl +/- zoom (also Ctrl+=, keypad and key repeat), and Ctrl+0 fit.
+`BoardPointerGesture` latches launch cancellation beyond 6 screen pixels.
+Use raylib's gesture drag vector to recover the real press origin when press
+and movement share a native input poll; sampling only the frame's pointer
+position allowed a fast drag to launch its endpoint arrow. Preserve queued
+key-down events as well, so short Ctrl chords survive release between frames.
+See [runtime input](../docs/en/RUNTIME.md#8-input) for the maintained contract.
+
+Validation on Windows: a clean Release build and all five default headless
+suites passed. A local controller harness around production Game.cpp passed
+36 scenarios: click/jitter, drag from arrows/empty space, return to origin,
+release-frame movement, focus/HUD handling, simultaneous middle/left buttons,
+keyboard/keypad/repeat/queued chords, zoom bounds/anchors and resized-window
+fit. These controller checks use real rendering with scripted input queries
+and are local QA, not default CTest. Native-input checks of a separate
+standalone production EXE also confirmed fast LMB panning without changing
+arrow/life counts, centred Ctrl+= / Ctrl- and Ctrl+0 after panning. Dark/Light
+720x600 and normal 1100x900 hints were inspected. No release was requested.
+
 Commit `8ebae99`, included in 0.4.0, adds a 1.2-second frozen fatal-collision view before
 Game Over. Collision audio is immediate; defeat audio follows the pause. New
 launches stop immediately, in-flight interpolation is preserved, and pending or
@@ -55,6 +75,7 @@ ordinary source pushes leave release artifacts unchanged.
 | Fonts | Embedded Inter with native Windows smoothing throughout UI | Scaled/blurred text and mixed unsmoothed labels |
 | Fullscreen | Desktop-resolution borderless window, restored cursor | Exclusive mode caused resolution/aspect problems and brief blackouts |
 | HUD/legend | Protected HUD, back arrow at left, board above legend | Gameplay over HUD or reserving another bottom gameplay strip |
+| Board navigation | Wheel/MMB plus LMB drag from arrows or empty space; Ctrl +/- centred zoom and Ctrl+0 fit | A drag must never launch an arrow, even after returning to its origin; tolerate up to 6 screen pixels of click jitter |
 | Sounds/guides | Optional, off by default, persisted; HUD shares sound preference | Surprise sound at startup or replay on redraw/unmute |
 | Results | Finite effects; preserve the fatal pose before delayed defeat | Immediate Game Over hiding the mistake; endless finished-game work |
 | Release trust | Build in Actions, bot-created release, hashes and provenance | Claiming a local EXE is the attested Actions artifact |

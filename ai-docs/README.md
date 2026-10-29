@@ -24,6 +24,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Generation, solvability, arrow composition | [Generator guide](../docs/en/GENERATOR.md) | `Generator.cpp`, `Board.cpp` |
 | Very Hard 0.4.0 work, benchmark evidence | [Generator work](generator-0.4.md) | `FrontierGenerator.cpp`, `GeneratorBenchmark.cpp` |
 | Flight, collisions, rollback, saves | [Runtime guide](../docs/en/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
+| Touchpad, click/drag safety, keyboard zoom/fit | [Runtime guide, section 8](../docs/en/RUNTIME.md) | `BoardPointerGesture.hpp`, `BoardPointerGestureTests.cpp`, `Game.cpp` |
 | Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/en/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
 | Accepted rounded arrows, resource comparisons | [Rounding evaluation](rounded-arrows.md) | `ArrowStroke.hpp`, `BoardCoverageShader.hpp`, `RenderingTests.cpp` |
 | Linux feasibility, packaging, X11/Wayland caveats | [Linux assessment](linux-portability.md) | `CMakeLists.txt`, `Persistence.cpp`, `UiText.cpp`, release workflow |

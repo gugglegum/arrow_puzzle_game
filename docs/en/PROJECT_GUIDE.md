@@ -57,8 +57,10 @@ Preserve these user decisions when making changes:
    lets them continue without rewinding.
 9. A static obstacle or genuine self-hit rewinds the launched arrow through its
    accepted history; it stays red afterward.
-10. A press only arms an arrow. Release over the same arrow launches it; moving
-    away before release cancels the action.
+10. A press only arms an arrow. Release over the same arrow launches it if the
+    pointer has not moved more than 6 screen pixels. Crossing that threshold
+    pans the board and cancels the launch for the rest of the gesture, even
+    when returning to the press position. Keep keyboard zoom and fit available.
 11. Saves contain complete geometry and game state, not a seed. This protects
     them from generator changes and standard-library RNG differences.
 
@@ -82,6 +84,7 @@ src/
   MotionResolver.cpp       Pure collision classification
   Persistence.cpp          Versioned text formats and atomic replacement
   Game.cpp                 raylib, UI, input, camera, animation, main loop
+  BoardPointerGesture.hpp  Click/drag threshold and launch cancellation
   StaticBoardGeometry.*    Geometry caching and analytic antialiasing
   ArrowStroke.hpp          Shared rounded strokes for idle/flight/rewind
   BoardPalette.hpp         Board and HUD palettes
@@ -97,6 +100,7 @@ tests/
   GeneratorTests.cpp       Geometry, quality, motion and collision regressions
   PersistenceTests.cpp     Formats, malformed input and atomic saving
   MenuSelectionTests.cpp   Shared selection, gaps and stationary pointer
+  BoardPointerGestureTests.cpp  Clicks, touchpad jitter, drags and cancellation
   EndScreenTests.cpp       Result states and finite animation timing
 
 assets/fonts/              Inter Medium and OFL license
@@ -116,6 +120,7 @@ CMake targets:
 - `arrow_tests`: generator, level quality, kinematics, and collisions;
 - `arrow_persistence_tests`: settings and saved games;
 - `arrow_menu_selection_tests`: window-free menu-selection logic;
+- `arrow_board_pointer_tests`: window-free click/drag and launch-cancellation checks;
 - `arrow_end_screen_tests`: window-free result-state/timing checks.
 
 Build `arrow_render_tests`, `arrow_ui_text_tests`, and `arrow_audio_tests`
@@ -207,7 +212,7 @@ their recorded PID.
 
 ## 6. Testing
 
-Full CTest runs four test suites:
+Full CTest runs five test suites:
 
 ```powershell
 ctest --test-dir build\windows-msvc --output-on-failure

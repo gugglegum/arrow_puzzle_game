@@ -10,6 +10,7 @@
 #include "MenuScreen.hpp"
 #include "MenuSelection.hpp"
 #include "BoardPalette.hpp"
+#include "BoardPointerGesture.hpp"
 #include "StaticBoardGeometry.hpp"
 #include "ArrowStroke.hpp"
 #include "UiText.hpp"
@@ -871,7 +872,7 @@ int Game::run() {
     bool recoveryStepActive = false;
     float recoveryStepProgress = 0.0F;
     std::uint64_t recoveryTick = 0;
-    std::optional<std::size_t> pressedArrow;
+    BoardPointerGesture boardPointer;
     std::optional<int> pressedMenuButton;
     bool pressedSoundButton = false;
     bool pressedHudMenuButton = false;
@@ -985,7 +986,7 @@ int Game::run() {
         recoveryStepActive = false;
         recoveryStepProgress = 0.0F;
         recoveryTick = 0;
-        pressedArrow.reset();
+        boardPointer.reset();
         invalidateStaticBoard();
     };
     resetRuntime();
@@ -1160,7 +1161,7 @@ int Game::run() {
         currentGeneratorOptions = options;
         generationError.clear();
         generationOverlayRendered = false;
-        pressedArrow.reset();
+        boardPointer.reset();
         screen = Screen::Playing;
         activeGame = false;
         try {
@@ -1284,7 +1285,7 @@ int Game::run() {
         endScreen.reset();
         pressedEndButton.reset();
         generationError.clear();
-        pressedArrow.reset();
+        boardPointer.reset();
         pressedMenuButton.reset();
         pressedSoundButton = false;
         pressedHudMenuButton = false;
@@ -2178,29 +2179,63 @@ int Game::run() {
                 (static_cast<float>(GetScreenHeight()) - kHudHeight) * 0.5F
         };
 
-        const float wheel = GetMouseWheelMove();
-        if (!generationBlocksInput && !endScreen.visible() && wheel != 0.0F) {
-            const Vector2 mouse = GetMousePosition();
-            const Vector2 before = GetScreenToWorld2D(mouse, camera);
-            camera.zoom = std::clamp(
-                camera.zoom * std::pow(1.12F, wheel),
-                kMinimumZoom,
-                3.5F
-            );
-            const Vector2 after = GetScreenToWorld2D(mouse, camera);
+        const bool cameraInputAvailable = IsWindowFocused() &&
+            !generationBlocksInput && !endScreen.visible();
+        bool cameraNavigated = false;
+        const auto zoomAt = [&](Vector2 anchor, float steps) {
+            const float zoom = std::clamp(
+                camera.zoom * std::pow(1.12F, steps), kMinimumZoom, 3.5F);
+            if (zoom == camera.zoom) return;
+            const Vector2 before = GetScreenToWorld2D(anchor, camera);
+            camera.zoom = zoom;
+            const Vector2 after = GetScreenToWorld2D(anchor, camera);
             camera.target.x += before.x - after.x;
             camera.target.y += before.y - after.y;
             staticBoardLayerDirty = true;
+            cameraNavigated = true;
+        };
+        const float wheel = GetMouseWheelMove();
+        if (cameraInputAvailable) {
+            if (wheel != 0.0F) zoomAt(GetMousePosition(), wheel);
+            const bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+            bool queuedControl = control;
+            bool queuedZoomIn = false;
+            bool queuedZoomOut = false;
+            bool queuedFit = false;
+            // A complete short Ctrl chord can arrive between frames, after
+            // both keys have been released. The key-down queue keeps its order.
+            for (int key = GetKeyPressed(); key != KEY_NULL; key = GetKeyPressed()) {
+                if (key == KEY_LEFT_CONTROL || key == KEY_RIGHT_CONTROL) queuedControl = true;
+                if (!queuedControl) continue;
+                queuedZoomIn |= key == KEY_EQUAL || key == KEY_KP_ADD;
+                queuedZoomOut |= key == KEY_MINUS || key == KEY_KP_SUBTRACT;
+                queuedFit |= key == KEY_ZERO || key == KEY_KP_0;
+            }
+            const auto pressedOrRepeated = [](int key) {
+                return IsKeyPressed(key) || IsKeyPressedRepeat(key);
+            };
+            if (queuedFit || (control && (IsKeyPressed(KEY_ZERO) || IsKeyPressed(KEY_KP_0)))) {
+                resetCamera();
+                cameraNavigated = true;
+            } else {
+                const bool zoomIn = queuedZoomIn || (control &&
+                    (pressedOrRepeated(KEY_EQUAL) || pressedOrRepeated(KEY_KP_ADD)));
+                const bool zoomOut = queuedZoomOut || (control &&
+                    (pressedOrRepeated(KEY_MINUS) || pressedOrRepeated(KEY_KP_SUBTRACT)));
+                const int steps = static_cast<int>(zoomIn) - static_cast<int>(zoomOut);
+                if (steps != 0) zoomAt(camera.offset, static_cast<float>(steps));
+            }
         }
 
-        if (!generationBlocksInput &&
-            !endScreen.visible() &&
-            IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
+        const bool middleDown = IsMouseButtonDown(MOUSE_BUTTON_MIDDLE);
+        if (cameraInputAvailable && middleDown) {
+            boardPointer.reset();
             const Vector2 movement = GetMouseDelta();
             if (movement.x != 0.0F || movement.y != 0.0F) {
                 camera.target.x -= movement.x / camera.zoom;
                 camera.target.y -= movement.y / camera.zoom;
                 staticBoardLayerDirty = true;
+                cameraNavigated = true;
             }
         }
 
@@ -2260,6 +2295,15 @@ int Game::run() {
         const bool leftDown =
             IsMouseButtonDown(MOUSE_BUTTON_LEFT);
         const Vector2 mouse = GetMousePosition();
+        Vector2 pressMouse = mouse;
+        if (leftPressed) {
+            // raylib processes every native mouse event before our frame. A
+            // fast press+move may already have reached its endpoint; the
+            // gesture vector retains the actual press origin within that poll.
+            const Vector2 drag = GetGestureDragVector();
+            pressMouse.x -= drag.x * GetScreenWidth();
+            pressMouse.y -= drag.y * GetScreenHeight();
+        }
         const bool soundButtonHovered = IsWindowFocused() &&
             CheckCollisionPointRec(mouse, soundButtonRectangle());
         const bool hudMenuButtonHovered = IsWindowFocused() &&
@@ -2272,9 +2316,13 @@ int Game::run() {
             pressedEndButton.reset();
         }
         if (leftPressed) {
-            pressedSoundButton = soundButtonHovered;
-            pressedHudMenuButton = hudMenuButtonHovered;
-            pressedEndButton = endButtonHovered;
+            pressedSoundButton = IsWindowFocused() &&
+                CheckCollisionPointRec(pressMouse, soundButtonRectangle());
+            pressedHudMenuButton = IsWindowFocused() &&
+                CheckCollisionPointRec(pressMouse, hudMenuButtonRectangle());
+            pressedEndButton = IsWindowFocused()
+                ? endScreen.buttonAt(pressMouse, GetScreenWidth(), GetScreenHeight(), kHudHeight)
+                : std::nullopt;
         }
         if (leftReleased) {
             if (std::exchange(pressedHudMenuButton, false) && hudMenuButtonHovered) {
@@ -2297,34 +2345,34 @@ int Game::run() {
         }
         const bool pointerInGameplay = mouse.y > kHudHeight &&
             mouse.y < GetScreenHeight() && mouse.x >= 0.0F && mouse.x < GetScreenWidth();
+        const bool pressInGameplay = pressMouse.y > kHudHeight &&
+            pressMouse.y < GetScreenHeight() && pressMouse.x >= 0.0F && pressMouse.x < GetScreenWidth();
 
-        if (!launchInputAvailable ||
-            (!leftDown && !leftReleased)) {
-            pressedArrow.reset();
+        if (!cameraInputAvailable || middleDown || (!leftDown && !leftReleased)) {
+            boardPointer.reset();
         }
-
         if (leftPressed) {
-            pressedArrow.reset();
-            if (launchInputAvailable && pointerInGameplay) {
-                pressedArrow = hitTest(GetScreenToWorld2D(mouse, camera), arrows);
+            boardPointer.reset();
+            if (cameraInputAvailable && !middleDown && pressInGameplay) {
+                const auto armedArrow = launchInputAvailable
+                    ? hitTest(GetScreenToWorld2D(pressMouse, camera), arrows) : std::nullopt;
+                boardPointer.begin(pressMouse.x, pressMouse.y, armedArrow);
             }
         }
-
-        if (leftReleased) {
-            const std::optional<std::size_t> armedArrow =
-                std::exchange(pressedArrow, std::nullopt);
-            if (armedArrow.has_value() &&
-                launchInputAvailable && pointerInGameplay) {
-                const Vector2 world = GetScreenToWorld2D(
-                    GetMousePosition(),
-                    camera
-                );
-                const std::optional<std::size_t> releasedArrow =
-                    hitTest(world, arrows);
-                if (releasedArrow == armedArrow) {
-                    launchArrow(*armedArrow);
-                }
+        if (!launchInputAvailable || cameraNavigated) boardPointer.cancelLaunch();
+        if (cameraInputAvailable && !middleDown && (leftDown || leftReleased)) {
+            const auto movement = boardPointer.move(mouse.x, mouse.y);
+            if (movement.x != 0.0F || movement.y != 0.0F) {
+                camera.target.x -= movement.x / camera.zoom;
+                camera.target.y -= movement.y / camera.zoom;
+                staticBoardLayerDirty = true;
             }
+        }
+        if (leftReleased) {
+            const auto releasedArrow = launchInputAvailable && pointerInGameplay
+                ? hitTest(GetScreenToWorld2D(mouse, camera), arrows) : std::nullopt;
+            const auto launchedArrow = boardPointer.release(releasedArrow);
+            if (launchedArrow) launchArrow(*launchedArrow);
         }
 
         // Hold the fatal collision in place before revealing Game Over, then
@@ -2743,10 +2791,10 @@ int Game::run() {
         if (activeGame && !generationBlocksInput && !endScreen.active()) {
             if (lives <= 0) {
                 endScreen.show(EndScreen::Outcome::Defeat, kDefeatRevealDelay);
-                pressedArrow.reset();
+                boardPointer.reset();
             } else if (remaining == 0) {
                 endScreen.show(EndScreen::Outcome::Victory);
-                pressedArrow.reset();
+                boardPointer.reset();
                 gameAudio.playVictory();
             }
             if (endScreen.active()) {
@@ -2815,12 +2863,15 @@ int Game::run() {
         if (!generationInProgress && generationError.empty() &&
             remaining > 0 && lives > 0) {
             const char* help =
-                "LMB launch   Wheel zoom   MMB pan   F11 fullscreen   Esc menu";
+                "Click: launch   LMB/MMB drag: pan   Wheel/Ctrl +/-: zoom   Ctrl 0: fit   F11: fullscreen   Esc: menu";
+            if (measureText(uiText, help, kHelpText).x > GetScreenWidth() - 32.0F) {
+                help = "Click: launch   Drag: pan   Wheel/Ctrl +/-: zoom   Ctrl 0: fit";
+            }
             drawCenteredText(
                 uiText,
                 help,
                 static_cast<float>(GetScreenWidth()) * 0.5F,
-                static_cast<float>(GetScreenHeight()) - 30.0F,
+                static_cast<float>(GetScreenHeight()) - 22.0F,
                 kHelpText,
                 palette.muted
             );

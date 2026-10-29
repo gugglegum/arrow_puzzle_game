@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Touchpad-friendly board controls: left-button dragging, Ctrl + + / - (also
+  Ctrl + = and keypad keys) for centred zoom, and Ctrl + 0 to fit the full board.
+  Dragging more than 6 screen pixels cancels an arrow launch for the whole
+  gesture, even after returning to the starting point. Updated in-game hints
+  and both documentation editions.
+
 ### Changed
 
 - Rounded arrowhead vertices and 90-degree body bends, with matching geometry
