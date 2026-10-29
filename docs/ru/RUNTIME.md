@@ -303,10 +303,11 @@ raylib из worker-потока.
 
 ## 11. Настройки и сохранение
 
-`Persistence` хранит файлы рядом с EXE, а не в текущем working directory:
-
-- `settings.txt`;
-- `savegame.txt`.
+Windows хранит `settings.txt` и `savegame.txt` рядом с EXE. В Linux используются
+`$XDG_CONFIG_HOME/arrow-puzzle/settings.txt` и
+`$XDG_DATA_HOME/arrow-puzzle/savegame.txt`; стандартные корни — `~/.config` и
+`~/.local/share`. Пустые/относительные переопределения игнорируются. Пути, перенос
+прогресса и изоляция QA описаны в [руководстве Linux](LINUX.md).
 
 Оба формата текстовые, имеют `format=` и `version=1`. Запись выполняется во
 временный `.tmp` и затем заменяет целевой файл. Публичные операции persistence

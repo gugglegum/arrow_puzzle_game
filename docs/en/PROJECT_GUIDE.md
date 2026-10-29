@@ -26,8 +26,9 @@ The current stack is:
 - only the C++ standard library outside raylib;
 - an Inter font embedded in the EXE.
 
-Windows x64 is the only verified platform. Linux and Android are future targets,
-so isolate platform-specific code and avoid unnecessary Windows-only dependencies.
+Windows x64 remains the main platform. Native Linux x86-64 is also built and
+tested; see [Linux development](LINUX.md) for prerequisites and validation limits.
+Android and native Wayland remain future targets.
 
 The current Windows renderer requires an OpenGL 3.3 Core context and GLSL 330,
 with a graphics driver that exposes them. A discrete GPU is not required;
@@ -213,9 +214,10 @@ cmake --build --preset windows-msvc
 ctest --preset windows-msvc
 ```
 
-If a running game locks the output EXE, use another build directory. Stopping a
-user's instance requires authorization; own test processes can be stopped by
-their recorded PID.
+If a running game locks the output EXE, identify the process using that exact
+path. AGENTS.md authorizes stopping it and rebuilding in place.
+
+For native Linux build commands and presets, see [LINUX.md](LINUX.md).
 
 ## 6. Testing
 
@@ -305,7 +307,7 @@ After editing:
   0.4.0. The 0.3.0 generator had substantial time/memory
   spikes. See the generator guide for current limits and the benchmark tool.
 - The generator needs even board dimensions.
-- Linux and Android are not built or verified in CI.
+- Native Wayland and Android are not verified; Linux initially uses X11/XWayland.
 - The root may contain the user's TODO.txt. Do not delete or rewrite this
   user-owned file without a request.
 

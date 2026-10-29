@@ -4,6 +4,10 @@
 #include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
+
+#if defined(__linux__)
+#include "LinuxWindow.hpp"
+#endif
 #include "BuildVersion.hpp"
 #include "AppIcon.hpp"
 #include "GameAudio.hpp"
@@ -829,7 +833,7 @@ int Game::run() {
 
     UiText uiText;
 
-    Persistence persistence(Persistence::executableDirectory());
+    Persistence persistence;
     Settings settings = persistence.loadSettings();
     GameAudio gameAudio;
     EndScreen endScreen;
@@ -894,6 +898,11 @@ int Game::run() {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     };
     const auto toggleDesktopFullscreen = [&]() {
+#if defined(__linux__)
+        if (!toggleLinuxDesktopFullscreen()) {
+            TraceLog(LOG_WARNING, "Could not request X11 desktop fullscreen");
+        }
+#else
         ToggleBorderlessWindowed();
 #if defined(_WIN32)
         if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
@@ -940,6 +949,7 @@ int Game::run() {
             // in a browser, instead of keeping the game above their windows.
             ClearWindowState(FLAG_WINDOW_TOPMOST);
         }
+#endif
 #endif
         restoreCursor();
         // Repeat after queued window-mode and focus notifications.
@@ -1778,7 +1788,13 @@ int Game::run() {
             toggleDesktopFullscreen();
         }
         if (IsKeyPressed(KEY_ESCAPE)) {
-            if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
+            if (
+#if defined(__linux__)
+                isLinuxDesktopFullscreen()
+#else
+                IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)
+#endif
+            ) {
                 toggleDesktopFullscreen();
             } else if (screen == Screen::Playing) {
                 returnToMainMenu();

@@ -148,10 +148,19 @@ their tails into newly vacated cells are especially valuable.
 Large rectangular S-shaped regions receive a severe penalty: they are solvable
 but look like separate territories rather than a tangle of threads.
 
-Standard 20 x 20 boards also have a strict quality floor,
-`meetsDefaultQualityFloor()`. Frontier boards have the additional hard limits
-described in section 11. The other sizes choose the best valid candidate by
-score and have separate test thresholds.
+Standard 20 x 20 boards have a strict quality floor,
+`meetsDefaultQualityFloor()`, including the tested bend fractions, length
+quartiles and variation. Hard 80 x 80 candidates must also have 3..7 opening
+moves. Eligibility takes precedence over score; if no candidate meets the
+required floor, generation throws instead of returning a weak board. Frontier
+boards have the additional hard limits described in section 11. Other sizes
+choose the best valid candidate by score and have separate test thresholds.
+
+Candidate scoring balances several metrics; each individual metric need not
+improve for every seed. The tail-pass comparison uses the aggregate fixed-seed
+sample while retaining independent per-board floors. Standard-library shuffle
+and distribution algorithms differ across platforms; equal seeds need not
+produce the same geometry on MSVC and libstdc++. Saves store geometry.
 
 ## 8. Parallel candidates and determinism
 

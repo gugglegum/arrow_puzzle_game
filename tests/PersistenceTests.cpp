@@ -2,9 +2,11 @@
 
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -104,6 +106,95 @@ bool equal(const arrow::SavedGame& lhs, const arrow::SavedGame& rhs) {
         }
     }
     return true;
+}
+
+void testSeparateDirectories() {
+    TemporaryDirectory temporary;
+    const auto config = temporary.path() / "config" / "arrow-puzzle";
+    const auto data = temporary.path() / "data" / "arrow-puzzle";
+    const arrow::Persistence persistence{config, data};
+    auto settings = persistence.loadSettings();
+    require(persistence.settingsPath() == config / "settings.txt", "Wrong settings path");
+    require(persistence.saveGamePath() == data / "savegame.txt", "Wrong save path");
+    require(std::filesystem::exists(persistence.settingsPath()), "Config directory was not created");
+    require(persistence.setSounds(settings, false), "Separate settings write failed");
+    const auto game = sampleGame();
+    require(persistence.saveSavedGame(game), "Separate saved-game write failed");
+    const arrow::Persistence reopened{config, data};
+    require(!reopened.loadSettings().sounds, "Separate settings were not restored");
+    const auto restored = reopened.loadSavedGame();
+    require(restored.has_value() && equal(*restored, game), "Separate save was not restored");
+    require(!std::filesystem::exists(config / "savegame.txt") &&
+            !std::filesystem::exists(data / "settings.txt"), "Data leaked into the wrong directory");
+    require(reopened.removeSavedGame() && std::filesystem::exists(reopened.settingsPath()),
+            "Removing the save affected settings");
+}
+
+#if defined(__linux__)
+class EnvironmentValue {
+public:
+    explicit EnvironmentValue(const char* name) : name_(name) {
+        if (const char* value = std::getenv(name)) previous_ = value;
+    }
+    ~EnvironmentValue() {
+        if (previous_) setenv(name_, previous_->c_str(), 1);
+        else unsetenv(name_);
+    }
+    void set(const char* value) const {
+        require((value ? setenv(name_, value, 1) : unsetenv(name_)) == 0,
+                "Unable to set test environment");
+    }
+private:
+    const char* name_;
+    std::optional<std::string> previous_;
+};
+#endif
+
+void testDefaultDirectories() {
+#if defined(__linux__)
+    TemporaryDirectory temporary;
+    EnvironmentValue home{"HOME"};
+    EnvironmentValue config{"XDG_CONFIG_HOME"};
+    EnvironmentValue data{"XDG_DATA_HOME"};
+    home.set(temporary.path().c_str());
+    for (const char* invalid : {static_cast<const char*>(nullptr), "", "relative/path"}) {
+        config.set(invalid);
+        data.set(invalid);
+        const arrow::Persistence persistence;
+        require(persistence.settingsPath() == temporary.path() / ".config/arrow-puzzle/settings.txt",
+                "Unset/empty/relative config override did not use HOME");
+        require(persistence.saveGamePath() == temporary.path() / ".local/share/arrow-puzzle/savegame.txt",
+                "Unset/empty/relative data override did not use HOME");
+    }
+    const auto configRoot = temporary.path() / "custom config";
+    const auto dataRoot = temporary.path() / "custom data";
+    config.set(configRoot.c_str());
+    data.set(dataRoot.c_str());
+    const arrow::Persistence overridden;
+    require(overridden.settingsPath() == configRoot / "arrow-puzzle/settings.txt" &&
+            overridden.saveGamePath() == dataRoot / "arrow-puzzle/savegame.txt",
+            "Absolute XDG overrides were not respected");
+    require(!std::filesystem::exists(configRoot), "Path discovery wrote settings prematurely");
+    data.set(nullptr);
+    require(arrow::Persistence{}.settingsPath() == overridden.settingsPath() &&
+            arrow::Persistence{}.saveGamePath() == temporary.path() / ".local/share/arrow-puzzle/savegame.txt",
+            "One XDG override affected the other path");
+    config.set(nullptr);
+    for (const char* invalid : {static_cast<const char*>(nullptr), "", "relative/home"}) {
+        home.set(invalid);
+        const arrow::Persistence persistence;
+        require(persistence.settingsPath().is_absolute() && persistence.saveGamePath().is_absolute(),
+                "Missing HOME did not resolve the account home");
+        require(persistence.directory() != arrow::Persistence::executableDirectory(),
+                "Missing HOME fell back to the program directory");
+    }
+#else
+    const arrow::Persistence persistence;
+    const auto directory = arrow::Persistence::executableDirectory();
+    require(persistence.settingsPath() == directory / "settings.txt" &&
+            persistence.saveGamePath() == directory / "savegame.txt",
+            "Portable persistence paths changed");
+#endif
 }
 
 void testDefaultSettingsAreCreated() {
@@ -544,6 +635,8 @@ void testRemoveSavedGameIsIdempotent() {
 
 int main() {
     try {
+        testDefaultDirectories();
+        testSeparateDirectories();
         testDefaultSettingsAreCreated();
         testMissingSettingsUseDefaultsAndPreserveExplicitOff();
         testSettingsRoundTripAndAutomaticSetters();

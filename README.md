@@ -3,7 +3,7 @@
 [Русская версия](README_RU.md)
 
 Arrow Puzzle is a minimalist desktop puzzle game about untangling a board of
-arrows. It is written in C++20 with raylib and currently targets Windows.
+arrows. It is written in C++20 with raylib for Windows and Linux.
 
 Version **0.4.0** makes Very Hard generation faster, less memory-hungry, and more
 varied around the perimeter. It offers 20 x 20, 40 x 40, 80 x 80, and experimental
@@ -386,9 +386,15 @@ solved levels remain stable across generator versions and platforms.
 
 ## Portability
 
-Windows is the only tested target at the moment. The core is standard C++20
-and raylib is cross-platform, so Linux and Android are intended future targets,
-but they are not yet supported or covered by the current build scripts.
+Windows x64 remains the main development platform. Native Linux x86-64 builds
+use X11/XWayland and OpenGL 3.3; see [Linux build and testing](docs/en/LINUX.md).
+The first native checks were performed on Linux Mint 22.3 inside VMware. Native
+Wayland, Android, other architectures and broader desktop coverage remain work
+for later. Linux releases have not yet been published.
+
+On Linux, settings live in `~/.config/arrow-puzzle/settings.txt` and progress in
+`~/.local/share/arrow-puzzle/savegame.txt` (absolute XDG overrides are respected).
+Windows keeps both files beside the EXE; their text formats are unchanged.
 
 ## License
 

@@ -48,6 +48,36 @@ std::vector<Color> capture(arrow::UiText& text, RenderTexture2D target,
     return result;
 }
 
+void checkGlyphsAndLayout(arrow::UiText& text, RenderTexture2D target) {
+    for (const int size : {15, 17, 18, 19, 20, 22, 24, 25, 26, 34}) {
+        const Vector2 extent = text.measure(kText, static_cast<float>(size), 0.0F);
+        require(std::isfinite(extent.x) && std::isfinite(extent.y) &&
+                extent.x > 50 && extent.x < kWidth - 16 && extent.y > 0 && extent.y < kHeight - 16,
+                "Text has invalid or clipped layout metrics");
+        const Vector2 spaced = text.measure(kText, static_cast<float>(size), 1.0F);
+        require(spaced.x > extent.x && spaced.y == extent.y, "Letter spacing did not affect layout");
+        const auto pixels = capture(text, target, WHITE, BLACK, size);
+        int ink = 0;
+        int edges = 0;
+        for (int y = 0; y < kHeight; ++y) {
+            for (int x = 0; x < kWidth; ++x) {
+                const Color pixel = pixels[y * kWidth + x];
+                if (pixel.r < 250 || pixel.g < 250 || pixel.b < 250) {
+                    ++ink;
+                    require(x > 0 && x < kWidth - 1 && y > 0 && y < kHeight - 1,
+                            "Glyphs reached the capture boundary");
+                    edges += pixel.r > 0 && pixel.r < 250;
+                }
+            }
+        }
+        require(ink > 50, "Text is empty");
+#if !defined(_WIN32)
+        require(edges > 10, "Font atlas has no antialiased edges");
+#endif
+    }
+    std::cout << "Nonempty antialiased glyphs and layout checked at ten UI sizes\n";
+}
+
 #if defined(_WIN32)
 // Independently render with Windows TextOut, without a GPU or atlas, to check
 // that native subpixel values survive texture upload and both blending passes.
@@ -160,6 +190,7 @@ int main() {
     {
         arrow::UiText text;
         try {
+            checkGlyphsAndLayout(text, target);
 #if defined(_WIN32)
             require(text.usesWindowsSmoothing(), "Windows text backend is unavailable");
             for (const int size : {15, 17, 18, 19, 20, 22, 24, 25, 26, 34}) {

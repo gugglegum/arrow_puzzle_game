@@ -1,11 +1,37 @@
 {
-  "version": 6,
+  "version": 5,
   "cmakeMinimumRequired": {
     "major": 3,
     "minor": 24,
     "patch": 0
   },
   "configurePresets": [
+    {
+      "name": "linux",
+      "displayName": "Linux / X11 / Ninja (Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ARROWPUZZLE_BUILD_TESTS": "ON",
+        "GLFW_BUILD_X11": "ON",
+        "GLFW_BUILD_WAYLAND": "OFF"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "linux",
+      "displayName": "Linux / X11 / Ninja (Debug)",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
     {
       "name": "windows-msvc",
       "displayName": "Windows / MSVC / Ninja",
@@ -30,6 +56,14 @@
   ],
   "buildPresets": [
     {
+      "name": "linux",
+      "configurePreset": "linux"
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug"
+    },
+    {
       "name": "windows-msvc",
       "configurePreset": "windows-msvc"
     },
@@ -39,6 +73,16 @@
     }
   ],
   "testPresets": [
+    {
+      "name": "linux",
+      "configurePreset": "linux",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "output": { "outputOnFailure": true }
+    },
     {
       "name": "windows-msvc",
       "configurePreset": "windows-msvc",

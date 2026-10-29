@@ -1,5 +1,51 @@
 # Linux portability assessment
 
+## Implemented native baseline (2026-10-30)
+
+The native build and desktop port are implemented on the shared source tree.
+Use [the maintained Linux guide](../docs/en/LINUX.md), `tools/build-linux.sh`
+and the `linux` / `linux-debug` presets. Windows remains the main platform;
+Linux changes are transferred through GitHub, with separate local build trees.
+No release or tag was created. Packaging and development CI are the next change.
+
+- Mint 22.3 / Ubuntu noble, x86-64, GCC 13.3, CMake 3.28.3, Ninja 1.11.1.
+  Native Release and all five default suites passed (full generator sample).
+- X11/Cinnamon in VMware: Mesa 25.2.8 SVGA3D exposes OpenGL 4.3. Explicit
+  rendering and platform-neutral glyph/layout checks passed. Main/Settings
+  and Dark/Light boards were captured and visually inspected.
+- Linux uses separate XDG config/data directories, with absolute overrides,
+  HOME/account fallback and unchanged version-1 formats. Explicit directories
+  remain available for tests. Windows portable paths are unchanged.
+- `tools/smoke-linux.py` runs the real executable outside its build tree in a
+  read-only program directory, checks menus and both themes, and verifies a
+  CRLF save import plus byte-identical save/resume. QA uses isolated XDG paths.
+- All embedded audio/mixer tests passed via PipeWire/PulseAudio; a menu launch
+  with unavailable PulseAudio and ALSA also completed with the expected warning.
+  End-to-end sound latency is not measured; the Wine delay cause remains unknown.
+- raylib's manual borderless resize on Cinnamon became topmost and failed to
+  restore the original window geometry. Linux now uses EWMH fullscreen through
+  bundled GLFW's X11 handle. F11/Escape restored 1100x900 at the previous position
+  from a 2560x1440 desktop, without ABOVE state. Windows keeps its existing path.
+- libstdc++ random sequences exposed real quality gaps: Hard seed 747 had only
+  one opening move; Simple seed 229 had a median length of five. Selection now
+  enforces existing tested Hard opening and Simple shape/length thresholds;
+  no eligible candidate means explicit failure. Tail-pass candidate comparison
+  uses the aggregate fixed-seed sample, retaining all per-board floors.
+
+Local evidence is ignored under `out/linux-qa` and `build/linux` and is not
+required for a fresh checkout. System sudo needs a password in this VM;
+official Ubuntu development packages were downloaded and extracted under
+`build/linux-deps` instead of installed system-wide. The local CMake cache
+records that prefix and Ninja path. Do not commit these machine paths or copy
+the cache to Windows. Normal package installation is in the Linux guide.
+
+Still unverified: native Wayland, XWayland session, other window managers,
+multi-monitor/fractional scaling, older distributions and bare-metal performance.
+The remainder below is the historical source assessment, superseded by this
+implementation record wherever it describes work as unperformed.
+
+## Historical pre-implementation assessment
+
 Assessment date: 2026-10-29. Source baseline: `830bdf7`, plus the existing
 uncommitted pointer-control changes inspected in the working tree. This is a
 source-level feasibility assessment. On 2026-10-29 the user accepted the proposed

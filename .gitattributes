@@ -11,6 +11,9 @@ CMakeLists.txt text eol=lf
 *.md text eol=lf
 *.txt text eol=lf
 *.ps1 text eol=crlf
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
 
 *.ico binary
 *.jpg binary

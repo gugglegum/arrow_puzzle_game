@@ -59,6 +59,7 @@ add_library(arrow_core STATIC
 
 target_include_directories(arrow_core PUBLIC include)
 target_compile_features(arrow_core PUBLIC cxx_std_20)
+target_link_libraries(arrow_core PUBLIC Threads::Threads)
 
 if(MSVC)
     target_compile_options(arrow_core PRIVATE /W4 /permissive- /utf-8)
@@ -171,8 +172,14 @@ if(WIN32)
     target_sources(arrow_puzzle PRIVATE "${icon_resource}")
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(X11 REQUIRED)
+    target_sources(arrow_puzzle PRIVATE src/LinuxWindow.cpp)
+    target_link_libraries(arrow_puzzle PRIVATE glfw X11::X11)
+endif()
+
 add_dependencies(arrow_puzzle arrow_build_version)
-target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib Threads::Threads)
+target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib)
 target_include_directories(arrow_puzzle PRIVATE
     src
     "${CMAKE_CURRENT_BINARY_DIR}/generated"

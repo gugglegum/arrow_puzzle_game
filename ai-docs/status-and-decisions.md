@@ -223,6 +223,11 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 
 ## Open work and limitations
 
+- Native Linux x86-64 now builds and passes all five default suites on Mint
+  22.3/VMware with X11. XDG persistence, glyph/render/audio checks, standalone
+  save/resume and EWMH fullscreen are implemented; see [Linux progress](linux-portability.md).
+  No Linux release exists; broader desktop coverage remains outstanding.
+
 - Rounded rendering is accepted and its earlier commit/push hold is lifted.
   Integrated-GPU performance remains unmeasured: OpenGL 3.3 Core is required;
   modern iGPUs are expected to cope, but RTX 5070 timings are not iGPU timings.
@@ -231,11 +236,11 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
 - Very Hard now uses bounded frontier construction for 0.4.0;
   see [generator work](generator-0.4.md) for the method, measurements and limits.
   This is separate from the earlier rendering work and is not in released 0.3.0.
-- Native Linux/Android builds remain unverified; even dimensions are a generator
+- Android builds remain unverified; even dimensions are a generator
   restriction. Linux development should use the user's Mint 22.3 VMware VM;
   WSL2 is excluded to preserve the VMware setup. The user reports adequate Wine
   operation with approximately 0.5-second audio delay. Keep this observation
-  separate from native support; see the [Linux workflow and handoff](linux-portability.md#current-development-environment-and-handoff).
+  separate from the native checks; see [Linux progress and handoff](linux-portability.md).
 - A local, user-owned, untracked `TODO.txt` mentions softer visual rounding of
   arrowheads/body corners. The accepted renderer implements that live request;
   preserve the file unless asked otherwise.

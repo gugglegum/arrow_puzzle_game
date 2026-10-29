@@ -35,10 +35,18 @@ struct SavedGame {
 // defaults, while a missing or invalid saved game returns std::nullopt.
 class Persistence {
 public:
+    // Windows keeps portable files beside the executable. Linux uses the XDG
+    // config/data directories, independently of the program's working directory.
+    Persistence();
     explicit Persistence(std::filesystem::path directory);
+    Persistence(
+        std::filesystem::path settingsDirectory,
+        std::filesystem::path saveDirectory
+    );
 
     [[nodiscard]] static std::filesystem::path executableDirectory() noexcept;
 
+    // The settings directory; settings and saves can have separate locations.
     [[nodiscard]] const std::filesystem::path& directory() const noexcept;
     [[nodiscard]] std::filesystem::path settingsPath() const;
     [[nodiscard]] std::filesystem::path saveGamePath() const;
@@ -73,6 +81,7 @@ public:
 
 private:
     std::filesystem::path directory_;
+    std::filesystem::path saveDirectory_;
 };
 
 } // namespace arrow

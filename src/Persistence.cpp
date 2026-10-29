@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -17,6 +19,10 @@
 #if defined(_WIN32)
 #define NOMINMAX
 #include <windows.h>
+#elif defined(__linux__)
+#include <cerrno>
+#include <pwd.h>
+#include <unistd.h>
 #endif
 
 namespace arrow {
@@ -28,6 +34,41 @@ constexpr int kSettingsVersion = 1;
 constexpr int kSaveGameVersion = 1;
 constexpr std::uint64_t kMaximumBoardCells = 100'000'000;
 constexpr std::size_t kMaximumLineLength = 64U * 1024U * 1024U;
+
+std::filesystem::path defaultDirectory(
+    [[maybe_unused]] const char* variable,
+    [[maybe_unused]] const char* fallback
+) {
+#if defined(__linux__)
+    if (const char* value = std::getenv(variable); value != nullptr) {
+        const std::filesystem::path path{value};
+        if (path.is_absolute()) return path / "arrow-puzzle";
+    }
+    std::filesystem::path home;
+    if (const char* value = std::getenv("HOME"); value != nullptr) home = value;
+    if (!home.is_absolute()) {
+        // Desktop launchers normally supply HOME. Resolve the account home if
+        // it is missing/invalid instead of writing beside a read-only program.
+        std::vector<char> buffer(16384);
+        passwd account{};
+        passwd* result = nullptr;
+        int error = 0;
+        do {
+            error = getpwuid_r(getuid(), &account, buffer.data(), buffer.size(), &result);
+            if (error == ERANGE) buffer.resize(buffer.size() * 2);
+        } while (error == ERANGE && buffer.size() <= 1024 * 1024);
+        if (error == 0 && result != nullptr && result->pw_dir != nullptr) {
+            home = result->pw_dir;
+        }
+    }
+    if (!home.is_absolute()) {
+        throw std::runtime_error("Cannot determine the user home directory for saved data");
+    }
+    return home / fallback / "arrow-puzzle";
+#else
+    return Persistence::executableDirectory();
+#endif
+}
 
 std::string_view trim(std::string_view value) noexcept {
     while (!value.empty() &&
@@ -327,10 +368,24 @@ bool isValidSavedGame(const SavedGame& game) noexcept {
     }
 }
 
+Persistence::Persistence()
+    : Persistence(
+          defaultDirectory("XDG_CONFIG_HOME", ".config"),
+          defaultDirectory("XDG_DATA_HOME", ".local/share")
+      ) {}
+
 Persistence::Persistence(std::filesystem::path directory)
-    : directory_(std::move(directory)) {
+    : Persistence(directory, directory) {}
+
+Persistence::Persistence(
+    std::filesystem::path settingsDirectory,
+    std::filesystem::path saveDirectory
+) : directory_(std::move(settingsDirectory)), saveDirectory_(std::move(saveDirectory)) {
     if (directory_.empty()) {
         directory_ = ".";
+    }
+    if (saveDirectory_.empty()) {
+        saveDirectory_ = ".";
     }
 }
 
@@ -379,7 +434,7 @@ std::filesystem::path Persistence::settingsPath() const {
 }
 
 std::filesystem::path Persistence::saveGamePath() const {
-    return directory_ / "savegame.txt";
+    return saveDirectory_ / "savegame.txt";
 }
 
 Settings Persistence::loadSettings() const noexcept {

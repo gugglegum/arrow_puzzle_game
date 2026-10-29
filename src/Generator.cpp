@@ -1731,8 +1731,38 @@ int minimumCountForShare(int arrowCount, int percentage) {
 
 bool meetsDefaultQualityFloor(
     const TangleMetrics& metrics,
-    int arrowCount
+    const std::vector<Arrow>& arrows
 ) {
+    const int arrowCount = static_cast<int>(arrows.size());
+    std::vector<int> lengths;
+    lengths.reserve(arrows.size());
+    int bentMedium = 0;
+    int bentLong = 0;
+    int longWithTwoTurns = 0;
+    double squaredLengths = 0;
+    int totalLength = 0;
+    for (const auto& value : arrows) {
+        const int length = static_cast<int>(value.cells.size());
+        lengths.push_back(length);
+        totalLength += length;
+        squaredLengths += static_cast<double>(length) * length;
+        int turns = 0;
+        for (std::size_t cell = 2; cell < value.cells.size(); ++cell) {
+            turns += value.cells[cell - 1] - value.cells[cell - 2] !=
+                     value.cells[cell] - value.cells[cell - 1] ? 1 : 0;
+        }
+        bentMedium += length > 5 && length <= 12 && turns > 0 ? 1 : 0;
+        bentLong += length > 12 && turns > 0 ? 1 : 0;
+        longWithTwoTurns += length > 12 && turns >= 2 ? 1 : 0;
+    }
+    if (lengths.empty()) return false;
+    std::ranges::sort(lengths);
+    const int firstQuartile = lengths[lengths.size() / 4];
+    const int median = lengths[lengths.size() / 2];
+    const int thirdQuartile = lengths[lengths.size() * 3 / 4];
+    const double mean = static_cast<double>(totalLength) / arrowCount;
+    const double coefficientOfVariation =
+        std::sqrt(std::max(0.0, squaredLengths / arrowCount - mean * mean)) / mean;
     const int minimumShort = minimumCountForShare(arrowCount, 32);
     const int minimumMedium = minimumCountForShare(arrowCount, 34);
     const int minimumLong = minimumCountForShare(arrowCount, 10);
@@ -1748,6 +1778,13 @@ bool meetsDefaultQualityFloor(
         metrics.longArrows >= minimumLong &&
         metrics.longArrows <= maximumLong &&
         metrics.veryLongArrows >= 2 &&
+        bentMedium * 5 >= metrics.mediumArrows * 3 &&
+        bentLong * 5 >= metrics.longArrows * 4 &&
+        longWithTwoTurns * 5 >= metrics.longArrows * 3 &&
+        firstQuartile <= 5 && median >= 6 && median <= 9 &&
+        thirdQuartile >= 8 && thirdQuartile <= 12 &&
+        thirdQuartile - firstQuartile >= 3 &&
+        coefficientOfVariation >= 0.40 && lengths.front() <= 3 &&
         metrics.turns >= 55 &&
         metrics.turns <= 160 &&
         metrics.interArrowEdges >= 300 &&
@@ -1855,6 +1892,9 @@ Board generateBoard(const GeneratorOptions& options) {
         options.rows == 20 &&
         minimumLength == 2 &&
         maximumLength == 30;
+    const bool enforceHardQuality =
+        options.columns == 80 && options.rows == 80 &&
+        minimumLength == 2 && maximumLength == 120;
     // The frontier quality profile assumes a substantial interior. Preserve
     // the generic path cutter for narrow custom boards and length constraints.
     const bool useFrontiers = options.columns >= 128 && options.rows >= 128 &&
@@ -2061,11 +2101,13 @@ Board generateBoard(const GeneratorOptions& options) {
                         initialChoiceTarget
                     );
                     const bool meetsRequiredQuality =
-                        !enforceDefaultQuality ||
-                        meetsDefaultQualityFloor(
+                        (!enforceDefaultQuality || meetsDefaultQualityFloor(
                             metrics,
-                            static_cast<int>(arrows.size())
-                        );
+                            arrows
+                        )) &&
+                        (!enforceHardQuality ||
+                         (metrics.initiallyRemovable >= minimumInitialChoices &&
+                          metrics.initiallyRemovable <= maximumInitialChoices));
                     return BoardCandidate{
                         std::move(arrows),
                         metrics,
@@ -2130,7 +2172,7 @@ Board generateBoard(const GeneratorOptions& options) {
         }
     }
 
-    if (best.arrows.empty()) {
+    if (best.arrows.empty() || !best.meetsRequiredQuality) {
         throw std::runtime_error(
             "Unable to generate a valid " +
             std::to_string(options.columns) + "x" +

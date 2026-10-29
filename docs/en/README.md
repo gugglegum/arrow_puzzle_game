@@ -11,6 +11,7 @@ They are shared technical documentation for developers and AI assistants.
   metrics, and performance.
 - [Runtime](RUNTIME.md): simulation, motion, collisions, rendering, menus,
   settings, and saved games.
+- [Linux](LINUX.md): native build, XDG paths and desktop validation.
 - [Releases](RELEASING.md): GitHub Actions builds, local previews, packaging,
   and EXE/ZIP provenance verification.
 - [Shared screenshots](../screenshots/): images used by both main README files.

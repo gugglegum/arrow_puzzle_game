@@ -9,11 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Native Linux x86-64 build presets/helper, XDG settings and save directories,
+  and window-manager-controlled X11/XWayland fullscreen. Windows retains portable
+  files beside the EXE and its existing borderless fullscreen implementation.
+
 - Touchpad-friendly board controls: left-button dragging, Ctrl + + / - (also
   Ctrl + = and keypad keys) for centred zoom, and Ctrl + 0 to fit the full board.
   Dragging more than 6 screen pixels cancels an arrow launch for the whole
   gesture, even after returning to the starting point. Updated in-game hints
   and both documentation editions.
+
+### Fixed
+
+- Enforce the existing Simple length/bend quality checks and Hard opening-move
+  limits during candidate selection, including with libstdc++ random sequences.
+  Reject candidates below the quality floor instead of returning a weak board.
 
 ### Changed
 

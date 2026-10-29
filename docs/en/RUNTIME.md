@@ -288,10 +288,11 @@ cannot simply be abandoned while its worker still uses captured data.
 
 ## 11. Settings and saved games
 
-Persistence stores these files beside the EXE, not in the working directory:
-
-- `settings.txt`;
-- `savegame.txt`.
+Windows stores `settings.txt` and `savegame.txt` beside the EXE. Linux uses
+`$XDG_CONFIG_HOME/arrow-puzzle/settings.txt` and
+`$XDG_DATA_HOME/arrow-puzzle/savegame.txt`, defaulting to `~/.config` and
+`~/.local/share` respectively. Relative/empty overrides are ignored. See
+[Linux development](LINUX.md) for paths, transfer and isolated QA.
 
 Both are text formats with `format=` and `version=1`. Writes use a temporary
 `.tmp` followed by replacement of the destination. Public persistence operations
