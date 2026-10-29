@@ -4,16 +4,32 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
-## Application icon design direction (2026-10-29)
+## Application icon design direction (2026-10-30)
 
-Design exploration only; no icon has been accepted for integration. The user
-prefers bent pale arrows from gameplay over generic colorful arrow logos.
+The user selected the symmetric 4-by-4 layout with two one-bend arrows, then
+requested larger dots and rounded arrowheads. The selected vector master is
+`assets/icons/arrow-puzzle.svg`, with a 1024-pixel transparent PNG alongside.
+Icon artwork is prepared; executable resources/window icon integration is
+still pending. The user prefers bent pale arrows from gameplay over generic
+colorful arrow logos.
 The icon should resemble the actual dark game board and preserve its rules:
 fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
 separate nonintersecting paths with one head each, and gray dots at every
 unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
 
-Latest request: make the 4-by-4 pair symmetric with one bend each, and render
+Latest refinement: dot diameter equals arrow stroke width at every export
+size, matching `kGridDotRadius = kArrowThickness / 2`. The master stroke is
+52/1024, hence dot radius 26. All three corners of each triangular head use
+true inset circular fillets of radius strokeWidth/4 (13 in the master),
+matching the game's 1.6-to-6.4 radius/stroke relationship. SVG head paths use
+circular arcs without the previous sharp polygon's extra outline. Exported
+16/24 px strokes are strengthened to 64/58, with dots and fillets following
+the same ratios; 32 px and larger use 52. All eight export sizes were checked
+for six correctly sized dots and three rounded corners per head; the actual
+16/32 px rasters were also inspected enlarged. The layout and palette remain
+the selected version. No application code/build change accompanied this art.
+
+Prior request: make the 4-by-4 pair symmetric with one bend each, and render
 the user's 3-by-3 ASCII sketch. The new 4-by-4 pair is A
 `(0,0),(2,0),(2,2)` left and B `(3,3),(1,3),(1,1)` right, exact 180-degree
 counterparts. Two removed three-cell vertical arrows explain its six dots.
