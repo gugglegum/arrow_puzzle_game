@@ -19,7 +19,7 @@ Initial game boards are completely occupied. Icon dots must represent nodes
 vacated by actual arrows that can legally leave that fully occupied board.
 The user explicitly requested a 5-by-5 revision with larger arrow silhouettes.
 
-The current 5-by-5 vector proposal uses these head-first vertices (expand
+The first, now superseded 5-by-5 proposal used these head-first vertices (expand
 each straight segment into unit cells):
 
 - A: `(0,0), (3,0), (3,3), (4,3)`, direction left, 8 cells.
@@ -36,6 +36,20 @@ thicker than the rejected draft; 16-24 px versions strengthen them further.
 Surface and arrow colors use the dark `BoardPalette.hpp` palette; dots are
 slightly brighter for small-icon visibility. The preview includes a filled
 initial-board diagram showing which arrow vacated the three nodes.
+The user accepted that draft's solvability but rejected its visual density,
+heavy strokes, and M-like silhouette. The next request is five different
+5-by-5 arrangements with more empty space and slimmer lines closer to gameplay.
+The resulting comparison contains: (1) two opposite L arrows, (2) three short
+L arrows pointing left/right/up, (3) two arrows forming an open frame,
+(4) three L arrows around an open center, (5) a short return and a long L.
+Options 1/2/5 occupy 11 nodes, options 3/4 occupy 14; all other nodes have dots.
+Each was independently checked and validated by a deterministic renderer's
+movement simulation against an explicit fully filled initial board, with a
+legal removal prefix and complete solve order. This is geometry validation,
+not a game runtime test. Their master stroke width is 44/1024 versus the dense
+draft's 96/1024; smaller versions use modest optical corrections. No option
+has yet been selected or integrated into the application.
+
 `cacheIdleBoardGeometry` defines free-node dot placement. Arrow head cell
 centers align to the grid; triangle tips extend beyond those centers.
 
