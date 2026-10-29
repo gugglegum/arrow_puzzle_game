@@ -26,6 +26,16 @@ The Board theme selector also previews Light with the light board surface and
 dark label/chevrons; Dark retains its gold accents. Both standalone Settings
 captures were inspected; no additional texture or animation cache was added.
 
+The user authorized local build cleanup on 2026-10-29. The primary
+`build/windows-msvc/arrow_puzzle.exe` was rebuilt with these menu changes;
+all five default CTest suites and a direct startup/Settings capture passed.
+Fifty-four temporary directories, including the duplicate preset Debug tree,
+were removed after preserving settings/saves and local QA sources/results in
+ignored `ai-docs/local/cleanup-2026-10-29`. Keep the primary Release tree,
+`cmake-build-debug`, `out/audio-previews`, and the official local 0.3.0/0.4.0
+release folders. Historical QA paths on these pages no longer imply existing
+files. The local backup is machine-specific and is not part of Git or a release.
+
 The user accepted rounded arrowheads and curved 90-degree bends after reviewing
 their appearance and local performance/memory measurements, then authorized
 commit/push. This is post-0.4.0 development; see

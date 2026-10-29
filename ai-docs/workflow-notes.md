@@ -21,6 +21,10 @@ hooks. Use those references instead of maintaining duplicate procedures here.
   board generation. Captures must be viewed. Clear environment hooks afterward
   when reusing a shell; SCREENSHOT intentionally forces redraws, so leave it
   empty when measuring idle behavior.
+- Pinned raylib's `TakeScreenshot` discards the directory part of its filename
+  and writes under its storage base (the initial working directory on GLFW).
+  An absolute screenshot environment value does not relocate the image. Check
+  the actual log/path, then move a newly generated capture to its QA destination.
 - Deterministic controller harnesses used real rendering and substituted input
   queries around production Game.cpp. Existing harnesses/logs under `build/`
   are disposable, may be stale, and are not maintained CMake tests.

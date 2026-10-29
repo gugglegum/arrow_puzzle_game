@@ -72,8 +72,10 @@ Expanded fresh-process run, seeds 0..99 in each mode (200 boards, all verified):
 
 At least 519/636 perimeter cells connected to the interior with loops, and at
 least 524/636 without. No loopless board crossed its own body on an exit ray.
-Raw local CSV/logs are disposable `build/generator-v04/` artifacts; the durable
-facts and procedure above must remain usable without them.
+Raw local CSV/logs originally lived in `build/generator-v04/`. They and the local
+scenarios were archived in ignored `ai-docs/local/cleanup-2026-10-29` before that
+temporary directory was removed with user authorization. The durable facts and
+procedure above must remain usable without those machine-specific artifacts.
 
 Whole-game screenshot runs used isolated EXEs/settings/saves, seed 747 and the
 same 1100x900 window. The local 0.3.0 EXE peaked at 928.1 MiB and took 32.53 s

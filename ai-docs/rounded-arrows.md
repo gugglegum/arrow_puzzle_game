@@ -52,11 +52,12 @@ redraws. Measure process CPU, working set and private memory after warmup.
 Driver allocations and Windows process working sets vary substantially between
 fresh graphics contexts; report repeat ranges and absolute differences.
 
-All fixtures, executables, logs and screenshots live in ignored
-`build/rounded-arrows-qa/`. Their scripts are local evidence, not maintained
-tests or dependencies of this roadmap. Preview saves/settings are isolated
-from the user's normal EXE. Rebuild current source before refreshing captures;
-copies of the EXE do not update themselves.
+Fixtures, executables, logs and screenshots originally lived in ignored
+`build/rounded-arrows-qa/`. That directory was removed during the authorized
+2026-10-29 cleanup; sources, scripts, logs, captures and saves were archived in
+ignored `ai-docs/local/cleanup-2026-10-29`. These are local evidence, not
+maintained tests or dependencies of this roadmap. Rebuild current source before
+refreshing captures; copies of the EXE do not update themselves.
 
 ## Evaluation results
 
@@ -109,11 +110,13 @@ and colours look consistent in those captures; the user accepted the visual
 result and measured resource tradeoff. No gameplay/simulation behavior was
 intentionally changed.
 
-The isolated trial EXE is `build/rounded-arrows-qa/preview/ArrowPuzzle.exe`, with
+The isolated trial EXE was `build/rounded-arrows-qa/preview/ArrowPuzzle.exe`, with
 sound disabled and a sample 20 x 20 save accessible through Resume. Its SHA-256
-matches the Release EXE used for the evaluation. Source publication does not
-replace the existing 0.4.0 release artifacts. Inspect Git history for the feature
-commit; the performance comparison above remains against baseline `1d1cc36`.
+matched the Release EXE used for the evaluation. That trial copy was removed
+in the authorized local cleanup; use the rebuilt primary Release EXE for current
+gameplay. Source publication does not replace the existing 0.4.0 release
+artifacts. Inspect Git history for the feature commit; the performance
+comparison above remains against baseline `1d1cc36`.
 
 ## Integrated graphics
 
