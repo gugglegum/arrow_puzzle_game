@@ -11,6 +11,7 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -1525,8 +1526,7 @@ int main(int argc, char** argv) {
         std::size_t minimumLargeInitial =
             std::numeric_limits<std::size_t>::max();
         std::size_t maximumLargeInitial = 0;
-        Quality seed64HighQuality;
-        Quality seed64FastQuality;
+        std::size_t pairedSamples = 0;
         std::size_t fastTailPasses = 0;
         std::size_t fastComplexTailPasses = 0;
         std::size_t selectedTailPasses = 0;
@@ -1545,11 +1545,23 @@ int main(int argc, char** argv) {
             );
             auto fastOptions = largeBoardOptions;
             fastOptions.candidateAttempts = 1;
-            const Quality fastQuality = verifyBoard(arrow::generateBoard(fastOptions), fastOptions);
-            fastTailPasses += fastQuality.tightSelfPassArrows;
-            fastComplexTailPasses += fastQuality.longComplexTightSelfPassArrows;
-            selectedTailPasses += quality.tightSelfPassArrows;
-            selectedComplexTailPasses += quality.longComplexTightSelfPassArrows;
+            std::optional<arrow::Board> fastBoard;
+            try {
+                fastBoard = arrow::generateBoard(fastOptions);
+            } catch (const std::runtime_error& error) {
+                // One bounded attempt can legitimately fail (including on
+                // MSVC seed 4,000,000,000). Never hide verification failures.
+                require(std::string(error.what()).starts_with("Unable to generate a valid 40x40 labyrinth board"),
+                        "Unexpected single-candidate generation failure");
+            }
+            if (fastBoard) {
+                const Quality fastQuality = verifyBoard(*fastBoard, fastOptions);
+                ++pairedSamples;
+                fastTailPasses += fastQuality.tightSelfPassArrows;
+                fastComplexTailPasses += fastQuality.longComplexTightSelfPassArrows;
+                selectedTailPasses += quality.tightSelfPassArrows;
+                selectedComplexTailPasses += quality.longComplexTightSelfPassArrows;
+            }
             require(
                 quality.arrowCount >= 160 &&
                     quality.arrowCount <= 220,
@@ -1589,10 +1601,6 @@ int main(int argc, char** argv) {
                 maximumLargeInitial,
                 quality.initiallyRemovable
             );
-            if (largeSeed == 64U) {
-                seed64HighQuality = quality;
-                seed64FastQuality = fastQuality;
-            }
         }
         require(
             minimumLargeInitial >= 2 &&
@@ -1621,7 +1629,8 @@ int main(int argc, char** argv) {
         // also differ between MSVC and libstdc++. Check the complete fixed
         // seed sample, retaining all per-board quality floors above.
         require(
-            selectedComplexTailPasses >= fastComplexTailPasses &&
+            pairedSamples >= largeBoardSeeds.size() / 2 &&
+                selectedComplexTailPasses >= fastComplexTailPasses &&
                 selectedTailPasses + selectedComplexTailPasses * 2 >=
                     fastTailPasses + fastComplexTailPasses * 2,
             "eight-candidate selection reduced aggregate fixed-seed tail-pass "
@@ -1926,19 +1935,15 @@ int main(int argc, char** argv) {
             << ", 40x40 tight/long-complex tail passes >= "
             << minimumLargeTightSelfPasses
             << "/" << minimumLargeComplexTightSelfPasses
-            << " (seed 64: one candidate "
-            << seed64FastQuality.tightSelfPassArrows
-            << "/"
-            << seed64FastQuality.longComplexTightSelfPassArrows
+            << " (" << pairedSamples << " paired seeds: one candidate "
+            << fastTailPasses << "/" << fastComplexTailPasses
             << ", eight candidates "
-            << seed64HighQuality.tightSelfPassArrows
-            << "/"
-            << seed64HighQuality.longComplexTightSelfPassArrows
+            << selectedTailPasses << "/" << selectedComplexTailPasses
             << ")"
             << ".\n"
             << "All generator tests passed ("
             << defaultSeedCount + alternateSeedCount * 3 +
-                   static_cast<int>(largeBoardSeeds.size()) * 2 + 26
+                   static_cast<int>(largeBoardSeeds.size() + pairedSamples) + 26
             << " boards).\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

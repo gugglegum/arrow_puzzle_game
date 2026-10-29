@@ -89,7 +89,7 @@ def main():
         shutil.copy2(ROOT / "assets/fonts/Inter-LICENSE.txt", font_licenses)
         version_header = (build / "generated/BuildVersion.hpp").read_text()
         version_label = re.search(r'kVersionLabel\[\] = "([^"]+)"', version_header).group(1)
-        compiler = re.search(r"^CMAKE_CXX_COMPILER:FILEPATH=(.+)$", cache, re.MULTILINE).group(1)
+        compiler = re.search(r"^CMAKE_CXX_COMPILER:[^=]+=(.+)$", cache, re.MULTILINE).group(1)
         run_url = None
         if os.environ.get("GITHUB_ACTIONS") == "true":
             run_url = "{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/actions/runs/{GITHUB_RUN_ID}".format(**os.environ)

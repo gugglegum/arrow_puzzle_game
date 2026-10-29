@@ -7,8 +7,10 @@ Use [the maintained Linux guide](../docs/en/LINUX.md), `tools/build-linux.sh`
 and the `linux` / `linux-debug` presets. Windows remains the main platform;
 Linux changes are transferred through GitHub, with separate local build trees.
 No release or tag was created. Development tar packaging and pre-release CI
-are implemented; the first hosted run is pending at this snapshot. AppImage
-follows tar validation.
+are implemented. The first hosted run compiled Windows and both Linux jobs;
+Clang passed headless/render/text checks. It exposed a single-attempt test
+assumption on MSVC and STRING-vs-FILEPATH compiler metadata parsing; both are
+corrected for the next run. AppImage follows tar validation.
 
 - `package-linux.py` installs/strips a copy with no build RPATH, bundles docs
   and licenses, and records ELF symbol requirements/hashes/source metadata. The

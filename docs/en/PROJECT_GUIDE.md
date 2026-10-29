@@ -230,7 +230,7 @@ Full CTest runs five test suites:
 ctest --test-dir build\windows-msvc --output-on-failure
 ```
 
-The default generator test checks 1,342 boards and special motion regressions.
+The default generator test checks more than 1,300 boards and special motion regressions.
 It is deliberately substantial and may take tens of seconds.
 
 For a quick reproducible range:
