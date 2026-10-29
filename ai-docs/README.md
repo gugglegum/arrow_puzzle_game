@@ -26,6 +26,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Flight, collisions, rollback, saves | [Runtime guide](../docs/en/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
 | Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/en/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
 | Accepted rounded arrows, resource comparisons | [Rounding evaluation](rounded-arrows.md) | `ArrowStroke.hpp`, `BoardCoverageShader.hpp`, `RenderingTests.cpp` |
+| Linux feasibility, packaging, X11/Wayland caveats | [Linux assessment](linux-portability.md) | `CMakeLists.txt`, `Persistence.cpp`, `UiText.cpp`, release workflow |
 | Menus, themes, sound, end screens | [Runtime guide](../docs/en/RUNTIME.md) | `MenuSelection.hpp`, `EndScreen.cpp`, `GameAudio.cpp` |
 | Release procedure and verification | [Release guide](../docs/en/RELEASING.md) | `cmake/`, `tools/`, `.github/workflows/` |
 | Previously verified release evidence | [Release history](release-history.md) | Tagged source and Actions run |
