@@ -2,8 +2,10 @@
 
 Assessment date: 2026-10-29. Source baseline: `830bdf7`, plus the existing
 uncommitted pointer-control changes inspected in the working tree. This is a
-feasibility assessment and proposed implementation order, not an accepted Linux
-support commitment. No game code or build configuration was changed for it.
+source-level feasibility assessment. On 2026-10-29 the user accepted the proposed
+initial sequence: native Linux x86-64, X11/XWayland, a tar archive, then AppImage.
+This agreement does not establish a working Linux build or verified support.
+No game code or build configuration was changed for this assessment.
 
 ## Conclusion
 
