@@ -231,8 +231,10 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
   The user also reports native Linux on a laptop with no perceptible sound lag
   using a mouse; an apparent touchpad delay and the guest's Wine/native delay
   remain observations, not a diagnosed game/audio defect. No Linux release
-  exists; tagged release packaging is still Windows-only, and broader desktop
-  coverage remains outstanding.
+  exists. The common Windows/Linux release workflow is implemented with
+  package/executable provenance, signed checksums and a draft-only gate; no
+  release publication or new version tag is authorized. Broader desktop coverage
+  remains outstanding.
 
 - Rounded rendering is accepted and its earlier commit/push hold is lifted.
   Integrated-GPU performance remains unmeasured: OpenGL 3.3 Core is required;

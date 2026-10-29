@@ -128,7 +128,7 @@ python3 tools/smoke-linux.py /absolute/path/to/ArrowPuzzle
 manual runs on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. Linux
 includes Mesa/Xvfb rendering, glyphs and extracted-package smoke checks. Download
 packages, logs and captures from the run's artifacts (14-day retention). It
-never creates a tag or release; the Windows release workflow remains separate.
+never creates a tag or release; the attested Windows/Linux **Release** workflow remains separate; see [RELEASING.md](RELEASING.md).
 
 Ubuntu 22.04/GCC is the intended oldest CI build baseline, not a promise about
 all older systems. Check the artifact's `required_symbol_versions`: a build made

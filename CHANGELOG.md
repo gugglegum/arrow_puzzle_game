@@ -9,6 +9,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Common Windows/Linux release preparation with tar.gz/AppImage, per-platform
+  build-provenance bundles, an attested combined SHA-256 manifest, and guarded
+  draft creation after both platforms pass. Manual branch runs verify the full
+  delivery pipeline without creating or publishing a release.
+
 - Linux AppImage packaging after tar validation, with pinned tooling/runtime,
   project icon, license notices, hashes and FUSE-free startup checks in CI.
 

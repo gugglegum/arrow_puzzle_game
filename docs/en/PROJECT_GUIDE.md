@@ -114,7 +114,7 @@ tools/package-windows.ps1  Windows ZIP, licenses and SHA-256
 tools/build-linux.sh       Linux configure, build and tests
 tools/package-linux.py     Linux tar.gz, metadata and SHA-256
 tools/smoke-linux.py       Isolated packaged-game launch/save checks
-.github/workflows/         Development checks and separate Windows release
+.github/workflows/         Development checks and common Windows/Linux release
 docs/                      Technical documentation and shared screenshots
 ```
 

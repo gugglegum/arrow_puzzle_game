@@ -1,4 +1,4 @@
-name: Windows release
+name: Release
 
 on:
   push:
@@ -15,57 +15,58 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-release-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build, test and attest Windows x64
-    runs-on: windows-2022
-    timeout-minutes: 40
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
+  prepare:
+    name: Validate source, version and draft gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
     outputs:
       tag: ${{ steps.ref.outputs.tag }}
       commit: ${{ steps.ref.outputs.commit }}
+      version: ${{ steps.ref.outputs.version }}
       create_release: ${{ steps.ref.outputs.create_release }}
-    defaults:
-      run:
-        shell: pwsh
     steps:
       - name: Check out the exact source and release history
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
-
+      - name: Check release assembly and version guards
+        run: python3 -B tests/ReleaseAssetsTests.py
       - name: Identify and validate the build
         id: ref
         env:
           MANUAL_RELEASE: ${{ inputs.create_release }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $commit = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $commit -ne $env:GITHUB_SHA) { throw 'Unexpected source commit.' }
-          $tag = ''
-          if ($env:GITHUB_REF -match '^refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)$') { $tag = $Matches[1] }
-          $release = $env:GITHUB_EVENT_NAME -eq 'push' -or $env:MANUAL_RELEASE -eq 'true'
-          if ($release -and -not $tag) { throw 'A draft release requires an existing vX.Y.Z tag.' }
-          $version = if ($tag) { $tag.Substring(1) } else { 'dev-' + $commit.Substring(0, 7) }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          "commit=$commit" >> $env:GITHUB_OUTPUT
-          "create_release=$($release.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+        run: python3 tools/release-assets.py prepare
 
+  windows:
+    name: Build, test and attest Windows x64
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Check out the exact source and release history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Build Release and run the complete headless test suite
         run: ./tools/build-windows.ps1 -Configuration Release
-
       - name: Package the executable and notices
         id: package
         run: ./tools/package-windows.ps1 -Version $env:PACKAGE_VERSION
-
       - name: Attest the executable and its release archive
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
@@ -73,57 +74,232 @@ jobs:
           subject-path: |
             ${{ steps.package.outputs.exe_path }}
             ${{ steps.package.outputs.archive_path }}
-
-      - name: Verify provenance and keep the verification bundle
+      - name: Verify provenance and stage Windows assets
         env:
           GH_TOKEN: ${{ github.token }}
           EXE_PATH: ${{ steps.package.outputs.exe_path }}
           ARCHIVE_PATH: ${{ steps.package.outputs.archive_path }}
           BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
         run: |
+          $ErrorActionPreference = 'Stop'
           foreach ($file in @($env:EXE_PATH, $env:ARCHIVE_PATH)) {
-            gh attestation verify $file --repo $env:GITHUB_REPOSITORY --source-digest $env:GITHUB_SHA --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
-            if ($LASTEXITCODE -ne 0) { throw 'Build provenance verification failed.' }
+            gh attestation verify $file --bundle $env:BUNDLE_PATH --repo $env:GITHUB_REPOSITORY --source-digest $env:GITHUB_SHA --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
+            if ($LASTEXITCODE -ne 0) { throw 'Windows provenance verification failed.' }
           }
-          Copy-Item -LiteralPath $env:BUNDLE_PATH -Destination out/release/attestation.sigstore.json
-          "Built from **$env:GITHUB_SHA** on GitHub-hosted Windows." >> $env:GITHUB_STEP_SUMMARY
-          'The archive, SHA256SUMS.txt and Sigstore bundle are attached below.' >> $env:GITHUB_STEP_SUMMARY
-
-      - name: Upload the verified release files
+          New-Item -ItemType Directory -Path out/release-windows | Out-Null
+          Copy-Item -LiteralPath $env:ARCHIVE_PATH -Destination out/release-windows/
+          Copy-Item out/release/build-info.json out/release-windows/build-info-windows-x64.json
+          Copy-Item out/release/SHA256SUMS.txt out/release-windows/SHA256SUMS-windows-x64.txt
+          Copy-Item -LiteralPath $env:BUNDLE_PATH -Destination out/release-windows/attestation-windows-x64.sigstore.json
+      - name: Upload verified Windows inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-release-${{ github.sha }}
+          path: out/release-windows/
           if-no-files-found: error
           retention-days: 30
+
+  linux:
+    name: Build, test and attest Linux x64
+    needs: prepare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - name: Check out the exact source and release history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the Linux build and display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build git curl python3-venv \
+            libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev \
+            libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth
+          python3 -m venv "$RUNNER_TEMP/arrow-cmake"
+          "$RUNNER_TEMP/arrow-cmake/bin/pip" install cmake==3.28.3
+          echo "$RUNNER_TEMP/arrow-cmake/bin" >> "$GITHUB_PATH"
+      - name: Build Release and run the complete headless test suite
+        run: ./tools/build-linux.sh
+      - name: Check rendering and text with Mesa
+        run: |
+          cmake --build build/linux --parallel 2 --target arrow_render_tests arrow_ui_text_tests
+          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_render_tests
+          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests
+      - name: Package the Linux archive
+        id: package
+        run: python3 tools/package-linux.py --version "$PACKAGE_VERSION"
+      - name: Verify and launch the extracted archive
+        env:
+          ARCHIVE: ${{ steps.package.outputs.archive_path }}
+        run: |
+          cd out/linux-package
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          mkdir -p "$RUNNER_TEMP/linux-unpacked"
+          tar -xzf "$ARCHIVE" -C "$RUNNER_TEMP/linux-unpacked" --strip-components=1
+          cp SHA256SUMS.txt "$RUNNER_TEMP/linux-unpacked/"
+          cd "$RUNNER_TEMP/linux-unpacked"
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          cd "$GITHUB_WORKSPACE"
+          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
+            "$RUNNER_TEMP/linux-unpacked/ArrowPuzzle" --output-dir out/linux-smoke
+      - name: Build the AppImage after archive validation
+        id: appimage
+        env:
+          ARCHIVE: ${{ steps.package.outputs.archive_path }}
+        run: python3 tools/package-appimage.py "$ARCHIVE"
+      - name: Verify and launch the AppImage without FUSE
+        env:
+          APPIMAGE_PATH: ${{ steps.appimage.outputs.appimage_path }}
+        run: |
+          cd out/linux-package
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          cd "$GITHUB_WORKSPACE"
+          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
+            "$APPIMAGE_PATH" --appimage --output-dir out/appimage-smoke
+      - name: Attest the Linux executable, archive and AppImage
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            ${{ runner.temp }}/linux-unpacked/ArrowPuzzle
+            ${{ steps.package.outputs.archive_path }}
+            ${{ steps.appimage.outputs.appimage_path }}
+      - name: Verify provenance and stage Linux assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_PATH: ${{ steps.package.outputs.archive_path }}
+          APPIMAGE_PATH: ${{ steps.appimage.outputs.appimage_path }}
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          for file in "$RUNNER_TEMP/linux-unpacked/ArrowPuzzle" "$ARCHIVE_PATH" "$APPIMAGE_PATH"; do
+            gh attestation verify "$file" --bundle "$BUNDLE_PATH" --repo "$GITHUB_REPOSITORY" \
+              --source-digest "$GITHUB_SHA" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
+          done
+          mkdir -p out/release-linux
+          cp "$ARCHIVE_PATH" "$APPIMAGE_PATH" out/release-linux/
+          cp out/linux-package/build-info.json out/release-linux/build-info-linux-x64.json
+          cp "$APPIMAGE_PATH.build-info.json" out/release-linux/build-info-linux-appimage-x64.json
+          cp out/linux-package/SHA256SUMS.txt out/release-linux/SHA256SUMS-linux-x64.txt
+          cp "$BUNDLE_PATH" out/release-linux/attestation-linux-x64.sigstore.json
+      - name: Upload verified Linux inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-release-${{ github.sha }}
+          path: out/release-linux/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Linux test logs and captures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-release-checks-${{ github.sha }}
           path: |
-            out/release/*.zip
-            out/release/SHA256SUMS.txt
-            out/release/build-info.json
-            out/release/attestation.sigstore.json
+            build/linux/Testing/Temporary/LastTest.log
+            out/linux-smoke/**/*.png
+            out/linux-smoke/**/*.log
+            out/appimage-smoke/**/*.png
+            out/appimage-smoke/**/*.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  assemble:
+    name: Verify and assemble the common release files
+    needs: [prepare, windows, linux]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+      SOURCE_COMMIT: ${{ needs.prepare.outputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the exact assembly implementation
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Download this run's Windows inputs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: windows-release-${{ github.sha }}
+          path: release-input/windows
+      - name: Download this run's Linux inputs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: linux-release-${{ github.sha }}
+          path: release-input/linux
+      - name: Verify both platforms before combining them
+        run: |
+          for file in release-input/windows/*.zip; do
+            gh attestation verify "$file" --bundle release-input/windows/attestation-windows-x64.sigstore.json \
+              --repo "$GITHUB_REPOSITORY" --source-digest "$SOURCE_COMMIT" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
+          done
+          for file in release-input/linux/*.tar.gz release-input/linux/*.AppImage; do
+            gh attestation verify "$file" --bundle release-input/linux/attestation-linux-x64.sigstore.json \
+              --repo "$GITHUB_REPOSITORY" --source-digest "$SOURCE_COMMIT" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
+          done
+      - name: Check source identities, package contents and SHA-256
+        run: |
+          python3 tools/release-assets.py assemble --windows-dir release-input/windows \
+            --linux-dir release-input/linux --output-dir out/release \
+            --commit "$SOURCE_COMMIT" --version "$PACKAGE_VERSION"
+      - name: Attest the combined checksum manifest
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: out/release/SHA256SUMS.txt
+      - name: Verify the combined checksum manifest
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          gh attestation verify out/release/SHA256SUMS.txt --bundle "$BUNDLE_PATH" \
+            --repo "$GITHUB_REPOSITORY" --source-digest "$SOURCE_COMMIT" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
+          cp "$BUNDLE_PATH" out/release/attestation-checksums.sigstore.json
+          echo "Verified Windows ZIP, Linux tar.gz/AppImage and common SHA256SUMS.txt from $SOURCE_COMMIT." >> "$GITHUB_STEP_SUMMARY"
+          echo "Create/update a draft: ${{ needs.prepare.outputs.create_release }}. Publication is manual." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the common verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ github.sha }}
+          path: out/release/
+          if-no-files-found: error
+          retention-days: 30
 
   release:
-    name: Prepare a release with github-actions[bot]
-    needs: build
-    if: needs.build.outputs.create_release == 'true'
-    runs-on: ubuntu-latest
+    name: Prepare a common Windows and Linux draft
+    needs: [prepare, assemble]
+    if: needs.prepare.outputs.create_release == 'true'
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
       actions: read
       contents: write
     steps:
-      - name: Download this run's verified files
+      - name: Download this run's common verified files
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: windows-release-${{ github.sha }}
+          name: release-${{ github.sha }}
           path: release-files
-
       - name: Create or update a draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.build.outputs.tag }}
-          SOURCE_COMMIT: ${{ needs.build.outputs.commit }}
-        shell: bash
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          SOURCE_COMMIT: ${{ needs.prepare.outputs.commit }}
         run: |
           set -euo pipefail
           current_commit="$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq '.sha')"
@@ -132,6 +308,6 @@ jobs:
             test "$draft" = 'true' || { echo 'Published release assets are never replaced. Use a new tag.' >&2; exit 1; }
             gh release upload "$RELEASE_TAG" release-files/* --clobber
           else
-            printf 'Built and tested by GitHub Actions from commit `%s`.\n\nBuild log: %s/%s/actions/runs/%s\n\nThe ZIP and its ArrowPuzzle.exe have GitHub build-provenance attestations. See docs/en/RELEASING.md for verification instructions.\n' "$SOURCE_COMMIT" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
+            printf 'Built and tested by GitHub Actions from commit `%s`.\n\nBuild log: %s/%s/actions/runs/%s\n\nWindows ZIP/EXE, Linux tar.gz/executable/AppImage and the common SHA256SUMS.txt have GitHub build-provenance attestations. See docs/en/RELEASING.md for verification instructions.\n' "$SOURCE_COMMIT" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
             gh release create "$RELEASE_TAG" release-files/* --verify-tag --draft --title "Arrow Puzzle $RELEASE_TAG" --notes-file release-notes.md
           fi

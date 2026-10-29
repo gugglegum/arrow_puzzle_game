@@ -131,7 +131,7 @@ python3 tools/smoke-linux.py /absolute/path/to/ArrowPuzzle
 и ручные запуски на Windows/MSVC, Ubuntu 22.04/GCC и Ubuntu 24.04/Clang. Для
 Linux выполняются проверки рендера/текста Mesa/Xvfb и распакованного пакета.
 Пакеты, логи и скриншоты доступны в артефактах запуска 14 дней. Этот workflow
-не создаёт теги и релизы; workflow релиза Windows остаётся отдельным.
+не создаёт теги и релизы; общий workflow **Release** с attestations остаётся отдельным; см. [RELEASING.md](RELEASING.md).
 
 Ubuntu 22.04/GCC — выбранная нижняя сборочная база CI, но не обещание работы
 на любых старых системах. Смотрите `required_symbol_versions` конкретного

@@ -93,9 +93,12 @@ Development CI is already configured for Linux and Windows. The later
 [run 40953718746](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40953718746)
 on `9900a0b` also passed all three jobs. `build.yml` creates development tar.gz,
 AppImage and Windows ZIP artifacts on branch push, PR and manual dispatch.
-`release.yml` still prepares/attests Windows packages only. Integrating Linux
-packages/provenance into the tagged release draft is a separate remaining
-release-pipeline step; no release publication has been requested.
+`release.yml` now prepares Windows ZIP and Linux tar.gz/AppImage together,
+with separate platform bundles/metadata, a common attested checksum manifest,
+and a draft-only publication gate. A branch manual run leaves that gate off
+while exercising the complete assembly/provenance path. See the release guide.
+The user authorized this pipeline change, not publication or a new version tag.
+Hosted validation of the expanded release workflow follows the implementation.
 
 ## Historical pre-implementation assessment
 

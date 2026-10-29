@@ -336,7 +336,7 @@ tools/               Windows/Linux build, packaging and smoke helpers
 docs/en/             English developer guides
 docs/ru/             Russian developer guides
 docs/screenshots/    Shared screenshots
-.github/workflows/   Release-only GitHub Actions build and provenance
+.github/workflows/   Development checks and common release/provenance
 ```
 
 `arrow_core` contains the board and generator without a raylib dependency.
