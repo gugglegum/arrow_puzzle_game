@@ -58,23 +58,39 @@ can also take precedence over a changed `HOME`. A robust portable package must
 route both persistent locations deliberately. Renaming a versioned AppImage
 also changes the adjacent portable-directory name expected by the runtime.
 
-## Proposed product direction
+## User requirement: a portable executable must work alone
 
-Keep one codebase and the same underlying executable, with clear data modes:
+Clarified on 2026-10-30 after the marker proposal: the user explicitly rejects
+`portable.flag` as obscure and unsuitable for the self-contained executable.
+A player may extract only the executable from the portable archive. That file
+must retain portable persistence without a sidecar, launcher, environment setup,
+or undocumented convention. Do not re-propose a marker as the selected design.
+
+Keep one codebase, but produce distinct executable variants if adopting both
+data policies:
 
 1. **Standard mode:** retain the current Linux XDG defaults, suitable for
    installed/read-only locations and the ordinary AppImage.
 2. **Portable mode:** keep settings and saves directly in the chosen game
-   directory (or a documented child directory if later preferred). Windows ZIP
-   already supplies the basic adjacent-file behavior. Offer an explicitly
-   labelled portable Linux archive if the user adopts this direction.
+   directory, with this behavior built into the executable. Windows ZIP already
+   supplies the basic adjacent-file behavior. A portable Linux archive must
+   contain an executable that remains portable when extracted on its own.
 
-A packaged marker such as `portable.flag` could select portable mode without
-separate builds or requiring players to type arguments. For AppImage, inspect
-the outer image's directory. This is a proposal; the current game ignores such
-a marker. A Linux launcher exporting both XDG variables to directories within
-the package is a lower-impact alternative using existing persistence, but users
-would have to start through that launcher.
+A compile-time CMake option is the recommended implementation approach, not
+implemented or tested yet. It can select the default persistence policy in the
+same sources, producing a standard executable and a portable executable with
+clear package names. Portable behavior must not depend on the executable's
+filename either. There is no need for a separate codebase or extra runtime file.
+Do not introduce a new non-portable Windows distribution as an incidental part
+of this discussion; existing Windows adjacent-file behavior should be preserved.
+
+A launcher-only approach also fails the executable-alone requirement if direct
+launch bypasses it. AppImage's optional `.home`/`.config` directories remain
+upstream functionality, but should not be the prerequisite that makes a package
+labelled Portable honor its data policy. A future portable AppImage should carry
+the portable executable and resolve the outer image directory for persistent
+files. The current standard AppImage and tar still contain the same binary;
+do not describe distinct standard/portable binaries as already available.
 
 If implementing portable mode:
 
@@ -88,8 +104,18 @@ If implementing portable mode:
   files; OS-managed records and temporary AppImage mounting/extraction are a
   separate matter.
 - Verify archive and AppImage launch paths, read-only failures, save/resume,
-  different working directories, and absence of writes to the user's normal
-  config/data directories. Preserve Windows behavior and existing progress.
+  different working directories, copying/renaming just the executable, and
+  absence of writes to the user's normal config/data directories. Preserve
+  Windows behavior and existing progress.
+
+The screenshot mentioned in this discussion is the existing **F12** command in
+`Game.cpp`: it writes `arrow-puzzle-screenshot.png` to raylib's storage base,
+initialized from the working directory. It is an explicit user action, not
+background capture during normal gameplay. Separate `ARROWPUZZLE_SCREENSHOT`
+hooks deliberately produce captures for automated QA. The user asked what was
+meant by screenshots; no request to add, remove, or automatically take them was
+made. Routing all permanent game-owned outputs consistently is a future
+portable-mode requirement, not a change already made here.
 
 This discussion does not authorize changing the prepared 0.5.0 draft, its tag,
 attested packages, or publication state. Treat any later implementation and
@@ -116,7 +142,7 @@ Gear Lever's integration copies the image into its managed location, creates a
 user `.desktop` entry and icon files, and can delete the original depending on
 the move setting. Launch and menu integration are distinct actions. Manager
 files/settings are separate from ArrowPuzzle's own persistence policy. A future
-portable design using adjacent data/markers must account for third-party
+portable design using adjacent data must account for third-party
 managers moving only the AppImage, rather than assuming the whole portable
 directory moves with it. No manager settings or game behavior were changed.
 
