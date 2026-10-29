@@ -5,6 +5,7 @@
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
 #include "BuildVersion.hpp"
+#include "AppIcon.hpp"
 #include "GameAudio.hpp"
 #include "EndScreen.hpp"
 #include "MenuScreen.hpp"
@@ -821,6 +822,7 @@ std::optional<std::uint32_t> unsignedFromEnvironment(
 int Game::run() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(kInitialWidth, kInitialHeight, "Arrow Puzzle");
+    setApplicationIcon();
     SetWindowMinSize(720, 600);
     SetTargetFPS(0);
     SetExitKey(KEY_NULL);

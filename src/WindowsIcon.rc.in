@@ -1,0 +1,3 @@
+// GLFW uses this resource as its initial window-class icon; Explorer and
+// default shortcuts also extract the only icon group from the executable.
+GLFW_ICON ICON "@ARROWPUZZLE_WINDOWS_ICON@"

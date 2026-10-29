@@ -9,15 +9,31 @@ this as current state.
 The user selected the symmetric 4-by-4 layout with two one-bend arrows, then
 requested larger dots and rounded arrowheads. The selected vector master is
 `assets/icons/arrow-puzzle.svg`, with a 1024-pixel transparent PNG alongside.
-Icon artwork is prepared; executable resources/window icon integration is
-still pending. The user prefers bent pale arrows from gameplay over generic
+The user authorized integration and a rebuild. The PNG sizes are embedded
+through `EmbedBinary.cmake`; `AppIcon.cpp` sets the window icons immediately
+after `InitWindow`. Windows also embeds the seven-frame ICO as `GLFW_ICON`.
+See [icon maintenance](../assets/icons/README.md) for the source/export workflow.
+The user prefers bent pale arrows from gameplay over generic
 colorful arrow logos.
 The icon should resemble the actual dark game board and preserve its rules:
 fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
 separate nonintersecting paths with one head each, and gray dots at every
 unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
 
-Latest refinement: dot diameter equals arrow stroke width at every export
+Integration validation (2026-10-30): clean primary MSVC Release build; all
+five default test suites passed. Persistence initially could not create its
+temporary settings file in the restricted system temp location, then passed
+using TEMP/TMP under the workspace. A standalone copy of only the EXE started
+successfully; the title-bar icon was visually inspected. Native resource
+inspection found seven PNG entries identical to the committed exports,
+Windows loaded every size, and the live window exposed the intended 16/32 px
+icons. Explorer's EXE icon and an ordinary new shortcut were also extracted
+and inspected (including the normal shortcut-arrow overlay). Artifact
+regeneration is byte-stable and pixel-identical to the approved artwork.
+Local evidence is under ignored `out/icon-integration-2026-10-30`; no release
+was requested. Rebuild after commit to refresh the Git-derived version label.
+
+Artwork refinement: dot diameter equals arrow stroke width at every export
 size, matching `kGridDotRadius = kArrowThickness / 2`. The master stroke is
 52/1024, hence dot radius 26. All three corners of each triangular head use
 true inset circular fillets of radius strokeWidth/4 (13 in the master),

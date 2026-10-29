@@ -92,6 +92,7 @@ src/
   MenuSelection.hpp        Shared mouse/keyboard selection
   EndScreen.*              Result screens and fireworks
   GameAudio.*              Optional embedded sounds
+  AppIcon.*                Embedded window icons, decoded only at startup
   UiText.*                 Windows GDI smoothing and text-mask cache
   main.cpp                 Calls Game::run()
   UiFontData.hpp           Embedded font data interface
@@ -105,6 +106,7 @@ tests/
 
 assets/fonts/              Inter Medium and OFL license
 assets/sounds/             Embedded game and firework sounds
+assets/icons/              SVG master, embedded PNG sizes, Windows ICO
 cmake/EmbedUiFont.cmake    TTF-to-C++ generation
 tools/build-windows.ps1    MSVC setup, build and tests
 tools/package-windows.ps1  ZIP, documentation, licenses and SHA-256
@@ -175,6 +177,11 @@ for live game state.
 
 Requirements: Visual Studio 2022 with MSVC x64 and Windows SDK, CMake 3.24+,
 Ninja, and Git. FetchContent downloads raylib during the first configuration.
+
+Application icons are embedded in the EXE, including the Windows resource
+used by Explorer and shortcuts. No PNG/ICO files need to accompany the game.
+Normal builds use committed icon assets; optional artwork regeneration is
+documented in [assets/icons/README.md](../../assets/icons/README.md).
 
 From a regular PowerShell in the repository root:
 

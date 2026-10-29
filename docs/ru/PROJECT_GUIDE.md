@@ -98,6 +98,7 @@ src/
   MenuSelection.hpp        Единый выбор мышью и клавиатурой
   EndScreen.*              Финальные экраны и фейерверки
   GameAudio.*              Отключаемые встроенные звуки
+  AppIcon.*                Встроенные значки окна, загрузка только при запуске
   UiText.*                 GDI-сглаживание Windows и кэш масок текста
   main.cpp                 Запуск Game::run()
   UiFontData.hpp           Интерфейс встроенных данных шрифта
@@ -111,6 +112,7 @@ tests/
 
 assets/fonts/              Inter Medium и лицензия OFL
 assets/sounds/             Встроенные звуки игры и фейерверков
+assets/icons/              Исходный SVG, встроенные PNG и Windows ICO
 cmake/EmbedUiFont.cmake    Преобразование TTF в C++ при сборке
 tools/build-windows.ps1    Настройка MSVC, сборка и запуск тестов
 tools/package-windows.ps1  ZIP, документация, лицензии и SHA-256
@@ -182,6 +184,11 @@ cells[0] - cells[1] == direction
 
 Нужны Visual Studio 2022 с MSVC x64 и Windows SDK, CMake 3.24+, Ninja и Git.
 raylib скачивается через `FetchContent` при первой конфигурации.
+
+Иконки встроены в EXE, включая ресурс Windows для Проводника и ярлыков.
+PNG/ICO рядом с игрой не нужны. Обычная сборка использует готовые изображения
+из репозитория; обновление изображений описано в
+[assets/icons/README.md](../../assets/icons/README.md).
 
 Из обычного PowerShell в корне проекта:
 

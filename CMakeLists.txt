@@ -113,9 +113,33 @@ arrow_embed_sound(d4-retro-fail.wav kDefeatWav)
 arrow_embed_sound(v3-glass-chord.wav kVictoryWav)
 arrow_embed_sound(firework-burst.wav kFireworkWav)
 
+foreach(size 16 24 32 48 64 128 256)
+    set(source "${CMAKE_CURRENT_BINARY_DIR}/generated/AppIcon${size}.cpp")
+    add_custom_command(
+        OUTPUT "${source}"
+        COMMAND
+            ${CMAKE_COMMAND}
+            "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/arrow-puzzle-${size}.png"
+            "-DOUTPUT_FILE=${source}"
+            "-DHEADER_NAME=AppIconData.hpp"
+            "-DSYMBOL_NAME=kAppIcon${size}Png"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/arrow-puzzle-${size}.png"
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+        COMMENT "Embedding ${size}px application icon"
+        VERBATIM
+    )
+    list(APPEND ARROWPUZZLE_EMBEDDED_ICON_SOURCES "${source}")
+endforeach()
+
 add_executable(arrow_puzzle WIN32
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
     ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES}
+    ${ARROWPUZZLE_EMBEDDED_ICON_SOURCES}
+    src/AppIcon.cpp
+    src/AppIcon.hpp
+    src/AppIconData.hpp
     src/GameAudio.cpp
     src/GameAudio.hpp
     src/EndScreen.cpp
@@ -136,6 +160,16 @@ add_executable(arrow_puzzle WIN32
     src/UiText.cpp
     src/UiText.hpp
 )
+
+if(WIN32)
+    enable_language(RC)
+    set(ARROWPUZZLE_WINDOWS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/arrow-puzzle.ico")
+    set(icon_resource "${CMAKE_CURRENT_BINARY_DIR}/generated/WindowsIcon.rc")
+    configure_file(src/WindowsIcon.rc.in "${icon_resource}" @ONLY)
+    set_source_files_properties("${icon_resource}" PROPERTIES
+        OBJECT_DEPENDS "${ARROWPUZZLE_WINDOWS_ICON}")
+    target_sources(arrow_puzzle PRIVATE "${icon_resource}")
+endif()
 
 add_dependencies(arrow_puzzle arrow_build_version)
 target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib Threads::Threads)
