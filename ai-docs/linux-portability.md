@@ -98,7 +98,25 @@ with separate platform bundles/metadata, a common attested checksum manifest,
 and a draft-only publication gate. A branch manual run leaves that gate off
 while exercising the complete assembly/provenance path. See the release guide.
 The user authorized this pipeline change, not publication or a new version tag.
-Hosted validation of the expanded release workflow follows the implementation.
+
+The expanded pipeline passed a real manual branch run on implementation commit
+`69b1e82`: [Release run 40963804710](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40963804710).
+Windows and Linux builds, tests, signatures and common assembly all passed;
+the draft job was skipped (`create_release=false`). The combined artifact
+`release-69b1e821e5708cf99bdc7c36910cc660373c1dbe` contains ten release files.
+After downloading it, its GitHub ZIP digest and all five checksum subjects
+(three packages, two unpacked executables) were verified locally. Independent
+`gh attestation verify --bundle` checks passed for both executables, all three
+packages and SHA256SUMS.txt, requiring the exact source commit, release.yml
+identity, repository and hosted runners. The four existing releases and their
+asset identities/digests remained unchanged. Development CI also passed:
+[run 40963734517](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40963734517).
+
+Ignored evidence and the downloaded common files are under
+`out/release-validation-69b1e82`. In the restricted agent environment, local
+GitHub CLI verification needed both GH_CONFIG_DIR and XDG_CACHE_HOME redirected
+there; the default read-only cache prevented Sigstore verifier initialization.
+These are verification-process overrides, not game settings or system changes.
 
 ## Historical pre-implementation assessment
 

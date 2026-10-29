@@ -232,7 +232,9 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
   using a mouse; an apparent touchpad delay and the guest's Wine/native delay
   remain observations, not a diagnosed game/audio defect. No Linux release
   exists. The common Windows/Linux release workflow is implemented with
-  package/executable provenance, signed checksums and a draft-only gate; no
+  package/executable provenance, signed checksums and a draft-only gate. Its
+  manual no-draft run passed, including independent verification of the
+  downloaded common assets; see the Linux progress page for run IDs. No
   release publication or new version tag is authorized. Broader desktop coverage
   remains outstanding.
 
