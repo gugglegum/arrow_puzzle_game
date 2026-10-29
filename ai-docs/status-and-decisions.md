@@ -4,6 +4,30 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Application icon design direction (2026-10-29)
+
+Design exploration only; no icon has been accepted for integration. The user
+prefers the three bent pale arrows concept over generic colorful arrow logos.
+The icon should resemble the actual dark game board and preserve its rules:
+fixed orthogonal grid spacing, bends and head/tail cells on grid nodes,
+separate nonintersecting paths with one head each, and gray dots at every
+unoccupied node. Do not invent impossible arrow junctions or arbitrary bends.
+
+A subsequent vector proposal uses a 7-by-7 grid with the following head-first
+vertices (expand each straight segment into unit cells):
+
+- A: `(0,0), (4,0), (4,2)`, direction left.
+- B: `(3,2), (3,6), (0,6), (0,4), (1,4), (1,2), (0,2)`, direction up.
+- C: `(6,3), (5,3), (5,6), (6,6)`, direction right.
+
+Read-only checking against `Board::canExit` semantics found 27 occupied nodes,
+22 free nodes, no overlaps/self-intersections, and a complete A-B-C solution.
+B initially depends on A; C can exit independently. This is a proposal, not
+a selected production asset or a runtime test. The preview uses the dark
+palette from `BoardPalette.hpp`; 16-32 px versions strengthen strokes/dots.
+`cacheIdleBoardGeometry` defines free-node dot placement. Arrow head cell
+centers align to the grid; triangle tips extend beyond those centers.
+
 ## Released versus development
 
 0.4.0 was published from `b785f23` using GitHub Actions and marked Latest; see
