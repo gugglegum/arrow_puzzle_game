@@ -228,7 +228,11 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
   save/resume and EWMH fullscreen are implemented. Windows/MSVC and Linux
   GCC/Clang development CI passed; tar.gz and AppImage packages are checked,
   including a downloaded Actions AppImage on Mint. See [Linux progress](linux-portability.md).
-  No Linux release exists; broader desktop coverage remains outstanding.
+  The user also reports native Linux on a laptop with no perceptible sound lag
+  using a mouse; an apparent touchpad delay and the guest's Wine/native delay
+  remain observations, not a diagnosed game/audio defect. No Linux release
+  exists; tagged release packaging is still Windows-only, and broader desktop
+  coverage remains outstanding.
 
 - Rounded rendering is accepted and its earlier commit/push hold is lifted.
   Integrated-GPU performance remains unmeasured: OpenGL 3.3 Core is required;
@@ -240,9 +244,9 @@ preserve the performance design, not a current benchmark or a diagnosed driver b
   This is separate from the earlier rendering work and is not in released 0.3.0.
 - Android builds remain unverified; even dimensions are a generator
   restriction. Linux development should use the user's Mint 22.3 VMware VM;
-  WSL2 is excluded to preserve the VMware setup. The user reports adequate Wine
-  operation with approximately 0.5-second audio delay. Keep this observation
-  separate from the native checks; see [Linux progress and handoff](linux-portability.md).
+  WSL2 is excluded to preserve the VMware setup. Both Wine and native Linux have
+  a user-reported sound delay in this guest; laptop/mouse testing differs. See
+  [Linux progress and handoff](linux-portability.md) for evidence and limits.
 - A local, user-owned, untracked `TODO.txt` mentions softer visual rounding of
   arrowheads/body corners. The accepted renderer implements that live request;
   preserve the file unless asked otherwise.

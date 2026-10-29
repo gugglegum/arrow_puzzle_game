@@ -50,7 +50,8 @@ use successful paired seeds while all eight-candidate boards retain their floors
   CRLF save import plus byte-identical save/resume. QA uses isolated XDG paths.
 - All embedded audio/mixer tests passed via PipeWire/PulseAudio; a menu launch
   with unavailable PulseAudio and ALSA also completed with the expected warning.
-  End-to-end sound latency is not measured; the Wine delay cause remains unknown.
+  End-to-end sound latency is not measured. See the user desktop follow-up below
+  for the later laptop/mouse comparison; the VM delay cause remains unknown.
 - raylib's manual borderless resize on Cinnamon became topmost and failed to
   restore the original window geometry. Linux now uses EWMH fullscreen through
   bundled GLFW's X11 handle. F11/Escape restored 1100x900 at the previous position
@@ -71,9 +72,30 @@ records that prefix and Ninja path. Do not commit these machine paths or copy
 the cache to Windows. Normal package installation is in the Linux guide.
 
 Still unverified: native Wayland, XWayland session, other window managers,
-multi-monitor/fractional scaling, older distributions and bare-metal performance.
+multi-monitor/fractional scaling, older distributions and measured bare-metal performance.
 The remainder below is the historical source assessment, superseded by this
 implementation record wherever it describes work as unperformed.
+
+## User desktop and sound follow-up (2026-10-30)
+
+The user reports that native Linux in the VMware guest has a sound delay similar
+to the Windows executable under Wine. On a separate laptop running Linux as its
+main OS, a small initial apparent delay disappeared when using a mouse instead
+of the touchpad. This provides user-reported native desktop/audio validation;
+it is not an instrumented latency measurement or an independent agent test.
+The laptop distribution, display session, exact build/package and input/audio
+configuration were not specified. Delayed touchpad event handling is the user's
+working hypothesis, not a diagnosed driver or game defect. Do not claim that
+Wine alone causes the VM delay, or change audio buffering based only on this
+observation.
+
+Development CI is already configured for Linux and Windows. The later
+[run 40953718746](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40953718746)
+on `9900a0b` also passed all three jobs. `build.yml` creates development tar.gz,
+AppImage and Windows ZIP artifacts on branch push, PR and manual dispatch.
+`release.yml` still prepares/attests Windows packages only. Integrating Linux
+packages/provenance into the tagged release draft is a separate remaining
+release-pipeline step; no release publication has been requested.
 
 ## Historical pre-implementation assessment
 

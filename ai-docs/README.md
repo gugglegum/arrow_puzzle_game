@@ -14,7 +14,8 @@ tests, Git history, and the current instructions settle discrepancies.
 4. Read [workflow notes](workflow-notes.md) and choose checks from the developer
    guide before changing behavior.
 5. Complete the change, maintain relevant notes, then commit and push according
-   to AGENTS.md. A routine push does not build or publish a release.
+   to AGENTS.md. Branch pushes run development build/test CI; release preparation
+   uses the separate tag/manual workflow, and publication is a separate action.
 
 ## Find the right entry point
 
