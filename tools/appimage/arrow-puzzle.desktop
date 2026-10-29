@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Arrow Puzzle
+Comment=Clear a maze of arrows without collisions
+Exec=ArrowPuzzle
+Icon=arrow-puzzle
+Categories=Game;LogicGame;
+Terminal=false

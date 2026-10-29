@@ -105,3 +105,12 @@ for raylib, with their respective copyright notices from the table.
 > this copyright and permissions notice appear in all copies and derivatives.
 >
 > This software is supplied "as is" without express or implied warranty.
+
+## Optional Linux AppImage container
+
+AppImage packages add the upstream type-2 runtime from checksum-pinned
+appimagetool 1.9.1. Its MIT license, statically linked component references and
+source/build links are included as `RUNTIME-NOTICES.txt` beside these notices
+inside the AppImage (`usr/share/arrow-puzzle` after extraction). The source
+checkout keeps the same text in `tools/appimage/RUNTIME-NOTICES.txt`. No system
+shared libraries for the game are bundled by this packaging step.

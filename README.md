@@ -193,6 +193,20 @@ not depend on a seed or the current generator implementation. Resume game is
 disabled when there is no valid unfinished game. Both text files are stored
 in the same directory as `ArrowPuzzle.exe`.
 
+## Building on Linux
+
+On Linux Mint / Ubuntu with the [build dependencies](docs/en/LINUX.md) installed:
+
+```bash
+./tools/build-linux.sh
+./build/linux/arrow_puzzle
+```
+
+Development tar.gz and AppImage packages are available from successful
+[Build and test runs](https://github.com/gugglegum/arrow_puzzle_game/actions/workflows/build.yml).
+See the [Linux guide](docs/en/LINUX.md) for checksums, runtime requirements and
+AppImage startup without FUSE.
+
 ## Building on Windows
 
 ### Requirements
@@ -318,7 +332,7 @@ src/MenuSelection.hpp  Shared mouse and keyboard menu selection
 src/EndScreen.cpp    Result cards and finite victory celebration
 src/GameAudio.cpp    Optional embedded sound effects
 tests/               Core, persistence, menus, and result-screen tests
-tools/               Windows build and packaging helpers
+tools/               Windows/Linux build, packaging and smoke helpers
 docs/en/             English developer guides
 docs/ru/             Russian developer guides
 docs/screenshots/    Shared screenshots

@@ -6,17 +6,32 @@ The native build and desktop port are implemented on the shared source tree.
 Use [the maintained Linux guide](../docs/en/LINUX.md), `tools/build-linux.sh`
 and the `linux` / `linux-debug` presets. Windows remains the main platform;
 Linux changes are transferred through GitHub, with separate local build trees.
-No release or tag was created. Development tar packaging and pre-release CI
-are implemented. The first hosted run compiled Windows and both Linux jobs;
-Clang passed headless/render/text checks. It exposed a single-attempt test
-assumption on MSVC and STRING-vs-FILEPATH compiler metadata parsing; both are
-corrected for the next run. AppImage follows tar validation.
+No release or tag was created. Development tar/AppImage packaging and
+pre-release CI are implemented. [Hosted run 40951331410](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40951331410)
+passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on `65a823f`,
+including Linux rendering/text and tar smoke tests. Earlier CI exposed an MSVC
+single-attempt test assumption and STRING-vs-FILEPATH compiler metadata parsing;
+both were fixed. A bounded one-candidate failure is valid; aggregate comparisons
+use successful paired seeds while all eight-candidate boards retain their floors.
 
 - `package-linux.py` installs/strips a copy with no build RPATH, bundles docs
   and licenses, and records ELF symbol requirements/hashes/source metadata. The
   extracted archive passed all seven smoke scenarios locally. `build.yml`
   checks Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on push/PR/manual
   runs, with Mesa/Xvfb and downloadable packages/logs. No publication permissions.
+- `package-appimage.py` wraps the validated tar using SHA-256-pinned
+  appimagetool 1.9.1 and its embedded `caf24f9` runtime (explicit runtime-file,
+  no moving runtime download). It includes icon/desktop/AppRun, runtime notices,
+  source/build metadata and SHA-256. It bundles no game shared libraries, so
+  the input binary's system-library baseline still applies. All seven local
+  AppImage scenarios passed through extraction-and-run. CI builds/tests the
+  AppImage on Ubuntu 22.04 after tar validation. `/dev/fuse` is absent in this
+  VM: mounting is not verified and no host/kernel/FUSE settings were changed.
+- Native X11 input checks passed: restored geometry/progress, Ctrl zoom and
+  pixel-identical Ctrl+0 fit, a head drag returning to its origin without launch,
+  Alt+Enter/Escape and focus switching. One quiet 20x20 board sample used
+  97,056 KiB RSS and accumulated no CPU clock ticks over two seconds; this is
+  a small VM observation, not a performance guarantee or GPU measurement.
 - Mint 22.3 / Ubuntu noble, x86-64, GCC 13.3, CMake 3.28.3, Ninja 1.11.1.
   Native Release and all five default suites passed (full generator sample).
 - X11/Cinnamon in VMware: Mesa 25.2.8 SVGA3D exposes OpenGL 4.3. Explicit

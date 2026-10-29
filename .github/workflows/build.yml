@@ -42,7 +42,7 @@ jobs:
       - name: Install Linux build and display dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang ninja-build git python3-venv \
+          sudo apt-get install -y build-essential clang ninja-build git curl python3-venv \
             libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev \
             libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth
           python3 -m venv "$RUNNER_TEMP/arrow-cmake"
@@ -77,6 +77,24 @@ jobs:
           xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
             "$RUNNER_TEMP/arrow-unpacked/ArrowPuzzle" --output-dir out/linux-smoke
 
+      - name: Build AppImage after archive validation
+        if: matrix.id == 'ubuntu22-gcc'
+        id: appimage
+        env:
+          ARCHIVE: ${{ steps.package.outputs.archive_path }}
+        run: python3 tools/package-appimage.py "$ARCHIVE"
+
+      - name: Launch AppImage without FUSE
+        if: matrix.id == 'ubuntu22-gcc'
+        env:
+          APPIMAGE_PATH: ${{ steps.appimage.outputs.appimage_path }}
+        run: |
+          cd out/linux-package
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          cd "$GITHUB_WORKSPACE"
+          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
+            "$APPIMAGE_PATH" --appimage --output-dir out/appimage-smoke
+
       - name: Upload development package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -94,6 +112,8 @@ jobs:
             build/linux/Testing/Temporary/LastTest.log
             out/linux-smoke/**/*.png
             out/linux-smoke/**/*.log
+            out/appimage-smoke/**/*.png
+            out/appimage-smoke/**/*.log
           if-no-files-found: warn
           retention-days: 14
 

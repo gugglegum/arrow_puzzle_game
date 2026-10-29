@@ -13,7 +13,7 @@ On Linux Mint 22.3 / Ubuntu 24.04, install build dependencies once:
 
 ```bash
 sudo apt-get update
-sudo apt-get install build-essential cmake ninja-build git python3 \
+sudo apt-get install build-essential cmake ninja-build git python3 curl \
     libasound2-dev libx11-dev libxrandr-dev libxi-dev \
     libgl1-mesa-dev libxcursor-dev libxinerama-dev
 ```
@@ -133,6 +133,40 @@ never creates a tag or release; the Windows release workflow remains separate.
 Ubuntu 22.04/GCC is the intended oldest CI build baseline, not a promise about
 all older systems. Check the artifact's `required_symbol_versions`: a build made
 on Mint 22.3/GCC 13 needs newer glibc/libstdc++ than one built on Ubuntu 22.04.
-X11/OpenGL drivers and system libraries must still be installed. AppImage is
-the next packaging stage after tar validation. Neither format establishes
-native Wayland support or performance on another GPU.
+X11/OpenGL drivers and system libraries must still be installed. Neither format
+establishes native Wayland support or performance on another GPU.
+
+## AppImage after tar validation
+
+```bash
+python3 tools/package-appimage.py out/linux-package/ArrowPuzzle-dev-local-linux-x64.tar.gz
+chmod +x out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage
+./out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage
+```
+
+The archive must come from the current source commit. The helper uses `curl`
+for the first download of checksum-pinned appimagetool 1.9.1, then caches it
+under `build/appimage-tools`. It reuses that tool's exact embedded runtime
+with `--runtime-file`; there is no download of a moving runtime. AppRun, a
+desktop entry, the project icon, runtime license/source notices and build
+metadata are included. The game binary is identical to the tar archive's.
+The helper appends the AppImage hash to `SHA256SUMS.txt` and refuses overwrites.
+
+System game libraries and graphics drivers are not bundled: the AppImage has
+the same glibc/libstdc++ requirements as its input tar archive. It is a single
+file container, not universal compatibility with older Linux distributions.
+Settings/saves remain in XDG directories outside the image.
+
+When FUSE is unavailable (including the current VMware guest), run without a
+mount or system changes:
+
+```bash
+./out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage --appimage-extract-and-run
+python3 tools/smoke-linux.py out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage --appimage
+```
+
+CI creates the AppImage on Ubuntu 22.04/GCC only, after the extracted tar passes,
+and repeats the seven isolated game scenarios through extraction-and-run.
+Normal FUSE mounting is not verified in the current VM; extraction-and-run is.
+Local checks also exercised real X11 Ctrl zoom/fit, a returning head drag that
+must not launch, unchanged saved progress, Alt+Enter/Escape and focus switching.

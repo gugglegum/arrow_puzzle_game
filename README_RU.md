@@ -200,6 +200,20 @@ arrow collisions, Crosshair guides и Sounds) по умолчанию включ
 пункт Resume game неактивен. Оба текстовых файла находятся в каталоге
 `ArrowPuzzle.exe`.
 
+## Сборка в Linux
+
+В Linux Mint / Ubuntu с установленными [зависимостями](docs/ru/LINUX.md):
+
+```bash
+./tools/build-linux.sh
+./build/linux/arrow_puzzle
+```
+
+Пакеты разработки tar.gz и AppImage доступны в успешных
+[запусках Build and test](https://github.com/gugglegum/arrow_puzzle_game/actions/workflows/build.yml).
+SHA-256, системные требования и запуск AppImage без FUSE описаны в
+[руководстве Linux](docs/ru/LINUX.md).
+
 ## Сборка в Windows
 
 ### Требования
@@ -325,7 +339,7 @@ src/MenuSelection.hpp  Единый выбор мышью и клавиатур�
 src/EndScreen.cpp    Финальные экраны и конечная победная анимация
 src/GameAudio.cpp    Отключаемые встроенные звуки
 tests/               Тесты ядра, сохранений, меню и финальных экранов
-tools/               Сборка и упаковка для Windows
+tools/               Сборка, упаковка и smoke-проверки Windows/Linux
 docs/en/             Техническая документация на английском
 docs/ru/             Техническая документация на русском
 docs/screenshots/    Общие скриншоты

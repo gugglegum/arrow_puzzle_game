@@ -4,8 +4,8 @@
 
 The **Windows release** workflow builds the executable on a GitHub-hosted
 Windows 2022 runner. It runs only after a `vX.Y.Z` tag is pushed or when an
-owner starts it with **Run workflow**. Ordinary branch pushes and pull requests
-do not start a build.
+owner starts it with **Run workflow**. Branch pushes and pull requests use the
+development workflow described below.
 
 ## Development checks before release
 
@@ -16,7 +16,9 @@ runs rendering/text checks with Mesa/Xvfb and launches the unpacked tar archive
 with isolated XDG data, a read-only program directory, menus, both themes and
 CRLF save/resume checks. The audio mixer still needs an explicit local device test.
 
-Each successful job uploads a development ZIP or tar.gz with hashes and build
+Ubuntu 22.04 also builds an AppImage after tar validation and checks its
+FUSE-free extraction path. Each successful job uploads development packages
+(ZIP, tar.gz and, on Ubuntu 22.04, AppImage) with hashes and build
 metadata for 14 days. These files identify the tested commit/run; they are not
 release-provenance-attested assets. Test logs and Linux captures are uploaded
 on failures too. This workflow has read-only repository permissions and does

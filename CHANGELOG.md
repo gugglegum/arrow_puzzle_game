@@ -9,6 +9,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Linux AppImage packaging after tar validation, with pinned tooling/runtime,
+  project icon, license notices, hashes and FUSE-free startup checks in CI.
+
 - Push/PR/manual development CI for Windows/MSVC and Linux GCC/Clang, with
   downloadable packages, hashes, metadata, Mesa render/text checks and isolated
   archive launch/save verification. Linux tar.gz packaging removes build RPATHs.

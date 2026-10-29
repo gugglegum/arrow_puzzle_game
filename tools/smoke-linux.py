@@ -14,13 +14,14 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path)
+    parser.add_argument("--appimage", action="store_true", help="Use the FUSE-free AppImage extraction path")
     parser.add_argument("--output-dir", type=Path, default=Path("out/linux-smoke"))
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="run-", dir=args.output_dir.resolve()))
     program = work / "program"
     program.mkdir()
-    executable = program / "ArrowPuzzle"
+    executable = program / ("ArrowPuzzle.AppImage" if args.appimage else "ArrowPuzzle")
     shutil.copy2(args.executable.resolve(), executable)
     executable.chmod(0o555)
     program.chmod(0o555)
@@ -35,7 +36,8 @@ def main():
             **overrides,
         }
         with (work / (name + ".log")).open("w") as log:
-            subprocess.run([str(executable)], cwd=work, env=case_env, stdout=log,
+            command = [str(executable)] + (["--appimage-extract-and-run"] if args.appimage else [])
+            subprocess.run(command, cwd=work, env=case_env, stdout=log,
                            stderr=subprocess.STDOUT, timeout=90, check=True)
         header = image.read_bytes()[:24]
         if header[:8] != b"\x89PNG\r\n\x1a\n" or struct.unpack(">II", header[16:24]) != (1100, 900):

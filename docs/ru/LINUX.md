@@ -14,7 +14,7 @@ Wayland) и настольным OpenGL 3.3. Native Wayland, ARM64 и Android т
 
 ```bash
 sudo apt-get update
-sudo apt-get install build-essential cmake ninja-build git python3 \
+sudo apt-get install build-essential cmake ninja-build git python3 curl \
     libasound2-dev libx11-dev libxrandr-dev libxi-dev \
     libgl1-mesa-dev libxcursor-dev libxinerama-dev
 ```
@@ -136,6 +136,40 @@ Linux выполняются проверки рендера/текста Mesa/X
 Ubuntu 22.04/GCC — выбранная нижняя сборочная база CI, но не обещание работы
 на любых старых системах. Смотрите `required_symbol_versions` конкретного
 пакета: сборка Mint 22.3/GCC 13 требует более новых glibc/libstdc++, чем сборка
-Ubuntu 22.04. Системные библиотеки и драйверы X11/OpenGL всё равно нужны.
-AppImage — следующий этап после проверки tar. Ни один формат сам по себе не
-подтверждает native Wayland или производительность другого GPU.
+Ubuntu 22.04. Системные библиотеки и драйверы X11/OpenGL всё равно нужны. Ни один формат сам
+по себе не подтверждает native Wayland или производительность другого GPU.
+
+## AppImage после проверки tar
+
+```bash
+python3 tools/package-appimage.py out/linux-package/ArrowPuzzle-dev-local-linux-x64.tar.gz
+chmod +x out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage
+./out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage
+```
+
+Архив должен быть собран из текущего commit. Скрипт использует `curl` для
+первого скачивания appimagetool 1.9.1 с зафиксированной SHA-256 и кэширует его
+в `build/appimage-tools`. Через `--runtime-file` берётся ровно тот runtime,
+который встроен в этот инструмент; плавающий runtime не скачивается. Включены
+AppRun, desktop-файл, иконка, лицензия/ссылки на исходники runtime и метаданные.
+Бинарник игры идентичен содержимому tar. Хэш AppImage дописывается в
+`SHA256SUMS.txt`; перезапись готового файла запрещена.
+
+Системные библиотеки игры и графические драйверы не включены: требования к
+glibc/libstdc++ совпадают с исходным tar. Это контейнер в одном файле, который
+не обеспечивает совместимость с любым старым дистрибутивом. Настройки и
+сохранения остаются вне образа в XDG-каталогах.
+
+Если FUSE недоступен (в том числе в текущей VMware VM), запуск не требует
+монтирования или изменения системы:
+
+```bash
+./out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage --appimage-extract-and-run
+python3 tools/smoke-linux.py out/linux-package/ArrowPuzzle-dev-local-linux-x64.AppImage --appimage
+```
+
+CI создаёт AppImage только на Ubuntu 22.04/GCC после проверки распакованного
+архива и повторяет семь изолированных сценариев игры через extraction-and-run.
+Обычное монтирование FUSE в текущей VM не проверено; extraction-and-run проверен.
+Локально также проверены реальные X11-вводы Ctrl zoom/fit, drag от головы с
+возвратом без запуска, неизменность прогресса, Alt+Enter/Escape и смена фокуса.
