@@ -7,6 +7,7 @@
 namespace arrow {
 
 class UiText;
+enum class BoardTheme;
 
 // Stateless menu rendering: no animation clock or additional texture cache.
 class MenuScreen {
@@ -25,7 +26,8 @@ public:
     static void drawHeading(UiText& text, Page page, int width, int height, int count);
     static void drawButton(UiText& text, Rectangle bounds, const char* label, Page page,
                            int index, bool enabled, bool selected, bool armed,
-                           std::optional<bool> toggle = std::nullopt, const char* choice = nullptr);
+                           std::optional<bool> toggle = std::nullopt,
+                           std::optional<BoardTheme> theme = std::nullopt);
     static void drawFooter(UiText& text, const char* label, int width, int height, int count);
     [[nodiscard]] static Color mutedColor();
 };

@@ -1,4 +1,5 @@
 #include "MenuScreen.hpp"
+#include "BoardPalette.hpp"
 #include "UiText.hpp"
 
 #include <algorithm>
@@ -185,7 +186,7 @@ void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int
 
 void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, Page page,
                             int index, bool enabled, bool selected, bool armed,
-                            std::optional<bool> toggle, const char* choice) {
+                            std::optional<bool> toggle, std::optional<BoardTheme> theme) {
     const bool highlighted = enabled && selected;
     const bool pressed = highlighted && armed;
     const bool primary = page == Page::Main && index == 0;
@@ -223,15 +224,20 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
         DrawCircleV({pill.x + (*toggle ? pill.width - 14 : 14), center.y}, 9, *toggle ? kTeal : kQuiet);
         centered(text, *toggle ? "ON" : "OFF", pill.x + (*toggle ? 23 : 45), center.y - 7, 11, 0.2F,
             *toggle ? kTeal : kQuiet);
-    } else if (choice != nullptr) {
+    } else if (theme.has_value()) {
+        const bool light = *theme == BoardTheme::Light;
+        const Color choiceFill = light ? kLightBoardPalette.surface : Fade(kGold, 0.10F);
+        const Color choiceBorder = light ? kLightBoardPalette.border : Fade(kGold, 0.45F);
+        const Color choiceInk = light ? kLightBoardPalette.ink : kGold;
         const Rectangle pill{bounds.x + bounds.width - 116, center.y - 14, 96, 28};
-        DrawRectangleRounded(pill, 1, 12, Fade(kGold, 0.10F));
-        DrawRectangleRoundedLinesEx(pill, 1, 12, 1, Fade(kGold, 0.45F));
-        centered(text, choice, pill.x + pill.width * 0.5F, center.y - 7, 11, 0.2F, kGold);
+        DrawRectangleRounded(pill, 1, 12, choiceFill);
+        DrawRectangleRoundedLinesEx(pill, 1, 12, 1, choiceBorder);
+        centered(text, light ? "LIGHT" : "DARK", pill.x + pill.width * 0.5F, center.y - 7,
+                 11, 0.2F, choiceInk);
         for (float sign : {-1.0F, 1.0F}) {
             const float x = pill.x + pill.width * 0.5F + sign * 36;
-            DrawLineEx({x - sign * 2, center.y - 3}, {x + sign * 1, center.y}, 1.2F, kGold);
-            DrawLineEx({x + sign * 1, center.y}, {x - sign * 2, center.y + 3}, 1.2F, kGold);
+            DrawLineEx({x - sign * 2, center.y - 3}, {x + sign * 1, center.y}, 1.2F, choiceInk);
+            DrawLineEx({x + sign * 1, center.y}, {x - sign * 2, center.y + 3}, 1.2F, choiceInk);
         }
     } else if (enabled && (page == Page::Main || index < 4)) {
         const Vector2 chevron{bounds.x + bounds.width - 28, center.y};

@@ -172,10 +172,10 @@ the pointer. **Sounds** enables the embedded effects; the HUD speaker button
 changes the same preference. All four options (Arrow loops, Flying arrow
 collisions, Crosshair guides, and Sounds) default to ON when `settings.txt` or
 the corresponding key is missing; explicitly saved OFF values are preserved.
-**Board theme**
-defaults to Dark and can be switched to Light; it affects the board and HUD,
-while menus and result screens stay dark. These preferences are also saved in
-`settings.txt` and remain compatible with older settings files.
+**Board theme** defaults to Dark and can be switched to Light; it affects the
+board and HUD, while menus and result screens stay dark. Its selector turns
+light when Light is chosen. These preferences are also saved in `settings.txt`
+and remain compatible with older settings files.
 
 Hovering a menu item selects it. The selection stays in place when the pointer
 leaves the item or crosses a gap. Arrow keys navigate from the current item,

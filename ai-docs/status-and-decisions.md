@@ -22,6 +22,9 @@ Sounds and Crosshair guides. Missing files/keys use those defaults; existing
 explicit OFF values are preserved. Persistence checks cover all 16 combinations
 of missing keys and explicit OFF, upgrades, malformed values and failed writes.
 A standalone fresh-start Settings capture confirmed all four ON switches.
+The Board theme selector also previews Light with the light board surface and
+dark label/chevrons; Dark retains its gold accents. Both standalone Settings
+captures were inspected; no additional texture or animation cache was added.
 
 The user accepted rounded arrowheads and curved 90-degree bends after reviewing
 their appearance and local performance/memory measurements, then authorized
@@ -76,7 +79,7 @@ ordinary source pushes leave release artifacts unchanged.
 | Generator | Dense, varied, constructively solvable tangles; explicit failure | Boring serpentine/S-shaped fallback or relaxed quality just to succeed |
 | Performance | Bounded memory, cached geometry, sleeping/polling while idle | Full geometry every camera frame, huge supersampled textures, driver VSync waits |
 | Arrow appearance | Rounded head vertices and curved 90-degree bends; retain cached analytic coverage | Extra per-frame static traversal or a large raster cache |
-| Themes | Dark board/HUD default, Light optional; menus/results always dark | Switching all screens to Light was considered but not selected |
+| Themes | Dark board/HUD default, Light optional; selector reflects Light with a light fill; menus/results always dark | Switching all screens to Light was considered but not selected |
 | Menu selection | One persistent current item shared by mouse/keys | Restoring a separate keyboard bookmark on mouse exit caused gap flicker |
 | Fonts | Embedded Inter with native Windows smoothing throughout UI | Scaled/blurred text and mixed unsmoothed labels |
 | Fullscreen | Desktop-resolution borderless window, restored cursor | Exclusive mode caused resolution/aspect problems and brief blackouts |

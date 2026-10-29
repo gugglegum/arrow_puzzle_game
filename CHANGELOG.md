@@ -17,6 +17,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- The Board theme selector now has a light fill and contrasting dark label and
+  chevrons when Light is chosen.
 - Arrow loops, Flying arrow collisions, Crosshair guides, and Sounds now default
   to ON when settings.txt or the corresponding key is missing. Saved OFF
   preferences remain unchanged.

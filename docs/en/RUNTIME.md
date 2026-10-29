@@ -172,6 +172,8 @@ Camera controls:
   resolution, without entering an exclusive display mode.
 
 Menus support mouse, Up/Down, Enter, and Space for settings including theme.
+The Board theme selector uses a light fill with dark text and chevrons for
+Light; Dark retains its dark fill and gold accents. The menu itself stays dark.
 `MenuSelection` stores one current item. Hover selects it; moving into a gap or
 outside the menu keeps it selected. Up/Down moves from that item even with the
 pointer resting over another row. New pointer movement over an item or a click

@@ -1940,14 +1940,14 @@ int Game::run() {
                 const int id =
                     static_cast<int>(menuScreen) * 16 + index;
                 std::optional<bool> toggle;
-                const char* choice = nullptr;
+                std::optional<BoardTheme> theme;
                 if (menuScreen == Screen::SettingsMenu && index < 4) {
                     const std::array<bool, 4> values{{settings.arrowLoops, settings.flyingArrowCollisions,
                         settings.crosshairGuides, settings.sounds}};
                     toggle = values[index];
                 }
                 if (menuScreen == Screen::SettingsMenu && index == 4) {
-                    choice = settings.boardTheme == BoardTheme::Dark ? "DARK" : "LIGHT";
+                    theme = settings.boardTheme;
                 }
                 MenuScreen::drawButton(
                     uiText,
@@ -1960,7 +1960,7 @@ int Game::run() {
                         selectedMenuButton == index,
                     pressedMenuButton == id && hoveredMenuButton == index,
                     toggle,
-                    choice
+                    theme
                 );
                 return enabled &&
                        activatedMenuButton == index;
