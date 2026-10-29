@@ -6,8 +6,15 @@ The native build and desktop port are implemented on the shared source tree.
 Use [the maintained Linux guide](../docs/en/LINUX.md), `tools/build-linux.sh`
 and the `linux` / `linux-debug` presets. Windows remains the main platform;
 Linux changes are transferred through GitHub, with separate local build trees.
-No release or tag was created. Packaging and development CI are the next change.
+No release or tag was created. Development tar packaging and pre-release CI
+are implemented; the first hosted run is pending at this snapshot. AppImage
+follows tar validation.
 
+- `package-linux.py` installs/strips a copy with no build RPATH, bundles docs
+  and licenses, and records ELF symbol requirements/hashes/source metadata. The
+  extracted archive passed all seven smoke scenarios locally. `build.yml`
+  checks Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on push/PR/manual
+  runs, with Mesa/Xvfb and downloadable packages/logs. No publication permissions.
 - Mint 22.3 / Ubuntu noble, x86-64, GCC 13.3, CMake 3.28.3, Ninja 1.11.1.
   Native Release and all five default suites passed (full generator sample).
 - X11/Cinnamon in VMware: Mesa 25.2.8 SVGA3D exposes OpenGL 4.3. Explicit

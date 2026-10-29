@@ -1,0 +1,135 @@
+name: Build and test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux / ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: ubuntu22-gcc
+            os: ubuntu-22.04
+            cc: gcc
+            cxx: g++
+          - id: ubuntu24-clang
+            os: ubuntu-24.04
+            cc: clang
+            cxx: clang++
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - name: Check out source and version history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Linux build and display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang ninja-build git python3-venv \
+            libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev \
+            libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth
+          python3 -m venv "$RUNNER_TEMP/arrow-cmake"
+          "$RUNNER_TEMP/arrow-cmake/bin/pip" install cmake==3.28.3
+          echo "$RUNNER_TEMP/arrow-cmake/bin" >> "$GITHUB_PATH"
+
+      - name: Build Release and run all headless suites
+        run: ./tools/build-linux.sh -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Check rendering and text with Mesa
+        run: |
+          cmake --build build/linux --parallel 2 --target arrow_render_tests arrow_ui_text_tests
+          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_render_tests
+          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests
+
+      - name: Package the tested build
+        id: package
+        run: python3 tools/package-linux.py --version "dev-${GITHUB_SHA:0:12}-${{ matrix.id }}"
+
+      - name: Verify and launch the extracted archive
+        env:
+          ARCHIVE: ${{ steps.package.outputs.archive_path }}
+        run: |
+          cd out/linux-package
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          mkdir -p "$RUNNER_TEMP/arrow-unpacked"
+          tar -xzf "$ARCHIVE" -C "$RUNNER_TEMP/arrow-unpacked" --strip-components=1
+          cp SHA256SUMS.txt "$RUNNER_TEMP/arrow-unpacked/"
+          cd "$RUNNER_TEMP/arrow-unpacked"
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          cd "$GITHUB_WORKSPACE"
+          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
+            "$RUNNER_TEMP/arrow-unpacked/ArrowPuzzle" --output-dir out/linux-smoke
+
+      - name: Upload development package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-${{ matrix.id }}-${{ github.sha }}
+          path: out/linux-package/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test logs and desktop captures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-checks-${{ matrix.id }}-${{ github.sha }}
+          path: |
+            build/linux/Testing/Temporary/LastTest.log
+            out/linux-smoke/**/*.png
+            out/linux-smoke/**/*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows:
+    name: Windows / MSVC x64
+    runs-on: windows-2022
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out source and version history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build Release and run all headless suites
+        run: ./tools/build-windows.ps1 -Configuration Release
+
+      - name: Package the tested build
+        run: ./tools/package-windows.ps1 -Version ("dev-" + $env:GITHUB_SHA.Substring(0, 12)) -OutputDirectory out/ci-windows
+
+      - name: Upload development package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-msvc-${{ github.sha }}
+          path: out/ci-windows/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-checks-${{ github.sha }}
+          path: build/windows-msvc/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+          retention-days: 14

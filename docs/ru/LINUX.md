@@ -103,3 +103,39 @@ Alt+Enter, Escape, Alt-Tab, изменение окна и потреблени�
 Источники: [зависимости raylib для Linux](https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux),
 [каталоги XDG](https://specifications.freedesktop.org/basedir/latest/),
 [fullscreen EWMH](https://specifications.freedesktop.org/wm/latest/ar01s05.html).
+
+## Архив разработки и CI
+
+```bash
+python3 tools/package-linux.py --version dev-local
+cd out/linux-package
+sha256sum --check --ignore-missing SHA256SUMS.txt
+tar -xzf ArrowPuzzle-dev-local-linux-x64.tar.gz
+cd ArrowPuzzle-dev-local-linux-x64
+sha256sum --check --ignore-missing ../SHA256SUMS.txt
+./ArrowPuzzle
+```
+
+Скрипт требует Release, обновляет сборку, устанавливает и strip-ит копию
+(удаляя RPATH сборочного каталога) и упаковывает её с документацией, лицензиями
+и `build-info.json`. Метаданные содержат компилятор, commit raylib, состояние
+исходников, запуск Actions при наличии, зависимости ELF и версии символов.
+Скрипт не перезаписывает пакет и метаданные; для следующего пакета используйте
+`--output-dir`. Проверка скачанной программы:
+
+```bash
+python3 tools/smoke-linux.py /absolute/path/to/ArrowPuzzle
+```
+
+**Build and test** (`.github/workflows/build.yml`) проверяет push в ветки, PR
+и ручные запуски на Windows/MSVC, Ubuntu 22.04/GCC и Ubuntu 24.04/Clang. Для
+Linux выполняются проверки рендера/текста Mesa/Xvfb и распакованного пакета.
+Пакеты, логи и скриншоты доступны в артефактах запуска 14 дней. Этот workflow
+не создаёт теги и релизы; workflow релиза Windows остаётся отдельным.
+
+Ubuntu 22.04/GCC — выбранная нижняя сборочная база CI, но не обещание работы
+на любых старых системах. Смотрите `required_symbol_versions` конкретного
+пакета: сборка Mint 22.3/GCC 13 требует более новых glibc/libstdc++, чем сборка
+Ubuntu 22.04. Системные библиотеки и драйверы X11/OpenGL всё равно нужны.
+AppImage — следующий этап после проверки tar. Ни один формат сам по себе не
+подтверждает native Wayland или производительность другого GPU.

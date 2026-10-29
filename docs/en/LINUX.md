@@ -100,3 +100,39 @@ support. The reported Wine sound delay has not been attributed to a cause.
 Sources: [raylib Linux dependencies](https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux),
 [XDG directories](https://specifications.freedesktop.org/basedir/latest/),
 [EWMH fullscreen](https://specifications.freedesktop.org/wm/latest/ar01s05.html).
+
+## Development archive and CI
+
+```bash
+python3 tools/package-linux.py --version dev-local
+cd out/linux-package
+sha256sum --check --ignore-missing SHA256SUMS.txt
+tar -xzf ArrowPuzzle-dev-local-linux-x64.tar.gz
+cd ArrowPuzzle-dev-local-linux-x64
+sha256sum --check --ignore-missing ../SHA256SUMS.txt
+./ArrowPuzzle
+```
+
+The helper requires Release, rebuilds the executable, installs/strips a copy
+(removing build RPATHs), and archives it with documentation, licenses and
+`build-info.json`. The metadata records compiler, raylib commit, source state,
+Actions run when applicable, ELF dependencies and required symbol versions.
+It refuses to overwrite package/metadata files; choose `--output-dir` for the
+next package. To check a downloaded binary:
+
+```bash
+python3 tools/smoke-linux.py /absolute/path/to/ArrowPuzzle
+```
+
+**Build and test** (`.github/workflows/build.yml`) checks branch pushes, PRs and
+manual runs on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. Linux
+includes Mesa/Xvfb rendering, glyphs and extracted-package smoke checks. Download
+packages, logs and captures from the run's artifacts (14-day retention). It
+never creates a tag or release; the Windows release workflow remains separate.
+
+Ubuntu 22.04/GCC is the intended oldest CI build baseline, not a promise about
+all older systems. Check the artifact's `required_symbol_versions`: a build made
+on Mint 22.3/GCC 13 needs newer glibc/libstdc++ than one built on Ubuntu 22.04.
+X11/OpenGL drivers and system libraries must still be installed. AppImage is
+the next packaging stage after tar validation. Neither format establishes
+native Wayland support or performance on another GPU.

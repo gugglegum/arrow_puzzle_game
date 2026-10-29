@@ -115,7 +115,10 @@ assets/sounds/             Встроенные звуки игры и фейе�
 assets/icons/              Исходный SVG, встроенные PNG и Windows ICO
 cmake/EmbedUiFont.cmake    Преобразование TTF в C++ при сборке
 tools/build-windows.ps1    Настройка MSVC, сборка и запуск тестов
-tools/package-windows.ps1  ZIP, документация, лицензии и SHA-256
+tools/package-windows.ps1  Windows ZIP, лицензии и SHA-256
+tools/build-linux.sh       Конфигурация, сборка и тесты Linux
+tools/package-linux.py     Linux tar.gz, метаданные и SHA-256
+tools/smoke-linux.py       Изолированный запуск и save/resume пакета
 .github/workflows/         Релизная сборка и подтверждение происхождения
 docs/                      Техническая документация и скриншоты
 ```
@@ -233,7 +236,7 @@ ctest --preset windows-msvc
 ctest --test-dir build\windows-msvc --output-on-failure
 ```
 
-Генераторный тест по умолчанию проверяет 1 333 поля и набор специальных
+Генераторный тест по умолчанию проверяет 1 342 поля и набор специальных
 сценариев движения. Он намеренно тяжёлый и может выполняться десятки секунд.
 
 Для быстрого воспроизводимого диапазона:
@@ -331,7 +334,8 @@ GitHub Releases. Релизный ZIP содержит автономный `Arr
 changelog, документацию со скриншотами и лицензии. Перед публикацией нужны
 чистая Release-сборка, полный `ctest`, запуск распакованного EXE и SHA-256.
 Тег `vX.Y.Z` запускает GitHub Actions, создающий проверяемые attestations и
-черновик релиза от `github-actions[bot]`. Обычный push сборку не запускает.
+черновик релиза от `github-actions[bot]`. Push в ветки и PR запускают отдельный
+workflow **Build and test**: проверки и артефакты Linux/Windows без публикации релиза.
 
 Надпись версии определяется Git-тегом; между релизами добавляются число коммитов
 и короткий hash. Отдельная локальная сборка с `ARROWPUZZLE_RELEASE_PREVIEW=ON`

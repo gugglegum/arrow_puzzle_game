@@ -176,6 +176,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(X11 REQUIRED)
     target_sources(arrow_puzzle PRIVATE src/LinuxWindow.cpp)
     target_link_libraries(arrow_puzzle PRIVATE glfw X11::X11)
+    # Installation removes build-tree RPATHs before Linux packaging.
+    install(TARGETS arrow_puzzle RUNTIME DESTINATION . COMPONENT Runtime)
 endif()
 
 add_dependencies(arrow_puzzle arrow_build_version)

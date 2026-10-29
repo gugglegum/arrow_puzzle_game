@@ -7,6 +7,22 @@ Windows 2022 runner. It runs only after a `vX.Y.Z` tag is pushed or when an
 owner starts it with **Run workflow**. Ordinary branch pushes and pull requests
 do not start a build.
 
+## Development checks before release
+
+The separate **Build and test** workflow (`build.yml`) runs on branch pushes,
+pull requests and manual dispatch. It builds Release and runs all five default
+suites on Windows 2022/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. Linux also
+runs rendering/text checks with Mesa/Xvfb and launches the unpacked tar archive
+with isolated XDG data, a read-only program directory, menus, both themes and
+CRLF save/resume checks. The audio mixer still needs an explicit local device test.
+
+Each successful job uploads a development ZIP or tar.gz with hashes and build
+metadata for 14 days. These files identify the tested commit/run; they are not
+release-provenance-attested assets. Test logs and Linux captures are uploaded
+on failures too. This workflow has read-only repository permissions and does
+not create tags, drafts or published releases. Download artifacts from its
+Actions run; Linux packaging details are in [LINUX.md](LINUX.md).
+
 ## Previewing a release before tagging
 
 Use a separate Release build directory when preparing screenshots before a

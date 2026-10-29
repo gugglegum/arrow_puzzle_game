@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Push/PR/manual development CI for Windows/MSVC and Linux GCC/Clang, with
+  downloadable packages, hashes, metadata, Mesa render/text checks and isolated
+  archive launch/save verification. Linux tar.gz packaging removes build RPATHs.
+
 - Native Linux x86-64 build presets/helper, XDG settings and save directories,
   and window-manager-controlled X11/XWayland fullscreen. Windows retains portable
   files beside the EXE and its existing borderless fullscreen implementation.

@@ -110,8 +110,11 @@ assets/sounds/             Embedded game and firework sounds
 assets/icons/              SVG master, embedded PNG sizes, Windows ICO
 cmake/EmbedUiFont.cmake    TTF-to-C++ generation
 tools/build-windows.ps1    MSVC setup, build and tests
-tools/package-windows.ps1  ZIP, documentation, licenses and SHA-256
-.github/workflows/         Release build and provenance
+tools/package-windows.ps1  Windows ZIP, licenses and SHA-256
+tools/build-linux.sh       Linux configure, build and tests
+tools/package-linux.py     Linux tar.gz, metadata and SHA-256
+tools/smoke-linux.py       Isolated packaged-game launch/save checks
+.github/workflows/         Development checks and separate Windows release
 docs/                      Technical documentation and shared screenshots
 ```
 
@@ -227,7 +230,7 @@ Full CTest runs five test suites:
 ctest --test-dir build\windows-msvc --output-on-failure
 ```
 
-The default generator test checks 1,333 boards and special motion regressions.
+The default generator test checks 1,342 boards and special motion regressions.
 It is deliberately substantial and may take tens of seconds.
 
 For a quick reproducible range:
@@ -322,7 +325,8 @@ A release ZIP contains standalone ArrowPuzzle.exe, both READMEs, changelog,
 documentation/screenshots, and licenses. Publication requires a clean Release
 build, full CTest, successful unpacked startup, and SHA-256 checks.
 A `vX.Y.Z` tag starts Actions, which creates verifiable attestations and a draft
-as `github-actions[bot]`. A normal branch push does not trigger a build.
+as `github-actions[bot]`. Branch pushes and PRs run the separate **Build and test**
+workflow with Linux/Windows development artifacts and no release publication.
 
 The displayed version comes from Git tags; intermediate builds add the commit
 count and short hash. An isolated local build with
