@@ -80,8 +80,13 @@ def production_smoke(executable, appimage, work, env, settings_path):
             def expect_language(code, action="initial selection"):
                 contents = settings_path.read_text()
                 if f"language={code}\n" not in contents:
+                    if shutil.which("xwd"):
+                        subprocess.run(["xwd", "-silent", "-id", window, "-out", str(work / "language-error.xwd")],
+                                       timeout=5, check=False)
+                    focus = subprocess.run(["xdotool", "getwindowfocus"], text=True,
+                                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=5)
                     raise RuntimeError(f"Language selector did not save {code} after {action}: {contents!r}; "
-                                       f"see {work / 'production.log'}")
+                                       f"window={window}, focus={focus.stdout.strip()}; see {work / 'production.log'}")
 
             # Fresh menu: Down skips disabled Resume and selects Settings.
             # Up wraps from the first setting to Back, then to Language.

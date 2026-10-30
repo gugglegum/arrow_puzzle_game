@@ -44,7 +44,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang ninja-build git curl python3-venv \
             libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev \
-            libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth xdotool
+            libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth xdotool x11-apps
           python3 -m venv "$RUNNER_TEMP/arrow-cmake"
           "$RUNNER_TEMP/arrow-cmake/bin/pip" install cmake==3.28.3
           echo "$RUNNER_TEMP/arrow-cmake/bin" >> "$GITHUB_PATH"
@@ -81,10 +81,12 @@ jobs:
             build/linux/Testing/Temporary/LastTest.log
             out/linux-smoke/**/*.png
             out/linux-smoke/**/*.log
+            out/linux-smoke/**/*.xwd
             out/linux-qa-smoke/**/*.png
             out/linux-qa-smoke/**/*.log
             out/appimage-smoke/**/*.png
             out/appimage-smoke/**/*.log
+            out/appimage-smoke/**/*.xwd
             out/localization-ui/*.png
           if-no-files-found: warn
           retention-days: 14
