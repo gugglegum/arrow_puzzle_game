@@ -16,7 +16,7 @@ Source entry points: `include/arrow/Localization.hpp`, `src/Localization.cpp`,
 The catalog statically rejects missing/empty translations or misordered IDs.
 
 Inter already contains Latin/Cyrillic including Ukrainian. Chinese uses a
-renamed 59,728-byte Noto Sans SC subset; reproduction and pinned upstream
+renamed Noto Sans SC subset; reproduction and pinned upstream
 SHA-256 are in [fonts](../assets/fonts/README.md). Both platform package helpers
 include the new OFL notice. Updating Chinese strings requires regenerating the
 checked-in subset; the glyph coverage test detects omissions. Normal builds

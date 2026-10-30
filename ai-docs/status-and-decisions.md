@@ -26,8 +26,13 @@ restart persistence, both left-drag modes, middle panning, return-to-origin,
 release-frame movement and ordinary click launches. A renamed standalone
 portable Release starts with the default on and shuts down cleanly. Evidence
 is in ignored `out/left-drag-settings/`; the probe is not production code.
-Linux production smoke also checks the new toggle with real X11 input;
-its next CI run is the cross-platform verification, not a physical desktop test.
+On implementation head `d876ebe`, [CI run 41049492956](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/41049492956)
+passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. Each passed six
+default suites; both Linux jobs rendered all eight languages at both sizes.
+Real X11 mouse/Enter/Space toggles and saved values passed in all four Linux
+package variants (ordinary/portable tar and AppImage on GCC; both tar builds
+also on Clang), alongside the existing language-selector checks. This is
+CI/Xvfb verification, not a new physical Linux desktop session.
 
 ## Interface localization, unreleased (2026-10-30)
 
