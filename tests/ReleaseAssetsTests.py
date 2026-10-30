@@ -11,6 +11,7 @@ import unittest
 import zipfile
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 spec = importlib.util.spec_from_file_location("release_assets", Path(__file__).resolve().parents[1] / "tools/release-assets.py")
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
@@ -28,24 +29,36 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.output = self.root / "combined"
         self.windows.mkdir()
         self.linux.mkdir()
-        self.win_name = f"ArrowPuzzle-{VERSION}-windows-x64.zip"
-        self.tar_name = f"ArrowPuzzle-{VERSION}-linux-x64.tar.gz"
-        self.image_name = f"ArrowPuzzle-{VERSION}-linux-x64.AppImage"
-        self.win_bytes = b"MZ Windows executable fixture"
-        self.linux_bytes = b"\x7fELF Linux executable fixture"
-        base = {"source_commit": COMMIT, "package_version": VERSION, "source_dirty": False}
-        self.win_meta = base | {"executable_sha256": release.sha256(self.win_bytes)}
-        self.linux_meta = base | {"executable_sha256": release.sha256(self.linux_bytes), "architecture": "x86_64"}
-        self.write_json(self.windows / "build-info-windows-x64.json", self.win_meta)
-        self.write_json(self.linux / "build-info-linux-x64.json", self.linux_meta)
-        self.make_zip()
-        self.make_tar()
-        (self.linux / self.image_name).write_bytes(b"AppImage fixture")
-        self.image_meta = self.linux_meta | {
-            "source_archive_sha256": release.sha256((self.linux / self.tar_name).read_bytes()),
-            "appimage_sha256": release.sha256((self.linux / self.image_name).read_bytes()),
-        }
-        self.write_json(self.linux / "build-info-linux-appimage-x64.json", self.image_meta)
+        self.modes = {}
+        for portable in (False, True):
+            suffix = "-portable" if portable else ""
+            marker = b"ARROWPUZZLE_STORAGE=" + (b"portable" if portable else b"user")
+            value = {
+                "suffix": suffix,
+                "win_name": f"ArrowPuzzle-{VERSION}-windows-x64{suffix}.zip",
+                "tar_name": f"ArrowPuzzle-{VERSION}-linux-x64{suffix}.tar.gz",
+                "image_name": f"ArrowPuzzle-{VERSION}-linux-x64{suffix}.AppImage",
+                "win_bytes": b"MZ Windows executable fixture " + marker,
+                "linux_bytes": b"\x7fELF Linux executable fixture " + marker,
+            }
+            base = {"source_commit": COMMIT, "package_version": VERSION, "source_dirty": False, "portable": portable}
+            value["win_meta"] = base | {"executable_sha256": release.sha256(value["win_bytes"]),
+                                        "executable_name": f"ArrowPuzzle{suffix}.exe"}
+            value["linux_meta"] = base | {"executable_sha256": release.sha256(value["linux_bytes"]),
+                                          "executable_name": f"ArrowPuzzle{suffix}", "architecture": "x86_64"}
+            self.modes[portable] = value
+            self.write_json(self.windows / f"build-info-windows-x64{suffix}.json", value["win_meta"])
+            self.write_json(self.linux / f"build-info-linux-x64{suffix}.json", value["linux_meta"])
+            self.make_zip(portable=portable)
+            self.make_tar(portable=portable)
+            (self.linux / value["image_name"]).write_bytes(b"AppImage fixture" + suffix.encode())
+            value["image_meta"] = value["linux_meta"] | {
+                "source_archive_sha256": release.sha256((self.linux / value["tar_name"]).read_bytes()),
+                "appimage_sha256": release.sha256((self.linux / value["image_name"]).read_bytes()),
+            }
+            self.write_json(self.linux / f"build-info-linux-appimage-x64{suffix}.json", value["image_meta"])
+        for name, value in self.modes[False].items():
+            setattr(self, name, value)
         # Fake bundles exercise file handling only, never cryptographic verification.
         (self.windows / "attestation-windows-x64.sigstore.json").write_text("{}")
         (self.linux / "attestation-linux-x64.sigstore.json").write_text("{}")
@@ -58,37 +71,42 @@ class ReleaseAssetsTests(unittest.TestCase):
     def write_json(path, value):
         path.write_text(json.dumps(value))
 
-    def make_zip(self, binary=None, metadata=None):
-        with zipfile.ZipFile(self.windows / self.win_name, "w") as archive:
-            archive.writestr("ArrowPuzzle.exe", self.win_bytes if binary is None else binary)
-            archive.writestr("build-info.json", json.dumps(self.win_meta if metadata is None else metadata))
+    def make_zip(self, binary=None, metadata=None, portable=False):
+        value = self.modes[portable]
+        with zipfile.ZipFile(self.windows / value["win_name"], "w") as archive:
+            archive.writestr(value["win_meta"]["executable_name"], value["win_bytes"] if binary is None else binary)
+            archive.writestr("build-info.json", json.dumps(value["win_meta"] if metadata is None else metadata))
 
-    def make_tar(self, mode=0o755):
-        with tarfile.open(self.linux / self.tar_name, "w:gz") as archive:
-            for name, data, permissions in (("ArrowPuzzle", self.linux_bytes, mode),
-                                             ("build-info.json", json.dumps(self.linux_meta).encode(), 0o644)):
-                info = tarfile.TarInfo(f"ArrowPuzzle-{VERSION}-linux-x64/{name}")
+    def make_tar(self, mode=0o755, portable=False):
+        value = self.modes[portable]
+        with tarfile.open(self.linux / value["tar_name"], "w:gz") as archive:
+            for name, data, permissions in ((value["linux_meta"]["executable_name"], value["linux_bytes"], mode),
+                                             ("build-info.json", json.dumps(value["linux_meta"]).encode(), 0o644)):
+                info = tarfile.TarInfo(f"ArrowPuzzle-{VERSION}-linux-x64{value['suffix']}/{name}")
                 info.size, info.mode = len(data), permissions
                 archive.addfile(info, io.BytesIO(data))
 
     def write_sums(self):
-        windows = {"ArrowPuzzle.exe": release.sha256(self.win_bytes),
-                   self.win_name: release.sha256((self.windows / self.win_name).read_bytes())}
-        linux = {"ArrowPuzzle": release.sha256(self.linux_bytes),
-                 self.tar_name: release.sha256((self.linux / self.tar_name).read_bytes()),
-                 self.image_name: release.sha256((self.linux / self.image_name).read_bytes())}
-        for directory, platform, values in ((self.windows, "windows", windows), (self.linux, "linux", linux)):
-            (directory / f"SHA256SUMS-{platform}-x64.txt").write_text(
-                "".join(f"{digest}  {name}\n" for name, digest in values.items()))
+        for value in self.modes.values():
+            windows = {value["win_meta"]["executable_name"]: release.sha256(value["win_bytes"]),
+                       value["win_name"]: release.sha256((self.windows / value["win_name"]).read_bytes())}
+            linux = {value["linux_meta"]["executable_name"]: release.sha256(value["linux_bytes"]),
+                     value["tar_name"]: release.sha256((self.linux / value["tar_name"]).read_bytes()),
+                     value["image_name"]: release.sha256((self.linux / value["image_name"]).read_bytes())}
+            for directory, platform, values in ((self.windows, "windows", windows), (self.linux, "linux", linux)):
+                (directory / f"SHA256SUMS-{platform}-x64{value['suffix']}.txt").write_text(
+                    "".join(f"{digest}  {name}\n" for name, digest in values.items()))
 
     def assemble(self):
         release.assemble(self.windows, self.linux, self.output, COMMIT, VERSION)
 
-    def test_common_assets_have_distinct_names_and_five_checksum_subjects(self):
+    def test_common_assets_include_six_packages_and_ten_checksum_subjects(self):
         self.assemble()
-        self.assertEqual(len(list(self.output.iterdir())), 9)
+        self.assertEqual(len(list(self.output.iterdir())), 15)
         self.assertEqual(set(release.checksums(self.output / "SHA256SUMS.txt")),
-                         {"ArrowPuzzle.exe", "ArrowPuzzle", self.win_name, self.tar_name, self.image_name})
+                         {name for value in self.modes.values() for name in
+                          (value["win_meta"]["executable_name"], value["linux_meta"]["executable_name"],
+                           value["win_name"], value["tar_name"], value["image_name"])})
         self.assertEqual((self.output / self.image_name).read_bytes(), b"AppImage fixture")
 
     def test_output_is_never_overwritten(self):
@@ -100,7 +118,9 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.assertEqual(marker.read_text(), "keep")
 
     def test_tampered_packages_are_rejected(self):
-        for directory, name in ((self.windows, self.win_name), (self.linux, self.tar_name), (self.linux, self.image_name)):
+        for directory, name in ((directory, value[key]) for value in self.modes.values()
+                                for directory, key in ((self.windows, "win_name"), (self.linux, "tar_name"),
+                                                       (self.linux, "image_name"))):
             with self.subTest(name=name):
                 path, original = directory / name, (directory / name).read_bytes()
                 path.write_bytes(original + b"changed")
@@ -110,8 +130,7 @@ class ReleaseAssetsTests(unittest.TestCase):
                 path.write_bytes(original)
 
     def test_source_version_and_dirty_metadata_are_checked_for_each_platform(self):
-        for path in (self.windows / "build-info-windows-x64.json", self.linux / "build-info-linux-x64.json",
-                     self.linux / "build-info-linux-appimage-x64.json"):
+        for path in (*self.windows.glob("build-info-*.json"), *self.linux.glob("build-info-*.json")):
             original = json.loads(path.read_text())
             for field, value in (("source_commit", "b" * 40), ("package_version", "0.4.0"), ("source_dirty", True)):
                 with self.subTest(path=path.name, field=field):
@@ -146,6 +165,43 @@ class ReleaseAssetsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing release asset"):
             self.assemble()
         self.assertFalse(self.output.exists())
+
+    def test_missing_or_wrong_storage_metadata_is_rejected(self):
+        for portable, value in self.modes.items():
+            for directory, platform in ((self.windows, "windows"), (self.linux, "linux"),
+                                        (self.linux, "linux-appimage")):
+                path = directory / f"build-info-{platform}-x64{value['suffix']}.json"
+                original = json.loads(path.read_text())
+                for wrong in (None, not portable, int(portable), "portable"):
+                    with self.subTest(path=path.name, wrong=wrong):
+                        self.write_json(path, original | {"portable": wrong})
+                        with self.assertRaisesRegex(ValueError, "storage mode"):
+                            self.assemble()
+                        self.assertFalse(self.output.exists())
+                self.write_json(path, original)
+
+    def test_matching_hashes_cannot_hide_the_wrong_baked_mode_or_debug_hooks(self):
+        portable = self.modes[True]
+        original = portable["win_bytes"]
+        for bad in (self.win_bytes, original + b" ARROWPUZZLE_SCREENSHOT_FRAME"):
+            with self.subTest(binary=bad):
+                portable["win_bytes"] = bad
+                portable["win_meta"]["executable_sha256"] = release.sha256(bad)
+                self.make_zip(portable=True)
+                self.write_json(self.windows / "build-info-windows-x64-portable.json", portable["win_meta"])
+                self.write_sums()
+                with self.assertRaises(ValueError):
+                    self.assemble()
+                self.assertFalse(self.output.exists())
+
+    def test_appimage_cannot_be_paired_with_the_other_storage_mode(self):
+        path = self.linux / "build-info-linux-appimage-x64-portable.json"
+        for field in ("source_archive_sha256", "executable_sha256"):
+            with self.subTest(field=field):
+                self.write_json(path, self.modes[True]["image_meta"] | {field: self.image_meta[field]})
+                with self.assertRaises(ValueError):
+                    self.assemble()
+                self.assertFalse(self.output.exists())
 
     def test_missing_linux_execute_permission_is_rejected(self):
         self.make_tar(mode=0o644)

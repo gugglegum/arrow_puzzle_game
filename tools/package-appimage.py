@@ -12,6 +12,8 @@ import subprocess
 import tarfile
 import tempfile
 
+from build_features import check_production
+
 ROOT = Path(__file__).resolve().parents[1]
 TOOL_VERSION = "1.9.1"
 TOOL_URL = f"https://github.com/AppImage/appimagetool/releases/download/{TOOL_VERSION}/appimagetool-x86_64.AppImage"
@@ -81,19 +83,27 @@ def main():
         metadata = json.loads(candidates[0].read_text())
         if metadata["source_commit"] != command("git", "rev-parse", "HEAD"):
             raise RuntimeError("Rebuild the tar archive from the current source commit first")
-        if digest(stage / "ArrowPuzzle") != metadata["executable_sha256"]:
+        portable = metadata.get("portable")
+        if type(portable) is not bool:
+            raise RuntimeError("Source archive is missing its storage mode")
+        suffix = "-portable" if portable else ""
+        executable_name = "ArrowPuzzle" + suffix
+        if metadata.get("executable_name") != executable_name:
+            raise RuntimeError("Unexpected source executable name")
+        check_production((stage / executable_name).read_bytes(), portable)
+        if digest(stage / executable_name) != metadata["executable_sha256"]:
             raise RuntimeError("The archived executable does not match its build metadata")
         version = metadata["package_version"]
         if not version or any(character not in "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.+-" for character in version):
             raise RuntimeError("Invalid package version")
-        destination = output / f"ArrowPuzzle-{version}-linux-x64.AppImage"
+        destination = output / f"ArrowPuzzle-{version}-linux-x64{suffix}.AppImage"
         if destination.exists() or destination.with_suffix(".AppImage.build-info.json").exists():
             raise RuntimeError(f"Refusing to overwrite {destination}")
         appdir = work / "ArrowPuzzle.AppDir"
         appdir.mkdir()
         binary_dir = appdir / "usr/bin"
         binary_dir.mkdir(parents=True)
-        (stage / "ArrowPuzzle").rename(binary_dir / "ArrowPuzzle")
+        (stage / executable_name).rename(binary_dir / "ArrowPuzzle")
         content = appdir / "usr/share/arrow-puzzle"
         content.parent.mkdir(parents=True, exist_ok=True)
         stage.rename(content)
@@ -104,6 +114,7 @@ def main():
         shutil.copy2(ROOT / "tools/appimage/RUNTIME-NOTICES.txt", content)
         build_info = metadata | {
             "format": "AppImage type 2",
+            "appimage_executable_path": "usr/bin/ArrowPuzzle",
             "source_archive_sha256": digest(archive),
             "appimagetool_version": TOOL_VERSION,
             "appimagetool_url": TOOL_URL,

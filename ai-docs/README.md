@@ -30,7 +30,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Debug-only screenshot hooks; no capture hotkeys | [Project guide, section 7](../docs/en/PROJECT_GUIDE.md), [capture policy](portable-distribution.md#accepted-screenshot-policy) | `Game.cpp`, CMake, `smoke-linux.py` |
 | Accepted rounded arrows, resource comparisons | [Rounding evaluation](rounded-arrows.md) | `ArrowStroke.hpp`, `BoardCoverageShader.hpp`, `RenderingTests.cpp` |
 | Linux build, Mint/VMware verification, packaging | [Linux progress](linux-portability.md), [developer guide](../docs/en/LINUX.md) | Linux presets/helpers, `Persistence.cpp`, `LinuxWindow.cpp`, workflows |
-| Portable package proposals and AppImage data paths | [Portable distribution discussion](portable-distribution.md) | `Persistence.cpp`, `Game.cpp`, `tools/appimage/AppRun` |
+| Ordinary/portable builds and AppImage data paths | [Accepted storage contract](portable-distribution.md) | `Persistence.cpp`, `Game.cpp`, packaging/CI |
 | Menus, themes, sound, end screens | [Runtime guide](../docs/en/RUNTIME.md) | `MenuSelection.hpp`, `EndScreen.cpp`, `GameAudio.cpp` |
 | Release procedure and verification | [Release guide](../docs/en/RELEASING.md) | `cmake/`, `tools/`, `.github/workflows/` |
 | Previously verified release evidence | [Release history](release-history.md) | Tagged source and Actions run |

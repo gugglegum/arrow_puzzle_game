@@ -65,6 +65,9 @@ add_library(arrow_core STATIC
 target_include_directories(arrow_core PUBLIC include)
 target_compile_features(arrow_core PUBLIC cxx_std_20)
 target_link_libraries(arrow_core PUBLIC Threads::Threads)
+if(WIN32)
+    target_link_libraries(arrow_core PRIVATE shell32 ole32 uuid)
+endif()
 
 if(MSVC)
     target_compile_options(arrow_core PRIVATE /W4 /permissive- /utf-8)
@@ -139,7 +142,7 @@ foreach(size 16 24 32 48 64 128 256)
     list(APPEND ARROWPUZZLE_EMBEDDED_ICON_SOURCES "${source}")
 endforeach()
 
-add_executable(arrow_puzzle WIN32
+set(ARROWPUZZLE_GAME_SOURCES
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
     ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES}
     ${ARROWPUZZLE_EMBEDDED_ICON_SOURCES}
@@ -174,33 +177,40 @@ if(WIN32)
     configure_file(src/WindowsIcon.rc.in "${icon_resource}" @ONLY)
     set_source_files_properties("${icon_resource}" PROPERTIES
         OBJECT_DEPENDS "${ARROWPUZZLE_WINDOWS_ICON}")
-    target_sources(arrow_puzzle PRIVATE "${icon_resource}")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(X11 REQUIRED)
-    target_sources(arrow_puzzle PRIVATE src/LinuxWindow.cpp)
-    target_link_libraries(arrow_puzzle PRIVATE glfw X11::X11)
-    # Installation removes build-tree RPATHs before Linux packaging.
-    install(TARGETS arrow_puzzle RUNTIME DESTINATION . COMPONENT Runtime)
 endif()
 
-add_dependencies(arrow_puzzle arrow_build_version)
-target_link_libraries(arrow_puzzle PRIVATE arrow_core raylib)
-# Scenario/capture code and its environment strings do not exist outside Debug.
-target_compile_definitions(arrow_puzzle PRIVATE
-    ARROWPUZZLE_SCREENSHOT_HOOKS=$<CONFIG:Debug>)
+function(arrow_add_game target portable)
+    add_executable(${target} WIN32 ${ARROWPUZZLE_GAME_SOURCES})
+    add_dependencies(${target} arrow_build_version)
+    target_link_libraries(${target} PRIVATE arrow_core raylib)
+    target_compile_definitions(${target} PRIVATE
+        ARROWPUZZLE_PORTABLE=${portable}
+        ARROWPUZZLE_SCREENSHOT_HOOKS=$<CONFIG:Debug>)
+    target_include_directories(${target} PRIVATE src "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    if(WIN32)
+        target_sources(${target} PRIVATE "${icon_resource}")
+    endif()
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_sources(${target} PRIVATE src/LinuxWindow.cpp)
+        target_link_libraries(${target} PRIVATE glfw X11::X11)
+    endif()
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        target_link_options(${target} PRIVATE "$<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>")
+    endif()
+endfunction()
 
-target_include_directories(arrow_puzzle PRIVATE
-    src
-    "${CMAKE_CURRENT_BINARY_DIR}/generated"
-)
+arrow_add_game(arrow_puzzle 0)
+arrow_add_game(arrow_puzzle_portable 1)
 
-if(MSVC)
-    target_compile_options(arrow_puzzle PRIVATE /W4 /permissive- /utf-8)
-    target_link_options(arrow_puzzle PRIVATE
-        "$<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>"
-    )
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Separate components keep ordinary and portable package inputs unambiguous.
+    install(TARGETS arrow_puzzle RUNTIME DESTINATION . COMPONENT Runtime)
+    install(TARGETS arrow_puzzle_portable RUNTIME DESTINATION . COMPONENT PortableRuntime)
 endif()
 
 if(ARROWPUZZLE_BUILD_TESTS)

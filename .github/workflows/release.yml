@@ -64,34 +64,49 @@ jobs:
           persist-credentials: false
       - name: Build Release and run the complete headless test suite
         run: ./tools/build-windows.ps1 -Configuration Release
-      - name: Reject developer capture functionality in the release binary
-        run: python tools/check-production-binary.py build/windows-msvc/arrow_puzzle.exe
-      - name: Package the executable and notices
+      - name: Check storage modes and reject developer capture functionality
+        run: |
+          python tools/check-production-binary.py build/windows-msvc/arrow_puzzle.exe
+          if ($LASTEXITCODE -ne 0) { throw 'User build validation failed.' }
+          python tools/check-production-binary.py build/windows-msvc/arrow_puzzle_portable.exe --portable
+          if ($LASTEXITCODE -ne 0) { throw 'Portable build validation failed.' }
+      - name: Package the ordinary executable and notices
         id: package
-        run: ./tools/package-windows.ps1 -Version $env:PACKAGE_VERSION
-      - name: Attest the executable and its release archive
+        run: ./tools/package-windows.ps1 -Version $env:PACKAGE_VERSION -OutputDirectory out/windows-package/user
+      - name: Package the portable executable and notices
+        id: portable
+        run: ./tools/package-windows.ps1 -Version $env:PACKAGE_VERSION -Portable -OutputDirectory out/windows-package/portable
+      - name: Attest both executables and their release archives
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: |
             ${{ steps.package.outputs.exe_path }}
             ${{ steps.package.outputs.archive_path }}
+            ${{ steps.portable.outputs.exe_path }}
+            ${{ steps.portable.outputs.archive_path }}
       - name: Verify provenance and stage Windows assets
         env:
           GH_TOKEN: ${{ github.token }}
           EXE_PATH: ${{ steps.package.outputs.exe_path }}
           ARCHIVE_PATH: ${{ steps.package.outputs.archive_path }}
+          PORTABLE_EXE_PATH: ${{ steps.portable.outputs.exe_path }}
+          PORTABLE_ARCHIVE_PATH: ${{ steps.portable.outputs.archive_path }}
           BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($file in @($env:EXE_PATH, $env:ARCHIVE_PATH)) {
+          foreach ($file in @($env:EXE_PATH, $env:ARCHIVE_PATH, $env:PORTABLE_EXE_PATH, $env:PORTABLE_ARCHIVE_PATH)) {
             gh attestation verify $file --bundle $env:BUNDLE_PATH --repo $env:GITHUB_REPOSITORY --source-digest $env:GITHUB_SHA --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
             if ($LASTEXITCODE -ne 0) { throw 'Windows provenance verification failed.' }
           }
           New-Item -ItemType Directory -Path out/release-windows | Out-Null
           Copy-Item -LiteralPath $env:ARCHIVE_PATH -Destination out/release-windows/
-          Copy-Item out/release/build-info.json out/release-windows/build-info-windows-x64.json
-          Copy-Item out/release/SHA256SUMS.txt out/release-windows/SHA256SUMS-windows-x64.txt
+          Copy-Item -LiteralPath $env:PORTABLE_ARCHIVE_PATH -Destination out/release-windows/
+          foreach ($mode in @('user', 'portable')) {
+            $suffix = if ($mode -eq 'portable') { '-portable' } else { '' }
+            Copy-Item "out/windows-package/$mode/build-info.json" "out/release-windows/build-info-windows-x64$suffix.json"
+            Copy-Item "out/windows-package/$mode/SHA256SUMS.txt" "out/release-windows/SHA256SUMS-windows-x64$suffix.txt"
+          }
           Copy-Item -LiteralPath $env:BUNDLE_PATH -Destination out/release-windows/attestation-windows-x64.sigstore.json
       - name: Upload verified Windows inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -130,71 +145,44 @@ jobs:
           echo "$RUNNER_TEMP/arrow-cmake/bin" >> "$GITHUB_PATH"
       - name: Build Release and run the complete headless test suite
         run: ./tools/build-linux.sh
-      - name: Check rendering, text and developer capture scenarios
-        run: |
-          python3 tools/check-production-binary.py build/linux/arrow_puzzle
-          cmake --build build/linux --parallel 2 --target arrow_render_tests arrow_ui_text_tests
-          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_render_tests
-          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests
-          cmake --preset linux-debug -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$GITHUB_WORKSPACE/build/linux/_deps/raylib-src"
-          cmake --build build/linux-debug --parallel 2 --target arrow_puzzle
-          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
-            build/linux-debug/arrow_puzzle --debug-hooks --output-dir out/linux-qa-smoke
-      - name: Package the Linux archive
+      - name: Check rendering, text and both Debug storage modes
+        run: bash tools/check-linux-desktop.sh
+      - name: Package, verify and launch all four Linux packages
         id: package
-        run: python3 tools/package-linux.py --version "$PACKAGE_VERSION"
-      - name: Verify and launch the extracted archive
-        env:
-          ARCHIVE: ${{ steps.package.outputs.archive_path }}
-        run: |
-          cd out/linux-package
-          sha256sum --check --ignore-missing SHA256SUMS.txt
-          mkdir -p "$RUNNER_TEMP/linux-unpacked"
-          tar -xzf "$ARCHIVE" -C "$RUNNER_TEMP/linux-unpacked" --strip-components=1
-          cp SHA256SUMS.txt "$RUNNER_TEMP/linux-unpacked/"
-          cd "$RUNNER_TEMP/linux-unpacked"
-          sha256sum --check --ignore-missing SHA256SUMS.txt
-          cd "$GITHUB_WORKSPACE"
-          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
-            "$RUNNER_TEMP/linux-unpacked/ArrowPuzzle" --output-dir out/linux-smoke
-      - name: Build the AppImage after archive validation
-        id: appimage
-        env:
-          ARCHIVE: ${{ steps.package.outputs.archive_path }}
-        run: python3 tools/package-appimage.py "$ARCHIVE"
-      - name: Verify and launch the AppImage without FUSE
-        env:
-          APPIMAGE_PATH: ${{ steps.appimage.outputs.appimage_path }}
-        run: |
-          cd out/linux-package
-          sha256sum --check --ignore-missing SHA256SUMS.txt
-          cd "$GITHUB_WORKSPACE"
-          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
-            "$APPIMAGE_PATH" --appimage --output-dir out/appimage-smoke
-      - name: Attest the Linux executable, archive and AppImage
+        run: bash tools/check-linux-packages.sh "$PACKAGE_VERSION" --appimage
+      - name: Attest both Linux executables, archives and AppImages
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: |
-            ${{ runner.temp }}/linux-unpacked/ArrowPuzzle
-            ${{ steps.package.outputs.archive_path }}
-            ${{ steps.appimage.outputs.appimage_path }}
+            ${{ steps.package.outputs.user_exe }}
+            ${{ steps.package.outputs.user_archive }}
+            ${{ steps.package.outputs.user_appimage }}
+            ${{ steps.package.outputs.portable_exe }}
+            ${{ steps.package.outputs.portable_archive }}
+            ${{ steps.package.outputs.portable_appimage }}
       - name: Verify provenance and stage Linux assets
         env:
           GH_TOKEN: ${{ github.token }}
-          ARCHIVE_PATH: ${{ steps.package.outputs.archive_path }}
-          APPIMAGE_PATH: ${{ steps.appimage.outputs.appimage_path }}
+          USER_EXE: ${{ steps.package.outputs.user_exe }}
+          PORTABLE_EXE: ${{ steps.package.outputs.portable_exe }}
           BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
         run: |
-          for file in "$RUNNER_TEMP/linux-unpacked/ArrowPuzzle" "$ARCHIVE_PATH" "$APPIMAGE_PATH"; do
+          for file in "$USER_EXE" "$PORTABLE_EXE" out/linux-package/*/*.tar.gz out/linux-package/*/*.AppImage; do
             gh attestation verify "$file" --bundle "$BUNDLE_PATH" --repo "$GITHUB_REPOSITORY" \
               --source-digest "$GITHUB_SHA" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
           done
           mkdir -p out/release-linux
-          cp "$ARCHIVE_PATH" "$APPIMAGE_PATH" out/release-linux/
-          cp out/linux-package/build-info.json out/release-linux/build-info-linux-x64.json
-          cp "$APPIMAGE_PATH.build-info.json" out/release-linux/build-info-linux-appimage-x64.json
-          cp out/linux-package/SHA256SUMS.txt out/release-linux/SHA256SUMS-linux-x64.txt
+          for mode in user portable; do
+            suffix=''
+            if [[ $mode == portable ]]; then suffix=-portable; fi
+            directory="out/linux-package/$mode"
+            image="$directory/ArrowPuzzle-$PACKAGE_VERSION-linux-x64$suffix.AppImage"
+            cp "$directory/"*.tar.gz "$image" out/release-linux/
+            cp "$directory/build-info.json" "out/release-linux/build-info-linux-x64$suffix.json"
+            cp "$image.build-info.json" "out/release-linux/build-info-linux-appimage-x64$suffix.json"
+            cp "$directory/SHA256SUMS.txt" "out/release-linux/SHA256SUMS-linux-x64$suffix.txt"
+          done
           cp "$BUNDLE_PATH" out/release-linux/attestation-linux-x64.sigstore.json
       - name: Upload verified Linux inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -278,7 +266,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --source-digest "$SOURCE_COMMIT" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --deny-self-hosted-runners
           cp "$BUNDLE_PATH" out/release/attestation-checksums.sigstore.json
-          echo "Verified Windows ZIP, Linux tar.gz/AppImage and common SHA256SUMS.txt from $SOURCE_COMMIT." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified all six user/portable packages and common SHA256SUMS.txt from $SOURCE_COMMIT." >> "$GITHUB_STEP_SUMMARY"
           echo "Create/update a draft: ${{ needs.prepare.outputs.create_release }}. Publication is manual." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the common verified release files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -317,6 +305,6 @@ jobs:
             test "$draft" = 'true' || { echo 'Published release assets are never replaced. Use a new tag.' >&2; exit 1; }
             gh release upload "$RELEASE_TAG" release-files/* --clobber
           else
-            printf 'Built and tested by GitHub Actions from commit `%s`.\n\nBuild log: %s/%s/actions/runs/%s\n\nWindows ZIP/EXE, Linux tar.gz/executable/AppImage and the common SHA256SUMS.txt have GitHub build-provenance attestations. See docs/en/RELEASING.md for verification instructions.\n' "$SOURCE_COMMIT" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
+            printf 'Built and tested by GitHub Actions from commit `%s`.\n\nBuild log: %s/%s/actions/runs/%s\n\nAll six ordinary/portable packages, four executables and the common SHA256SUMS.txt have GitHub build-provenance attestations. See docs/en/RELEASING.md for verification instructions.\n' "$SOURCE_COMMIT" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
             gh release create "$RELEASE_TAG" release-files/* --verify-tag --draft --title "Arrow Puzzle $RELEASE_TAG" --notes-file release-notes.md
           fi

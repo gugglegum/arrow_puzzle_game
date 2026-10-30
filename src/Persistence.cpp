@@ -9,6 +9,7 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -19,6 +20,7 @@
 #if defined(_WIN32)
 #define NOMINMAX
 #include <windows.h>
+#include <shlobj.h>
 #elif defined(__linux__)
 #include <cerrno>
 #include <pwd.h>
@@ -65,9 +67,46 @@ std::filesystem::path defaultDirectory(
         throw std::runtime_error("Cannot determine the user home directory for saved data");
     }
     return home / fallback / "arrow-puzzle";
+#elif defined(_WIN32)
+    PWSTR raw = nullptr;
+    const HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &raw);
+    const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> folder(raw, CoTaskMemFree);
+    if (FAILED(result) || raw == nullptr) {
+        throw std::runtime_error("Cannot determine LocalAppData for saved data");
+    }
+    return std::filesystem::path{raw} / "ArrowPuzzle";
 #else
     return Persistence::executableDirectory();
 #endif
+}
+
+std::filesystem::path portableDirectory() {
+    const auto executable = Persistence::executableDirectory();
+#if defined(__linux__)
+    const char* imageValue = std::getenv("APPIMAGE");
+    const char* appDirValue = std::getenv("APPDIR");
+    if (imageValue != nullptr && appDirValue != nullptr) {
+        const std::filesystem::path image{imageValue};
+        const std::filesystem::path appDir{appDirValue};
+        if (image.is_absolute() && appDir.is_absolute()) {
+            std::error_code error;
+            const auto root = std::filesystem::weakly_canonical(appDir, error);
+            if (!error) {
+                const auto program = std::filesystem::weakly_canonical(executable, error);
+                if (!error) {
+                    const auto relative = program.lexically_relative(root);
+                    // An AppImage-hosted terminal/agent can export these variables
+                    // to an unrelated standalone game. Only honor our own AppDir.
+                    if (!relative.empty() && !relative.is_absolute() &&
+                        *relative.begin() != "..") {
+                        return image.parent_path();
+                    }
+                }
+            }
+        }
+    }
+#endif
+    return executable;
 }
 
 std::string_view trim(std::string_view value) noexcept {
@@ -368,11 +407,11 @@ bool isValidSavedGame(const SavedGame& game) noexcept {
     }
 }
 
-Persistence::Persistence()
-    : Persistence(
-          defaultDirectory("XDG_CONFIG_HOME", ".config"),
-          defaultDirectory("XDG_DATA_HOME", ".local/share")
-      ) {}
+Persistence::Persistence(StorageMode mode)
+    : directory_(mode == StorageMode::Portable ? portableDirectory()
+          : defaultDirectory("XDG_CONFIG_HOME", ".config")),
+      saveDirectory_(mode == StorageMode::Portable ? directory_
+          : defaultDirectory("XDG_DATA_HOME", ".local/share")) {}
 
 Persistence::Persistence(std::filesystem::path directory)
     : Persistence(directory, directory) {}

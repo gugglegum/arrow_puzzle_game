@@ -31,6 +31,8 @@ From the repository root:
 
 The helper configures Release, builds with two workers, and runs all five
 headless CTest suites. It forwards additional CMake configuration arguments.
+It builds `arrow_puzzle` (user storage) and `arrow_puzzle_portable` (adjacent
+storage) from the same sources.
 Use `--debug` for `build/linux-debug`; `CMAKE_BUILD_PARALLEL_LEVEL` controls
 parallelism. Equivalent commands:
 
@@ -47,6 +49,8 @@ an optional audio service are still runtime dependencies.
 
 ## Settings and saves
 
+The table applies to ordinary tar.gz and AppImage builds:
+
 | File | Default Linux location | Absolute override |
 | --- | --- | --- |
 | Settings | `~/.config/arrow-puzzle/settings.txt` | `$XDG_CONFIG_HOME/arrow-puzzle/settings.txt` |
@@ -54,10 +58,17 @@ an optional audio service are still runtime dependencies.
 
 Unset, empty or relative XDG variables use the defaults. An absent/invalid
 `HOME` is resolved through the user's account. Directories are created when
-writing, so the executable can live in a read-only directory. Windows keeps
-both files beside its EXE. Existing version-1 text formats are unchanged;
+writing, so the executable can live in a read-only directory. Ordinary Windows
+builds use `%LOCALAPPDATA%\ArrowPuzzle\`. Existing version-1 text formats are unchanged;
 to transfer progress, copy the two files to the corresponding OS locations
 while the game is closed. Adjacent Linux files are not imported automatically.
+
+Packages ending in `-portable.tar.gz` or `-portable.AppImage` instead store both
+files beside the executable or outer AppImage. The mode is compiled into
+`arrow_puzzle_portable`; neither a marker file nor a particular filename is
+required. XDG variables are ignored and an unwritable portable directory does
+not cause a fallback to user storage. Keep the portable directory writable.
+AppImage managers that move only the image do not move its adjacent data.
 
 Screenshot hooks exist only in Debug; Release and RelWithDebInfo exclude them.
 All configurations disable capture hotkeys.
@@ -169,7 +180,9 @@ The helper appends the AppImage hash to `SHA256SUMS.txt` and refuses overwrites.
 System game libraries and graphics drivers are not bundled: the AppImage has
 the same glibc/libstdc++ requirements as its input tar archive. It is a single
 file container, not universal compatibility with older Linux distributions.
-Settings/saves remain in XDG directories outside the image.
+Ordinary settings/saves remain in XDG directories outside the image. Portable
+data lives beside the outer AppImage, including with `--appimage-extract-and-run`,
+rather than in the temporary mount/extraction.
 
 When FUSE is unavailable (including the current VMware guest), run without a
 mount or system changes:
@@ -187,3 +200,22 @@ binary for capture hook/hotkey signatures before release packaging.
 Normal FUSE mounting is not verified in the current VM; extraction-and-run is.
 Local checks also exercised real X11 Ctrl zoom/fit, a returning head drag that
 must not launch, unchanged saved progress, Alt+Enter/Escape and focus switching.
+
+## Both package variants
+
+Use separate output directories for the metadata and checksum manifests. The
+AppImage helper verifies the baked storage mode from the input archive:
+
+```bash
+python3 tools/package-linux.py --version dev-local --output-dir out/packages/user
+python3 tools/package-linux.py --version dev-local --portable --output-dir out/packages/portable
+python3 tools/package-appimage.py out/packages/user/ArrowPuzzle-dev-local-linux-x64.tar.gz
+python3 tools/package-appimage.py out/packages/portable/ArrowPuzzle-dev-local-linux-x64-portable.tar.gz
+```
+
+CI uses `bash tools/check-linux-desktop.sh` for rendering and both Debug capture
+scenarios, then `bash tools/check-linux-packages.sh dev-local --appimage` for
+both tar archives and both AppImages. Add `--portable` to `smoke-linux.py` and
+`check-production-binary.py` when checking the portable target. The smoke helper
+copies/renames the executable alone, verifies adjacent files with no XDG writes
+in portable mode, and checks read-only program directories in ordinary mode.

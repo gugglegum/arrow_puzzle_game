@@ -123,6 +123,7 @@ CMake targets:
 - `arrow_core`: Board, generation, kinematics, collisions, and persistence,
   independent of raylib;
 - `arrow_puzzle`: GUI application linking the core and raylib;
+- `arrow_puzzle_portable`: the same GUI with adjacent settings/save storage;
 - `arrow_tests`: generator, level quality, kinematics, and collisions;
 - `arrow_persistence_tests`: settings and saved games;
 - `arrow_menu_selection_tests`: window-free menu-selection logic;
@@ -269,10 +270,16 @@ cmake --build --preset windows-msvc-debug --parallel 2
 $env:ARROWPUZZLE_SEED = "747"
 $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
 $env:ARROWPUZZLE_DIFFICULTY = "2"
-& .\build\windows-msvc-debug\arrow_puzzle.exe
+$qa = New-Item -ItemType Directory -Path (Join-Path $PWD 'out/qa-example') -Force
+Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'Game.exe')
+& (Join-Path $qa 'Game.exe')
 ```
 
 Available hooks:
+
+For Windows QA, use an isolated copy of the portable Debug executable as above
+to keep settings/saves out of personal LocalAppData. For ordinary Linux Debug
+QA, set isolated absolute XDG paths. Portable mode remains baked in when renamed.
 
 - `ARROWPUZZLE_SEED`: reproducible seed;
 - `ARROWPUZZLE_DIFFICULTY`: difficulty 1..4;

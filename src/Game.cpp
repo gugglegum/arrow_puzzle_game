@@ -835,7 +835,13 @@ int Game::run() {
 
     UiText uiText;
 
+#if ARROWPUZZLE_PORTABLE
+    TraceLog(LOG_INFO, "ARROWPUZZLE_STORAGE=portable");
+    Persistence persistence(StorageMode::Portable);
+#else
+    TraceLog(LOG_INFO, "ARROWPUZZLE_STORAGE=user");
     Persistence persistence;
+#endif
     Settings settings = persistence.loadSettings();
     GameAudio gameAudio;
     EndScreen endScreen;

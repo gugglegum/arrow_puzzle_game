@@ -9,6 +9,7 @@
 namespace arrow {
 
 enum class BoardTheme { Light, Dark };
+enum class StorageMode { User, Portable };
 
 struct Settings {
     bool arrowLoops{true};
@@ -35,9 +36,9 @@ struct SavedGame {
 // defaults, while a missing or invalid saved game returns std::nullopt.
 class Persistence {
 public:
-    // Windows keeps portable files beside the executable. Linux uses the XDG
-    // config/data directories, independently of the program's working directory.
-    Persistence();
+    // User mode uses Windows LocalAppData or Linux XDG directories. Portable
+    // mode uses the executable's directory, or the outer AppImage's directory.
+    explicit Persistence(StorageMode mode = StorageMode::User);
     explicit Persistence(std::filesystem::path directory);
     Persistence(
         std::filesystem::path settingsDirectory,

@@ -85,3 +85,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Ready: $buildDirectory\arrow_puzzle.exe"
+Write-Host "Ready: $buildDirectory\arrow_puzzle_portable.exe"

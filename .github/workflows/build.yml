@@ -56,53 +56,13 @@ jobs:
         run: python3 -B tests/ReleaseAssetsTests.py
 
       - name: Check rendering, text and developer capture scenarios
+        run: bash tools/check-linux-desktop.sh -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Package, verify and launch user and portable builds
         run: |
-          python3 tools/check-production-binary.py build/linux/arrow_puzzle
-          cmake --build build/linux --parallel 2 --target arrow_render_tests arrow_ui_text_tests
-          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_render_tests
-          xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests
-          cmake --preset linux-debug -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
-            -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$GITHUB_WORKSPACE/build/linux/_deps/raylib-src"
-          cmake --build build/linux-debug --parallel 2 --target arrow_puzzle
-          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
-            build/linux-debug/arrow_puzzle --debug-hooks --output-dir out/linux-qa-smoke
-
-      - name: Package the tested build
-        id: package
-        run: python3 tools/package-linux.py --version "dev-${GITHUB_SHA:0:12}-${{ matrix.id }}"
-
-      - name: Verify and launch the extracted archive
-        env:
-          ARCHIVE: ${{ steps.package.outputs.archive_path }}
-        run: |
-          cd out/linux-package
-          sha256sum --check --ignore-missing SHA256SUMS.txt
-          mkdir -p "$RUNNER_TEMP/arrow-unpacked"
-          tar -xzf "$ARCHIVE" -C "$RUNNER_TEMP/arrow-unpacked" --strip-components=1
-          cp SHA256SUMS.txt "$RUNNER_TEMP/arrow-unpacked/"
-          cd "$RUNNER_TEMP/arrow-unpacked"
-          sha256sum --check --ignore-missing SHA256SUMS.txt
-          cd "$GITHUB_WORKSPACE"
-          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
-            "$RUNNER_TEMP/arrow-unpacked/ArrowPuzzle" --output-dir out/linux-smoke
-
-      - name: Build AppImage after archive validation
-        if: matrix.id == 'ubuntu22-gcc'
-        id: appimage
-        env:
-          ARCHIVE: ${{ steps.package.outputs.archive_path }}
-        run: python3 tools/package-appimage.py "$ARCHIVE"
-
-      - name: Launch AppImage without FUSE
-        if: matrix.id == 'ubuntu22-gcc'
-        env:
-          APPIMAGE_PATH: ${{ steps.appimage.outputs.appimage_path }}
-        run: |
-          cd out/linux-package
-          sha256sum --check --ignore-missing SHA256SUMS.txt
-          cd "$GITHUB_WORKSPACE"
-          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
-            "$APPIMAGE_PATH" --appimage --output-dir out/appimage-smoke
+          options=()
+          if [[ '${{ matrix.id }}' == ubuntu22-gcc ]]; then options+=(--appimage); fi
+          bash tools/check-linux-packages.sh "dev-${GITHUB_SHA:0:12}-${{ matrix.id }}" "${options[@]}"
 
       - name: Upload development package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -148,11 +108,18 @@ jobs:
       - name: Check release assembly guards
         run: python -B tests/ReleaseAssetsTests.py
 
-      - name: Check production binary
-        run: python tools/check-production-binary.py build/windows-msvc/arrow_puzzle.exe
+      - name: Check both production binaries
+        run: |
+          python tools/check-production-binary.py build/windows-msvc/arrow_puzzle.exe
+          if ($LASTEXITCODE -ne 0) { throw 'User build validation failed.' }
+          python tools/check-production-binary.py build/windows-msvc/arrow_puzzle_portable.exe --portable
+          if ($LASTEXITCODE -ne 0) { throw 'Portable build validation failed.' }
 
       - name: Package the tested build
-        run: ./tools/package-windows.ps1 -Version ("dev-" + $env:GITHUB_SHA.Substring(0, 12)) -OutputDirectory out/ci-windows
+        run: |
+          $version = 'dev-' + $env:GITHUB_SHA.Substring(0, 12)
+          ./tools/package-windows.ps1 -Version $version -OutputDirectory out/ci-windows/user
+          ./tools/package-windows.ps1 -Version $version -Portable -OutputDirectory out/ci-windows/portable
 
       - name: Upload development package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

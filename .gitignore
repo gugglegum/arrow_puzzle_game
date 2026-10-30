@@ -70,6 +70,10 @@ arrow-puzzle-screenshot.png
 *.dmp
 *.log
 
+# Python packaging and validation helpers
+__pycache__/
+*.pyc
+
 # Operating-system metadata
 .DS_Store
 Desktop.ini

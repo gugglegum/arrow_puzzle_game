@@ -12,6 +12,8 @@ import subprocess
 import tarfile
 import zipfile
 
+from build_features import check_production
+
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = r"[0-9A-Za-z][0-9A-Za-z.+-]*"
 
@@ -76,54 +78,71 @@ def assemble(windows, linux, output, commit, version):
     require(re.fullmatch(r"[0-9a-f]{40}", commit) is not None, "Invalid source commit")
     require(re.fullmatch(VERSION, version) is not None, "Invalid package version")
     require(not output.exists(), "Refusing to overwrite an existing assembled release")
-    win_name = f"ArrowPuzzle-{version}-windows-x64.zip"
-    tar_name = f"ArrowPuzzle-{version}-linux-x64.tar.gz"
-    image_name = f"ArrowPuzzle-{version}-linux-x64.AppImage"
-    win_meta = metadata(windows / "build-info-windows-x64.json", commit, version)
-    linux_meta = metadata(linux / "build-info-linux-x64.json", commit, version)
-    image_meta = metadata(linux / "build-info-linux-appimage-x64.json", commit, version)
-    require(linux_meta.get("architecture") == "x86_64", "Unexpected Linux architecture")
-    require(image_meta.get("executable_sha256") == linux_meta.get("executable_sha256"),
-            "The AppImage and tar have different executables")
-    win_sums = checksums(windows / "SHA256SUMS-windows-x64.txt")
-    linux_sums = checksums(linux / "SHA256SUMS-linux-x64.txt")
-    require(set(win_sums) == {"ArrowPuzzle.exe", win_name}, "Unexpected Windows checksum subjects")
-    require(set(linux_sums) == {"ArrowPuzzle", tar_name, image_name}, "Unexpected Linux checksum subjects")
-    for directory, name, sums in ((windows, win_name, win_sums), (linux, tar_name, linux_sums),
-                                  (linux, image_name, linux_sums)):
-        require(sha256((directory / name).read_bytes()) == sums[name], f"Checksum mismatch: {name}")
-    require(image_meta.get("source_archive_sha256") == linux_sums[tar_name], "AppImage used a different tar archive")
-    require(image_meta.get("appimage_sha256") == linux_sums[image_name], "AppImage metadata checksum mismatch")
-    with zipfile.ZipFile(windows / win_name) as archive:
-        require(archive.namelist().count("ArrowPuzzle.exe") == 1, "Missing or duplicate Windows executable")
-        require(archive.namelist().count("build-info.json") == 1, "Missing or duplicate Windows build metadata")
-        win_exe = archive.read("ArrowPuzzle.exe")
-        require(json.loads(archive.read("build-info.json")) == win_meta, "Windows inner/outer metadata mismatch")
-    tar_root = f"ArrowPuzzle-{version}-linux-x64"
-    with tarfile.open(linux / tar_name, "r:gz") as archive:
-        names = archive.getnames()
-        require(names.count(tar_root + "/ArrowPuzzle") == 1, "Missing or duplicate Linux executable")
-        require(names.count(tar_root + "/build-info.json") == 1, "Missing or duplicate Linux build metadata")
-        binary = archive.getmember(tar_root + "/ArrowPuzzle")
-        require(binary.isfile() and binary.mode & 0o111, "Linux executable is not an executable regular file")
-        linux_exe = archive.extractfile(binary).read()
-        require(json.loads(archive.extractfile(tar_root + "/build-info.json").read()) == linux_meta,
-                "Linux inner/outer metadata mismatch")
-    require(sha256(win_exe) == win_sums["ArrowPuzzle.exe"] == win_meta.get("executable_sha256"),
-            "Windows executable checksum mismatch")
-    require(sha256(linux_exe) == linux_sums["ArrowPuzzle"] == linux_meta.get("executable_sha256"),
-            "Linux executable checksum mismatch")
+    combined, copies = {}, []
+    for portable in (False, True):
+        suffix = "-portable" if portable else ""
+        win_exe_name = f"ArrowPuzzle{suffix}.exe"
+        linux_exe_name = f"ArrowPuzzle{suffix}"
+        win_name = f"ArrowPuzzle-{version}-windows-x64{suffix}.zip"
+        tar_root = f"ArrowPuzzle-{version}-linux-x64{suffix}"
+        tar_name, image_name = tar_root + ".tar.gz", tar_root + ".AppImage"
+        win_meta_name = f"build-info-windows-x64{suffix}.json"
+        linux_meta_name = f"build-info-linux-x64{suffix}.json"
+        image_meta_name = f"build-info-linux-appimage-x64{suffix}.json"
+        win_meta = metadata(windows / win_meta_name, commit, version)
+        linux_meta = metadata(linux / linux_meta_name, commit, version)
+        image_meta = metadata(linux / image_meta_name, commit, version)
+        for value, exe_name in ((win_meta, win_exe_name), (linux_meta, linux_exe_name),
+                                (image_meta, linux_exe_name)):
+            require(value.get("portable") is portable, "Package storage mode mismatch")
+            require(value.get("executable_name") == exe_name, "Unexpected packaged executable name")
+        require(linux_meta.get("architecture") == image_meta.get("architecture") == "x86_64",
+                "Unexpected Linux architecture")
+        require(image_meta.get("executable_sha256") == linux_meta.get("executable_sha256"),
+                "The AppImage and tar have different executables")
+        win_sums = checksums(windows / f"SHA256SUMS-windows-x64{suffix}.txt")
+        linux_sums = checksums(linux / f"SHA256SUMS-linux-x64{suffix}.txt")
+        require(set(win_sums) == {win_exe_name, win_name}, "Unexpected Windows checksum subjects")
+        require(set(linux_sums) == {linux_exe_name, tar_name, image_name}, "Unexpected Linux checksum subjects")
+        for directory, name, sums in ((windows, win_name, win_sums), (linux, tar_name, linux_sums),
+                                      (linux, image_name, linux_sums)):
+            require(sha256((directory / name).read_bytes()) == sums[name], f"Checksum mismatch: {name}")
+        require(image_meta.get("source_archive_sha256") == linux_sums[tar_name], "AppImage used a different tar archive")
+        require(image_meta.get("appimage_sha256") == linux_sums[image_name], "AppImage metadata checksum mismatch")
+        with zipfile.ZipFile(windows / win_name) as archive:
+            require(archive.namelist().count(win_exe_name) == 1, "Missing or duplicate Windows executable")
+            require(archive.namelist().count("build-info.json") == 1, "Missing or duplicate Windows build metadata")
+            require(not any(name.lower().endswith(".exe") and name != win_exe_name for name in archive.namelist()),
+                    "Unexpected second game executable in Windows package")
+            win_exe = archive.read(win_exe_name)
+            require(json.loads(archive.read("build-info.json")) == win_meta, "Windows inner/outer metadata mismatch")
+        with tarfile.open(linux / tar_name, "r:gz") as archive:
+            names = archive.getnames()
+            require(names.count(tar_root + "/" + linux_exe_name) == 1, "Missing or duplicate Linux executable")
+            require(names.count(tar_root + "/build-info.json") == 1, "Missing or duplicate Linux build metadata")
+            binary = archive.getmember(tar_root + "/" + linux_exe_name)
+            require(binary.isfile() and binary.mode & 0o111, "Linux executable is not an executable regular file")
+            linux_exe = archive.extractfile(binary).read()
+            require(json.loads(archive.extractfile(tar_root + "/build-info.json").read()) == linux_meta,
+                    "Linux inner/outer metadata mismatch")
+        require(sha256(win_exe) == win_sums[win_exe_name] == win_meta.get("executable_sha256"),
+                "Windows executable checksum mismatch")
+        require(sha256(linux_exe) == linux_sums[linux_exe_name] == linux_meta.get("executable_sha256"),
+                "Linux executable checksum mismatch")
+        check_production(win_exe, portable)
+        check_production(linux_exe, portable)
+        copies.extend(((windows, win_name), (linux, tar_name), (linux, image_name),
+                       (windows, win_meta_name), (linux, linux_meta_name), (linux, image_meta_name)))
+        require(not (set(combined) & (set(win_sums) | set(linux_sums))), "Duplicate release checksum subject")
+        combined.update(win_sums | linux_sums)
     # Crypto verification is performed by gh in the workflow before this step.
-    copies = [(windows, win_name), (linux, tar_name), (linux, image_name),
-              (windows, "build-info-windows-x64.json"), (linux, "build-info-linux-x64.json"),
-              (linux, "build-info-linux-appimage-x64.json"),
-              (windows, "attestation-windows-x64.sigstore.json"), (linux, "attestation-linux-x64.sigstore.json")]
+    copies.extend(((windows, "attestation-windows-x64.sigstore.json"),
+                   (linux, "attestation-linux-x64.sigstore.json")))
     for directory, name in copies:
         require((directory / name).is_file(), f"Missing release asset: {name}")
     output.mkdir(parents=True)
     for directory, name in copies:
         shutil.copy2(directory / name, output / name)
-    combined = win_sums | linux_sums
     (output / "SHA256SUMS.txt").write_text("".join(f"{digest}  {name}\n" for name, digest in sorted(combined.items())))
     print(f"Assembled {len(copies)} assets and {len(combined)} SHA-256 subjects from {commit}")
 

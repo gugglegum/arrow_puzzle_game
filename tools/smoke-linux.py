@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the real Linux executable with isolated data and a read-only program dir."""
+"""Check real Linux executables with isolated user or portable storage."""
 
 import argparse
 import hashlib
@@ -12,8 +12,10 @@ import subprocess
 import tempfile
 import time
 
+from build_features import check_production, check_storage
 
-def production_smoke(executable, appimage, work, env):
+
+def production_smoke(executable, appimage, work, env, settings_path):
     """Drive the real packaged binary through X11, without in-game QA hooks."""
     if shutil.which("xdotool") is None:
         raise RuntimeError("The production smoke check needs xdotool (run under X11 or Xvfb)")
@@ -67,7 +69,7 @@ def production_smoke(executable, appimage, work, env):
             subprocess.run(["xdotool", "keydown", "--window", window, "Escape"], check=True, timeout=5)
             if process.wait(timeout=15) != 0:
                 raise RuntimeError("Production game did not exit cleanly")
-            if not (work / "config/arrow-puzzle/settings.txt").is_file():
+            if not settings_path.is_file():
                 raise RuntimeError("Production game did not initialize isolated settings")
             print("Production startup, ignored QA variables, F12/Control+F12, and clean exit passed")
         finally:
@@ -81,6 +83,7 @@ def main():
     parser.add_argument("executable", type=Path)
     parser.add_argument("--appimage", action="store_true", help="Use the FUSE-free AppImage extraction path")
     parser.add_argument("--debug-hooks", action="store_true", help="Run capture scenarios with a Debug build")
+    parser.add_argument("--portable", action="store_true", help="Expect files beside the copied program")
     parser.add_argument("--output-dir", type=Path, default=Path("out/linux-smoke"))
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -90,9 +93,22 @@ def main():
     executable = program / ("ArrowPuzzle.AppImage" if args.appimage else "ArrowPuzzle")
     shutil.copy2(args.executable.resolve(), executable)
     executable.chmod(0o555)
-    program.chmod(0o555)
+    program.chmod(0o755 if args.portable else 0o555)
     env = {key: value for key, value in os.environ.items() if not key.startswith("ARROWPUZZLE_")}
     env.update(XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"))
+    settings_path = program / "settings.txt" if args.portable else work / "config/arrow-puzzle/settings.txt"
+    save_path = program / "savegame.txt" if args.portable else work / "data/arrow-puzzle/savegame.txt"
+
+    def check_writes(saved=False):
+        expected = {executable}
+        if args.portable:
+            expected.add(settings_path)
+            if saved:
+                expected.add(save_path)
+            if (work / "config").exists() or (work / "data").exists():
+                raise RuntimeError("Portable game wrote into XDG directories")
+        if set(program.iterdir()) != expected:
+            raise RuntimeError("Unexpected files beside the executable")
 
     def capture(name, **overrides):
         image = work / (name + ".png")
@@ -112,12 +128,15 @@ def main():
 
     try:
         if not args.debug_hooks:
-            production_smoke(executable, args.appimage, work, env)
-            if set(program.iterdir()) != {executable}:
-                raise RuntimeError("The program wrote beside its executable")
+            if not args.appimage:
+                check_production(executable.read_bytes(), args.portable)
+            production_smoke(executable, args.appimage, work, env, settings_path)
+            check_writes()
+            print(f"{'Portable' if args.portable else 'User'} storage verified: {settings_path}")
             return
         if args.appimage or b"ARROWPUZZLE_SCREENSHOT" not in executable.read_bytes():
             raise RuntimeError("--debug-hooks requires a Debug executable with screenshot hooks")
+        check_storage(executable.read_bytes(), args.portable)
         capture("menu", ARROWPUZZLE_SCREENSHOT_MENU="1")
         capture("new-game", ARROWPUZZLE_SCREENSHOT_MENU="2")
         capture("settings", ARROWPUZZLE_SCREENSHOT_MENU="3")
@@ -125,8 +144,6 @@ def main():
                 PULSE_SERVER=f"unix:{work}/unavailable-pulse", ALSA_CONFIG_PATH="/dev/null")
         capture("board-dark", ARROWPUZZLE_SEED="747", ARROWPUZZLE_DIFFICULTY="1",
                 ARROWPUZZLE_SCREENSHOT_REMOVE="3", ARROWPUZZLE_SAVE_ON_EXIT="1")
-        save_path = work / "data/arrow-puzzle/savegame.txt"
-        settings_path = work / "config/arrow-puzzle/settings.txt"
         saved = save_path.read_bytes()
         if not saved.startswith(b"format=arrow-puzzle-save\nversion=1\n"):
             raise RuntimeError("The game did not create a version-1 save")
@@ -142,8 +159,7 @@ def main():
         capture("resume-light", ARROWPUZZLE_RESUME="1", ARROWPUZZLE_SAVE_ON_EXIT="1")
         if save_path.read_bytes() != saved:
             raise RuntimeError("Changing the theme affected progress")
-        if set(program.iterdir()) != {executable}:
-            raise RuntimeError("The program wrote beside its executable")
+        check_writes(saved=True)
         print(f"Save SHA-256: {hashlib.sha256(saved).hexdigest()}")
         print(f"Smoke checks passed; inspect screenshots in {work}")
     finally:

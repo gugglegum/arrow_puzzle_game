@@ -4,6 +4,25 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Unified ordinary/portable builds, unreleased (2026-10-30)
+
+The user requested six packages: Windows ZIP, Linux tar.gz, and Linux AppImage,
+each ordinary and portable. This is four executable variants from shared
+sources. Ordinary Windows stores both files in `%LOCALAPPDATA%\ArrowPuzzle\`
+via KnownFolder API; ordinary Linux retains XDG. Portable mode is compiled in,
+works when a renamed executable is extracted alone, and stores both files
+beside the EXE/ELF or outer AppImage. No marker or runtime mode flag. Profiles
+are independent; existing data is not automatically migrated. Full contract,
+packaging and QA notes: [portable distribution](portable-distribution.md).
+
+Local Windows validation: both Release executables build and all five CTest
+suites pass; both Debug executables build, menu/board capture checks pass, and
+a renamed lone portable EXE creates adjacent settings/save files. Production
+ignores all capture variables and F12/Control+F12, with clean startup/exit.
+Both ZIPs package successfully, and 16 assembly guard tests pass. Linux/CI and
+the complete six-package provenance path still need the new workflow run.
+The existing 0.5.0 draft, tag, packages and publication state remain unchanged.
+
 ## Screenshot cleanup, unreleased (2026-10-30)
 
 The user confirmed with the initial chat that F12 capture was added without a

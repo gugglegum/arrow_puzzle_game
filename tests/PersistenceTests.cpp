@@ -6,11 +6,18 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#if defined(_WIN32)
+#define NOMINMAX
+#include <windows.h>
+#include <shlobj.h>
+#endif
 
 namespace {
 
@@ -188,12 +195,55 @@ void testDefaultDirectories() {
         require(persistence.directory() != arrow::Persistence::executableDirectory(),
                 "Missing HOME fell back to the program directory");
     }
-#else
+#elif defined(_WIN32)
+    PWSTR raw = nullptr;
+    const HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &raw);
+    const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> folder(raw, CoTaskMemFree);
+    require(SUCCEEDED(result) && raw != nullptr, "Unable to read LocalAppData for the test");
     const arrow::Persistence persistence;
-    const auto directory = arrow::Persistence::executableDirectory();
+    const auto directory = std::filesystem::path{raw} / "ArrowPuzzle";
     require(persistence.settingsPath() == directory / "settings.txt" &&
             persistence.saveGamePath() == directory / "savegame.txt",
-            "Portable persistence paths changed");
+            "Ordinary Windows data must use LocalAppData");
+    require(directory != arrow::Persistence::executableDirectory(),
+            "Ordinary Windows data fell back to the executable directory");
+#endif
+}
+
+void testPortableDirectories() {
+    const auto executable = arrow::Persistence::executableDirectory();
+#if defined(__linux__)
+    TemporaryDirectory temporary;
+    EnvironmentValue config{"XDG_CONFIG_HOME"};
+    EnvironmentValue data{"XDG_DATA_HOME"};
+    EnvironmentValue appDir{"APPDIR"};
+    EnvironmentValue image{"APPIMAGE"};
+    const auto wrong = temporary.path() / "unrelated app";
+    const auto outer = temporary.path() / "portable image";
+    std::filesystem::create_directories(wrong);
+    std::filesystem::create_directories(outer);
+    const auto imageFile = outer / "RenamedGame";
+    writeText(imageFile, "runtime fixture");
+    config.set(wrong.c_str());
+    data.set(wrong.c_str());
+    appDir.set(wrong.c_str());
+    image.set(imageFile.c_str());
+#endif
+    const arrow::Persistence standalone{arrow::StorageMode::Portable};
+    require(standalone.settingsPath() == executable / "settings.txt" &&
+            standalone.saveGamePath() == executable / "savegame.txt",
+            "Standalone portable data must stay beside the executable");
+#if defined(__linux__)
+    appDir.set(executable.c_str());
+    const arrow::Persistence bundled{arrow::StorageMode::Portable};
+    require(bundled.settingsPath() == outer / "settings.txt" &&
+            bundled.saveGamePath() == outer / "savegame.txt",
+            "Portable AppImage data must stay beside the outer image");
+    image.set("relative.AppImage");
+    require(arrow::Persistence{arrow::StorageMode::Portable}.directory() == executable,
+            "A relative AppImage override redirected portable data");
+    require(!std::filesystem::exists(outer / "settings.txt"),
+            "Portable path discovery created files prematurely");
 #endif
 }
 
@@ -636,6 +686,7 @@ void testRemoveSavedGameIsIdempotent() {
 int main() {
     try {
         testDefaultDirectories();
+        testPortableDirectories();
         testSeparateDirectories();
         testDefaultSettingsAreCreated();
         testMissingSettingsUseDefaultsAndPreserveExplicitOff();

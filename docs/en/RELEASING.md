@@ -21,8 +21,10 @@ runs menus, themes, no-audio startup and CRLF save/resume capture scenarios.
 The normal executable excludes those hooks; both unpacked tar and AppImage are
 checked through external X11 input for startup, ignored QA variables, no captures
 on F12/Control+F12 and clean exit, with isolated XDG data and a read-only program
-directory. Packaging accepts only Release. Binary signature checks also
-reject capture hooks/hotkeys in production files. Interactive GPU/input and
+directory for ordinary builds; portable checks require adjacent files and no
+XDG writes. Both modes run Debug save/resume scenarios. Packaging accepts only
+Release. Binary checks validate the baked storage mode and reject capture
+hooks/hotkeys in production files. Interactive GPU/input and
 audio-device checks still need a desktop. Development artifacts are retained
 for 14 days and do not carry the release workflow's provenance attestations.
 
@@ -69,7 +71,10 @@ No personal access token or signing secret is required by the release workflow.
 | `ArrowPuzzle-<version>-windows-x64.zip` | Standalone `ArrowPuzzle.exe`, documentation, screenshots, licenses and internal `build-info.json` |
 | `ArrowPuzzle-<version>-linux-x64.tar.gz` | Executable `ArrowPuzzle` with documentation, licenses and internal `build-info.json` |
 | `ArrowPuzzle-<version>-linux-x64.AppImage` | The same Linux executable in a single-file container with icon, launcher, runtime notices and metadata |
-| `SHA256SUMS.txt` | SHA-256 for the three download packages and both unpacked executables |
+| `ArrowPuzzle-<version>-windows-x64-portable.zip` | Standalone `ArrowPuzzle-portable.exe` with adjacent settings/save storage |
+| `ArrowPuzzle-<version>-linux-x64-portable.tar.gz` | Standalone `ArrowPuzzle-portable` with adjacent settings/save storage |
+| `ArrowPuzzle-<version>-linux-x64-portable.AppImage` | Portable Linux executable; data beside the outer AppImage |
+| `SHA256SUMS.txt` | SHA-256 for six download packages and four unpacked executables |
 | `build-info-windows-x64.json` | Windows source commit, version, executable hash and Actions run |
 | `build-info-linux-x64.json` | Linux source/build identity, executable hash and required library symbol versions |
 | `build-info-linux-appimage-x64.json` | AppImage hash, input tar hash, executable identity and pinned tool/runtime details |
@@ -84,6 +89,14 @@ executable permissions and the tar/AppImage relationship before copying files.
 `gh attestation verify` separately verifies the supplied cryptographic bundles,
 repository, workflow identity, exact source commit and GitHub-hosted runners.
 The common manifest is itself attested and verified before the draft job runs.
+
+Each build-info file also has a `-portable.json` counterpart. Metadata records
+`portable` and `executable_name`; assembly checks the actual binary's baked
+mode too. The Windows bundle covers both ZIPs and both EXEs; the Linux bundle
+covers both tar archives, both ELFs and both AppImages. There are four executable
+variants and six packages. Ordinary Windows storage is
+`%LOCALAPPDATA%\ArrowPuzzle\`; ordinary Linux storage uses XDG. The older 0.5.0
+draft/tag/assets retain their original three-package layout and behavior.
 
 Each platform uses the same Release build/packaging helpers as local development.
 raylib, actions and AppImage tooling/runtime are pinned. Linux uses CMake
@@ -151,3 +164,8 @@ Ordinary local Release packaging uses `tools/package-windows.ps1`,
 `tools/package-linux.py` and then `tools/package-appimage.py`; see the Linux
 guide for full commands. Packaging refuses to overwrite existing outputs.
 Only an Actions run can produce this workflow's GitHub provenance attestations.
+
+Add `-Portable` to the Windows packager or `--portable` to the Linux tar
+packager, using a separate output directory for each mode. The AppImage helper
+infers the mode from the verified input tar. No runtime marker/flag or filename
+test selects the game's storage policy.

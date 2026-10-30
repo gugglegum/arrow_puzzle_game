@@ -128,6 +128,7 @@ docs/                      Техническая документация и с
 - `arrow_core` — `Board`, генератор, кинематика, коллизии и persistence без
   зависимости от raylib;
 - `arrow_puzzle` — GUI-приложение, связывающее `arrow_core` и raylib;
+- `arrow_puzzle_portable` — тот же GUI с данными рядом с исполняемым файлом;
 - `arrow_tests` — генератор, качество уровней, кинематика и коллизии;
 - `arrow_persistence_tests` — настройки и сохранения;
 - `arrow_menu_selection_tests` — логика выбора меню без окна;
@@ -275,10 +276,16 @@ cmake --build --preset windows-msvc-debug --parallel 2
 $env:ARROWPUZZLE_SEED = "747"
 $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
 $env:ARROWPUZZLE_DIFFICULTY = "2"
-& .\build\windows-msvc-debug\arrow_puzzle.exe
+$qa = New-Item -ItemType Directory -Path (Join-Path $PWD 'out/qa-example') -Force
+Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'Game.exe')
+& (Join-Path $qa 'Game.exe')
 ```
 
 Доступные hooks:
+
+Для Windows QA используйте отдельную копию portable Debug-бинарника, как выше,
+чтобы не менять личный LocalAppData. В обычной Linux Debug-сборке задавайте
+изолированные абсолютные XDG-пути. Переименование сохраняет portable-режим.
 
 - `ARROWPUZZLE_SEED` — воспроизводимый seed;
 - `ARROWPUZZLE_DIFFICULTY` — сложность 1..4;

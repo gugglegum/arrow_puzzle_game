@@ -8,8 +8,9 @@ arrows. It is written in C++20 with raylib for Windows and Linux.
 Version **0.5.0** adds native Linux packages, rounded arrows, an application icon,
 and touchpad-friendly board controls. It offers 20 x 20, 40 x 40, 80 x 80, and
 experimental 160 x 160 boards, dark and light board themes, optional sounds,
-and animated result screens. Windows saves settings and unfinished games beside
-the executable; Linux uses the user's XDG config and data directories.
+and animated result screens. Current source builds use LocalAppData on Windows
+and XDG config/data directories on Linux; explicitly labelled portable builds
+keep settings and unfinished games beside the executable.
 
 ## Screenshots
 
@@ -41,6 +42,15 @@ The 0.5.0 release also includes Linux x86-64 tar.gz and AppImage packages.
 See [Linux startup and data locations](docs/en/LINUX.md) for requirements and
 AppImage startup without FUSE. A draft is visible only to repository maintainers
 until it is published.
+
+The next release pipeline produces six packages: Windows ZIP, Linux tar.gz and
+Linux AppImage, each in ordinary and `-portable` variants. Ordinary Windows
+builds store `settings.txt` and `savegame.txt` in `%LOCALAPPDATA%\ArrowPuzzle\`.
+Portable builds keep both files beside `ArrowPuzzle-portable.exe`,
+`ArrowPuzzle-portable`, or the outer `.AppImage` file. The mode is built into
+the executable: extracting it alone or renaming it does not change the mode.
+The portable directory must be writable. Earlier release assets retain their
+original behavior; existing saves are not moved automatically.
 
 Release builds are compiled and tested by **GitHub Actions**. Packages include
 build metadata, with a common SHA-256 manifest supplied alongside the downloads.
@@ -420,9 +430,12 @@ The first native checks were performed on Linux Mint 22.3 inside VMware. Native
 Wayland, Android, other architectures and broader desktop coverage remain work
 for later. Linux releases have not yet been published.
 
-On Linux, settings live in `~/.config/arrow-puzzle/settings.txt` and progress in
+In ordinary Linux builds, settings live in `~/.config/arrow-puzzle/settings.txt` and progress in
 `~/.local/share/arrow-puzzle/savegame.txt` (absolute XDG overrides are respected).
-Windows keeps both files beside the EXE; their text formats are unchanged.
+Ordinary Windows builds keep both files in `%LOCALAPPDATA%\ArrowPuzzle\`.
+Portable builds on either OS keep both beside the executable (beside the outer
+file for AppImage). Their text formats are unchanged; copy the two files while
+the game is closed to transfer progress between variants or platforms.
 
 ## License
 

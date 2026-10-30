@@ -15,6 +15,8 @@ import subprocess
 import tarfile
 import tempfile
 
+from build_features import check_production
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -49,6 +51,7 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/linux")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "out/linux-package")
+    parser.add_argument("--portable", action="store_true", help="Package the portable target")
     args = parser.parse_args()
     if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
         parser.error("This package targets native Linux x86-64")
@@ -59,13 +62,16 @@ def main():
     cache = (build / "CMakeCache.txt").read_text()
     if not re.search(r"^CMAKE_BUILD_TYPE:STRING=Release$", cache, re.MULTILINE):
         parser.error("Packaging requires a configured Release build")
-    package_name = f"ArrowPuzzle-{args.version}-linux-x64"
+    suffix = "-portable" if args.portable else ""
+    target = "arrow_puzzle_portable" if args.portable else "arrow_puzzle"
+    executable_name = "ArrowPuzzle" + suffix
+    package_name = f"ArrowPuzzle-{args.version}-linux-x64{suffix}"
     archive = output / (package_name + ".tar.gz")
     for name in (archive.name, "build-info.json", "SHA256SUMS.txt"):
         if (output / name).exists():
             parser.error(f"Refusing to overwrite {output / name}; choose a new output directory")
     # Refresh the binary and Git-derived version, including after a commit.
-    subprocess.run(["cmake", "--build", str(build), "--target", "arrow_puzzle",
+    subprocess.run(["cmake", "--build", str(build), "--target", target,
                     "--parallel", os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL", "2")], check=True)
     output.mkdir(parents=True, exist_ok=True)
     commit = command("git", "rev-parse", "HEAD")
@@ -73,9 +79,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="package-", dir=build) as temp:
         stage = Path(temp) / package_name
         subprocess.run(["cmake", "--install", str(build), "--prefix", str(stage),
-                        "--component", "Runtime", "--strip"], check=True)
-        executable = stage / "ArrowPuzzle"
-        (stage / "arrow_puzzle").rename(executable)
+                        "--component", "PortableRuntime" if args.portable else "Runtime", "--strip"], check=True)
+        executable = stage / executable_name
+        (stage / target).rename(executable)
+        check_production(executable.read_bytes(), args.portable)
         header = executable.read_bytes()[:20]
         if header[:6] != b"\x7fELF\x02\x01" or int.from_bytes(header[18:20], "little") != 62:
             raise RuntimeError("The built executable is not x86-64 ELF")
@@ -95,6 +102,8 @@ def main():
             run_url = "{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/actions/runs/{GITHUB_RUN_ID}".format(**os.environ)
         metadata = {
             "package_version": args.version,
+            "portable": args.portable,
+            "executable_name": executable_name,
             "executable_version": version_label,
             "source_commit": commit,
             "source_ref": os.environ.get("GITHUB_REF"),
@@ -119,7 +128,7 @@ def main():
             info.uid = info.gid = 0
             info.uname = info.gname = ""
             info.mtime = epoch
-            info.mode = 0o755 if info.isdir() or info.name.endswith("/ArrowPuzzle") else 0o644
+            info.mode = 0o755 if info.isdir() or info.name.endswith("/" + executable_name) else 0o644
             return info
 
         # Stable archive ordering, ownership and gzip headers. Toolchains and
@@ -129,7 +138,7 @@ def main():
                 tar.add(stage, arcname=package_name, filter=normalize)
         (output / "build-info.json").write_text(metadata_text)
         (output / "SHA256SUMS.txt").write_text(
-            f"{metadata['executable_sha256']}  ArrowPuzzle\n{digest(archive)}  {archive.name}\n")
+            f"{metadata['executable_sha256']}  {executable_name}\n{digest(archive)}  {archive.name}\n")
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a") as file:
             file.write(f"archive_path={archive}\npackage_name={package_name}\n")

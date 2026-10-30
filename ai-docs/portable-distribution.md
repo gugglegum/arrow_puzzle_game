@@ -1,10 +1,68 @@
 # Portable distribution and AppImage data locations
 
-Discussion recorded on 2026-10-30 after pulling `master` from `83a5ddd` to
-`3fd31be`. The user is considering explicitly labelled portable packages whose
-persistent game files stay in one chosen directory. This is a preference and
-design proposal, not an instruction to change storage behavior or release assets
-yet. No portable mode was implemented in this discussion.
+## Accepted storage contract (2026-10-30, unreleased)
+
+The user explicitly requested ordinary and portable builds on **both** OSes.
+This supersedes the earlier discussion-only proposal and the old Windows ZIP's
+implicit portable behavior. Existing release tags/assets are not changed.
+
+| Package family | Ordinary storage | Portable storage |
+| --- | --- | --- |
+| Windows ZIP | `%LOCALAPPDATA%\ArrowPuzzle\settings.txt` and `savegame.txt` | Beside the EXE |
+| Linux tar.gz | XDG config/settings and XDG data/save | Beside the ELF |
+| Linux AppImage | Same XDG paths | Beside the outer `.AppImage` |
+
+There are **six packages**, but **four executable variants** (OS x storage
+mode). Each Linux ELF is reused unchanged in its tar and AppImage. Portable
+package/executable names have the suffix `-portable`; the name does not select
+the behavior. CMake builds `arrow_puzzle` and `arrow_puzzle_portable` from shared
+sources, defining `ARROWPUZZLE_PORTABLE=0/1` only for the GUI target.
+`Game::run()` selects `Persistence(StorageMode::User/Portable)` at compilation.
+
+Windows uses `SHGetKnownFolderPath(FOLDERID_LocalAppData)`, not concatenated
+profile paths or a narrow environment value. Settings and the one small offline
+save share one per-user, non-roaming folder. `Saved Games` is a legitimate
+alternative if a future product requirement calls for it; it is not the chosen
+path. Linux respects absolute XDG overrides and falls back to the account home
+for invalid/unset ones. Serialized version-1 formats are unchanged.
+
+A portable executable must work when extracted **alone**, including after
+renaming and from another working directory. The user rejected `portable.flag`
+as obscure. No sidecar, filename test, runtime switch, launcher or environment
+setup may be the prerequisite for portable mode. Portable mode ignores XDG,
+never silently falls back to user storage, and requires a writable directory.
+No existing adjacent/XDG/LocalAppData files are automatically imported, moved,
+overwritten or deleted. Copy settings/save manually with the game closed.
+
+For AppImage, `/proc/self/exe` resolves the inner mounted/extracted ELF, which is
+not the durable destination. Portable mode uses the absolute outer `APPIMAGE`
+path only when the executable is inside the corresponding canonical `APPDIR`.
+This also handles extraction-and-run. Unrelated APPIMAGE/APPDIR variables
+inherited from an AppImage-hosted terminal or coding agent must not redirect a
+standalone game. Renaming the outer image is supported.
+
+## Packaging and checks
+
+- `package-windows.ps1 -Portable` / `package-linux.py --portable` package the
+  portable target. Use separate output directories per mode; each has its own
+  build-info and checksum files. AppImage infers the mode from the verified tar.
+- Package metadata includes a boolean `portable` and `executable_name`.
+  `ARROWPUZZLE_STORAGE=user/portable` is a compiled diagnostic string, not an
+  environment switch. Packaging and common release assembly verify the actual
+  binary's marker, capture exclusion and hashes, not just labels/metadata.
+- Six packages and four unpacked executables give ten SHA256SUMS subjects.
+  Windows and Linux provenance bundles cover four and six subjects respectively;
+  the common checksum manifest is an eleventh signed subject.
+- `check-linux-desktop.sh` runs rendering/text and both Debug save/resume suites.
+  `check-linux-packages.sh VERSION --appimage` packages and launches both tar
+  variants and both AppImages. Ordinary smoke uses a read-only program dir and
+  isolated XDG; portable smoke renames a lone executable and requires adjacent
+  data with no XDG writes. All production smoke is external X11 input.
+- Windows QA should copy the portable Debug/Release executable to an isolated
+  scratch directory; ordinary Debug now uses personal LocalAppData. Unit tests
+  check KnownFolder path discovery without writing the actual profile.
+- Do not replace or republish the prepared v0.5.0 draft/tag/attested packages.
+  Verify the new pipeline with `create_release=false` on a branch instead.
 
 ## Accepted screenshot policy
 
@@ -29,127 +87,21 @@ the remaining environment hooks to work **only in Debug builds**.
 - The existing 0.5.0 draft/tag/packages are historical artifacts and are not
   replaced by this source change. New builds receive the changed policy.
 
-## Current implementation, checked after the Linux port
+## AppImage installation and portable limits
 
-- `Game::run()` constructs the default `Persistence` object.
-- `defaultDirectory()` in `Persistence.cpp` uses the executable directory outside Linux;
-  the current Windows ZIP therefore already keeps settings and saves beside
-  `ArrowPuzzle.exe`.
-- Linux uses `$XDG_CONFIG_HOME/arrow-puzzle/settings.txt` and
-  `$XDG_DATA_HOME/arrow-puzzle/savegame.txt`, falling back to the account's
-  `.config` and `.local/share` directories. The default is the same in a source
-  build, the tar.gz package, and the AppImage. Merely extracting the archive on
-  the Desktop does not select portable persistence in the current Linux game.
-- Linux's explicit-directory persistence constructors are currently used by
-  tests; there is no player-facing portable marker or command-line switch.
-- `tools/appimage/AppRun` only launches the embedded executable. It does not
-  independently redirect either XDG location.
-- The same game binary is used in the Linux archive and its AppImage wrapper.
-  The wrapper uses the pinned `caf24f9` type-2 runtime. Current guide/evidence:
-  [Linux guide](../docs/en/LINUX.md) and [Linux progress](linux-portability.md).
+An AppImage is downloaded, made executable and launched without a required
+system installation or administrator action. Optional desktop integration can
+add launchers/icons elsewhere. The runtime mounts its embedded filesystem
+read-only or temporarily extracts it; this OS/runtime activity is separate
+from the game's persistent files. Portable means the game's own settings/save
+stay adjacent, not that third-party managers or the OS never create anything.
 
-Writing next to an executable is suitable for a writable extracted/portable
-directory on either OS. It is not inherently a portability defect. The earlier
-concern applies to read-only system/program directories and the *inner*
-executable directory in a normally mounted AppImage. Packaging format and the
-application's data-location policy are separate choices.
-
-## How AppImage starts
-
-An AppImage is normally downloaded, made executable, and launched directly;
-there is no required system installation or administrator action. Desktop-menu
-integration is optional and can itself add launcher/icon files elsewhere.
-The runtime normally mounts its embedded filesystem read-only at a temporary
-location and runs the inner `AppRun` entry point. The outer AppImage file can
-still live in the user's chosen writable directory.
-
-Saving beside the *outer* AppImage is possible. Saving beside the inner ELF
-executable targets the mounted image instead. A future portable implementation
-must resolve the outer location using `APPIMAGE`, not just `/proc/self/exe`.
-The extraction-and-run fallback uses temporary extracted content and normally
-cleans it afterward; that is not a durable place for saves either.
-
-AppImage's existing portable mechanisms use a writable adjacent directory named
-like the full image filename plus `.home` or `.config`. The pinned runtime
-sets `HOME` for the former and `XDG_CONFIG_HOME` for the latter, including in
-extraction-and-run. This is supported infrastructure, not an ArrowPuzzle-specific
-portable-mode acceptance test.
-
-For this game, `.config` alone only redirects settings. Existing absolute
-`XDG_DATA_HOME` remains in effect for saves, and an absolute `XDG_CONFIG_HOME`
-can also take precedence over a changed `HOME`. A robust portable package must
-route both persistent locations deliberately. Renaming a versioned AppImage
-also changes the adjacent portable-directory name expected by the runtime.
-
-## User requirement: a portable executable must work alone
-
-Clarified on 2026-10-30 after the marker proposal: the user explicitly rejects
-`portable.flag` as obscure and unsuitable for the self-contained executable.
-A player may extract only the executable from the portable archive. That file
-must retain portable persistence without a sidecar, launcher, environment setup,
-or undocumented convention. Do not re-propose a marker as the selected design.
-
-Keep one codebase, but produce distinct executable variants if adopting both
-data policies:
-
-1. **Standard mode:** retain the current Linux XDG defaults, suitable for
-   installed/read-only locations and the ordinary AppImage.
-2. **Portable mode:** keep settings and saves directly in the chosen game
-   directory, with this behavior built into the executable. Windows ZIP already
-   supplies the basic adjacent-file behavior. A portable Linux archive must
-   contain an executable that remains portable when extracted on its own.
-
-A compile-time CMake option is the recommended implementation approach, not
-implemented or tested yet. It can select the default persistence policy in the
-same sources, producing a standard executable and a portable executable with
-clear package names. Portable behavior must not depend on the executable's
-filename either. There is no need for a separate codebase or extra runtime file.
-Do not introduce a new non-portable Windows distribution as an incidental part
-of this discussion; existing Windows adjacent-file behavior should be preserved.
-
-A launcher-only approach also fails the executable-alone requirement if direct
-launch bypasses it. AppImage's optional `.home`/`.config` directories remain
-upstream functionality, but should not be the prerequisite that makes a package
-labelled Portable honor its data policy. A future portable AppImage should carry
-the portable executable and resolve the outer image directory for persistent
-files. The current standard AppImage and tar still contain the same binary;
-do not describe distinct standard/portable binaries as already available.
-
-If implementing portable mode:
-
-- Resolve the selected directory independently of the current working directory.
-- Keep explicit portable storage local even when normal XDG overrides exist.
-- Report an unwritable portable directory instead of silently falling back to
-  the user's home; hidden fallback would defeat the user's stated preference.
-- Do not silently import, move, overwrite, or delete existing XDG/adjacent saves.
-- Audit other permanent game-owned outputs. F12 screenshots were removed by the
-  accepted policy above; Debug-only QA captures are an explicit development
-  action. OS-managed records and temporary AppImage mounting/extraction remain
-  separate matters.
-- Verify archive and AppImage launch paths, read-only failures, save/resume,
-  different working directories, copying/renaming just the executable, and
-  absence of writes to the user's normal config/data directories. Preserve
-  Windows behavior and existing progress.
-
-The earlier discussion referred to the then-existing **F12** command, which
-wrote `arrow-puzzle-screenshot.png` relative to the initial working directory.
-The user later explicitly requested its removal, as recorded above. The
-separate `ARROWPUZZLE_SCREENSHOT` hooks remain for deliberate Debug-only QA.
-
-The user then said they did not recall requesting screenshot functionality.
-The complete, non-shallow Git history places both `KEY_F12` and
-`TakeScreenshot("arrow-puzzle-screenshot.png")`, as well as the README control
-entry, in root commit `d5ebdb911b857a8dcd5c5bb3dc4ff58038816245`
-(`Initial commit`, 2026-07-28). This establishes when the feature entered the
-repository, not who requested it or whether it was authorized. No user request
-for this feature appears in the current conversation. Do not treat its existing
-code/documentation as evidence of acceptance or as a requirement to retain it.
-The explicit F12 product shortcut and automated QA hooks are distinct concerns;
-the subsequent removal request supersedes the earlier unconfirmed status.
-
-This discussion does not authorize changing the prepared 0.5.0 draft, its tag,
-attested packages, or publication state. Treat any later implementation and
-release packaging as a separate scoped change.
+AppImage's `.home`/`.config` mechanisms are upstream options, not prerequisites
+for ArrowPuzzle portable mode. `.config` alone does not redirect XDG data, and
+changing only HOME can lose to existing absolute XDG overrides. The compiled
+portable path deliberately routes both files. If a manager moves only the
+AppImage, it does not also move the existing adjacent data; move the whole
+portable folder to retain its profile.
 
 ## Gear Lever desktop-launch observation (2026-10-30)
 

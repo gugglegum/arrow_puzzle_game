@@ -14,6 +14,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Build ordinary and portable executables for both platforms. Ordinary Windows
+  builds use `%LOCALAPPDATA%\ArrowPuzzle`; ordinary Linux builds retain XDG.
+  Portable builds keep settings/saves beside the executable or outer AppImage,
+  with the mode compiled in and no sidecar or filename dependency.
+- Produce six packages: Windows ZIP, Linux tar.gz and Linux AppImage, each in
+  ordinary and `-portable` variants, with mode-aware validation and provenance.
 - Compile screenshot/scenario environment hooks only in Debug. Release binaries
   and packages exclude them; CI checks the packaged game through external X11
   input and runs capture scenarios on a separate Debug build.

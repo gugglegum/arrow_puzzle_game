@@ -1,5 +1,10 @@
 # Linux portability assessment
 
+Current storage policy: ordinary builds use Windows LocalAppData or Linux XDG;
+portable builds keep data beside the executable/outer AppImage. See the
+[accepted storage contract](portable-distribution.md). Older Windows-adjacent
+and three-package observations below are historical.
+
 Current screenshot policy: capture/scenario hooks are **Debug-only**; F12 and
 raylib's capture hotkeys were removed. See [the accepted policy](portable-distribution.md#accepted-screenshot-policy)
 and the Linux guide before running new QA. Packaged-binary capture evidence

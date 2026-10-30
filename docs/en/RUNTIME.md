@@ -288,11 +288,23 @@ cannot simply be abandoned while its worker still uses captured data.
 
 ## 11. Settings and saved games
 
-Windows stores `settings.txt` and `savegame.txt` beside the EXE. Linux uses
+Ordinary Windows builds store `settings.txt` and `savegame.txt` in
+`%LOCALAPPDATA%\ArrowPuzzle\`, resolved with `SHGetKnownFolderPath` and
+`FOLDERID_LocalAppData` (Unicode paths and redirected profiles supported).
+Ordinary Linux builds use
 `$XDG_CONFIG_HOME/arrow-puzzle/settings.txt` and
 `$XDG_DATA_HOME/arrow-puzzle/savegame.txt`, defaulting to `~/.config` and
 `~/.local/share` respectively. Relative/empty overrides are ignored. See
 [Linux development](LINUX.md) for paths, transfer and isolated QA.
+
+`arrow_puzzle_portable` compiles `Game.cpp` with `ARROWPUZZLE_PORTABLE=1`, which
+constructs `Persistence(StorageMode::Portable)`. Both files go beside the
+executable; Linux AppImage resolves the outer image through `APPIMAGE` only
+when the executable is inside the matching `APPDIR`. Inherited variables from
+an unrelated AppImage do not redirect a standalone game. Renaming/extracting
+the executable alone preserves the mode. Portable mode ignores XDG paths and
+never falls back to user storage if its directory is unwritable. No sidecar or
+runtime mode switch is needed. Profiles are independent; no automatic migration.
 
 Both are text formats with `format=` and `version=1`. Writes use a temporary
 `.tmp` followed by replacement of the destination. Public persistence operations
