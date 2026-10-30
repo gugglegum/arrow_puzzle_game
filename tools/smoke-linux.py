@@ -67,14 +67,17 @@ def production_smoke(executable, appimage, work, env, settings_path):
             if list(work.rglob("*.png")) or list(work.rglob("*.gif")):
                 raise RuntimeError("F12/Control+F12 or developer variables created a capture")
             def key(name):
-                subprocess.run(["xdotool", "key", "--window", window, "--delay", "80", name],
+                # Use XTest into the focused window, as a real keyboard does;
+                # --window sends synthetic XSendEvent messages instead.
+                subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "80", name],
                                check=True, timeout=5)
                 time.sleep(0.15)
 
-            def expect_language(code):
+            def expect_language(code, action="initial selection"):
                 contents = settings_path.read_text()
                 if f"language={code}\n" not in contents:
-                    raise RuntimeError(f"Language selector did not save {code}; see {work / 'production.log'}")
+                    raise RuntimeError(f"Language selector did not save {code} after {action}: {contents!r}; "
+                                       f"see {work / 'production.log'}")
 
             # Fresh menu: Down skips disabled Resume and selects Settings.
             # Up wraps from the first setting to Back, then to Language.
@@ -85,7 +88,7 @@ def production_smoke(executable, appimage, work, env, settings_path):
                                    ("Left", "uk"), ("Right", "auto"),
                                    ("space", "en"), ("Return", "es")):
                 key(name)
-                expect_language(language)
+                expect_language(language, name)
             # Return to Auto for later smoke scenarios; the other preferences
             # and every save remain independent of the interface language.
             for name in ("Left", "Left"):

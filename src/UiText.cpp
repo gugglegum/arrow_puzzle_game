@@ -342,7 +342,13 @@ Vector2 UiText::measure(const char* text, float size, float spacing) {
 float UiText::fitSize(const char* text, float size, float spacing, float width) {
     // Integer sizes preserve the raster-at-display-size contract on both backends.
     size = std::max(1.0F, std::floor(size));
-    while (size > 1.0F && measure(text, size, spacing).x > width) size -= 1.0F;
+    while (size > 1.0F) {
+        const float measured = measure(text, size, spacing).x;
+        if (measured <= width) break;
+        // Jump near the fitting size: loading every intermediate size would
+        // leave many unnecessary Linux font atlases alive after a long title.
+        size = std::max(1.0F, std::min(size - 1.0F, std::floor(size * width / measured)));
+    }
     return size;
 }
 
