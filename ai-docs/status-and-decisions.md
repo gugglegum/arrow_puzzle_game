@@ -27,6 +27,12 @@ exits cleanly outside the build tree. Evidence is in ignored
 `out/selector-alignment/`. The atlas probe exercises production text/menu code
 on the Windows OpenGL driver; it is not a native Linux desktop test.
 
+Implementation `77c0c9a` passed [CI run 41052543082](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/41052543082)
+on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. Both native Linux
+jobs passed the 96 pixel checks with 0.5-pixel maximum error on both axes,
+all eight languages at both sizes, six core suites and the existing packaged
+game checks. Linux rendering was verified through Xvfb/Mesa.
+
 ## Optional left-button dragging, unreleased (2026-10-30)
 
 The user requested a boolean **Left-button dragging** setting, on by default,
