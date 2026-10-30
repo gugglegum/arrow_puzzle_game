@@ -61,6 +61,7 @@ def production_smoke(executable, appimage, work, env, settings_path):
             if window is None:
                 raise RuntimeError(f"Production game did not open its window; see {work / 'production.log'}")
             subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True, timeout=5)
+            subprocess.run(["xdotool", "mousemove", "--window", window, "5", "5"], check=True, timeout=5)
             time.sleep(0.3)
             for key in ("F12", "ctrl+F12", "ctrl+F12"):
                 subprocess.run(["xdotool", "key", "--window", window, "--delay", "80", key],
@@ -77,6 +78,15 @@ def production_smoke(executable, appimage, work, env, settings_path):
                                check=True, timeout=5)
                 time.sleep(0.15)
 
+            def point(x, y, click=False):
+                subprocess.run(["xdotool", "mousemove", "--window", window, str(x), str(y)], check=True, timeout=5)
+                time.sleep(0.15)
+                if click:
+                    subprocess.run(["xdotool", "mousedown", "1"], check=True, timeout=5)
+                    time.sleep(0.1)
+                    subprocess.run(["xdotool", "mouseup", "1"], check=True, timeout=5)
+                    time.sleep(0.15)
+
             def expect_language(code, action="initial selection"):
                 contents = settings_path.read_text()
                 if f"language={code}\n" not in contents:
@@ -88,16 +98,20 @@ def production_smoke(executable, appimage, work, env, settings_path):
                     raise RuntimeError(f"Language selector did not save {code} after {action}: {contents!r}; "
                                        f"window={window}, focus={focus.stdout.strip()}; see {work / 'production.log'}")
 
-            # Fresh menu: Down skips disabled Resume and selects Settings.
-            # Up wraps from the first setting to Back, then to Language.
-            for name in ("Down", "Return", "Up", "Up"):
-                key(name)
+            # Target the visible rows explicitly in the standard 1100x900
+            # fixture; page transitions reset shared mouse/keyboard selection.
+            point(550, 547, click=True)  # Main menu: Settings.
+            point(550, 657)              # Settings: Language (no activation).
             expect_language("auto")
             for name, language in (("Right", "en"), ("Left", "auto"),
                                    ("Left", "uk"), ("Right", "auto"),
                                    ("space", "en"), ("Return", "es")):
                 key(name)
                 expect_language(language, name)
+            point(673, 657, click=True)
+            expect_language("en", "left mouse chevron")
+            point(796, 657, click=True)
+            expect_language("es", "right mouse chevron")
             # Return to Auto for later smoke scenarios; the other preferences
             # and every save remain independent of the interface language.
             for name in ("Left", "Left"):
