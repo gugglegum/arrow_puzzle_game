@@ -258,13 +258,18 @@ Minimum validation by change type:
 
 ## 7. Automated visual checks
 
-Game.cpp supports environment variables for testing UI without manual clicks:
+Only the Debug configuration compiles environment-driven UI checks. Release
+and RelWithDebInfo exclude the code and environment-variable strings. All
+configurations disable raylib's F12/Control+F12 capture keys. Packaging requires
+Release, so developer hooks cannot enter a release package:
 
 ```powershell
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug --parallel 2
 $env:ARROWPUZZLE_SEED = "747"
 $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
 $env:ARROWPUZZLE_DIFFICULTY = "2"
-& .\build\windows-msvc\arrow_puzzle.exe
+& .\build\windows-msvc-debug\arrow_puzzle.exe
 ```
 
 Available hooks:

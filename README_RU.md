@@ -140,7 +140,6 @@ Very Hard (160 x 160), созданный новым алгоритмом вер
 | F11 или левый Alt+Enter | Переключить полноэкранный режим |
 | Escape | Выйти из полноэкранного режима, вернуться в меню или закрыть главное меню |
 | R | Создать новое поле, когда ни одна стрелка не движется |
-| F12 | Сохранить `arrow-puzzle-screenshot.png` в рабочем каталоге |
 
 Для приближения также работает Ctrl + «=», без Shift. Клавиши «+», «−» и 0
 цифрового блока поддерживаются с любым Ctrl; удержание сочетания масштабирования
@@ -308,11 +307,20 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 ## Возможности для разработки
 
+Screenshot-хуки и управление тестовыми сценариями компилируются только в Debug.
+Сборки Release и RelWithDebInfo игнорируют эти переменные; клавиши создания
+скриншотов удалены. Debug-конфигурацию нужно собрать явно:
+
+```powershell
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug --parallel 2
+```
+
 Начальное поле можно воспроизвести без изменения исходного кода:
 
 ```powershell
 $env:ARROWPUZZLE_SEED = "747"
-& .\build\windows-msvc\arrow_puzzle.exe
+& .\build\windows-msvc-debug\arrow_puzzle.exe
 ```
 
 Для автоматической визуальной проверки задайте путь через
@@ -321,7 +329,7 @@ $env:ARROWPUZZLE_SEED = "747"
 ```powershell
 $env:ARROWPUZZLE_SEED = "747"
 $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
-& .\build\windows-msvc\arrow_puzzle.exe
+& .\build\windows-msvc-debug\arrow_puzzle.exe
 ```
 
 ## Структура проекта

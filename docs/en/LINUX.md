@@ -59,14 +59,18 @@ both files beside its EXE. Existing version-1 text formats are unchanged;
 to transfer progress, copy the two files to the corresponding OS locations
 while the game is closed. Adjacent Linux files are not imported automatically.
 
+Screenshot hooks exist only in Debug; Release and RelWithDebInfo exclude them.
+All configurations disable capture hotkeys.
 Use temporary absolute XDG paths for QA so tests do not touch personal progress:
 
 ```bash
+cmake --preset linux-debug
+cmake --build build/linux-debug --parallel 2 --target arrow_puzzle
 mkdir -p "$PWD/out/linux-smoke"
 cd out/linux-smoke
 XDG_CONFIG_HOME="$PWD/config" XDG_DATA_HOME="$PWD/data" \
     ARROWPUZZLE_SCREENSHOT=menu.png ARROWPUZZLE_SCREENSHOT_MENU=1 \
-    ARROWPUZZLE_SCREENSHOT_FRAME=4 ../../build/linux/arrow_puzzle
+    ARROWPUZZLE_SCREENSHOT_FRAME=4 ../../build/linux-debug/arrow_puzzle
 ```
 
 raylib writes screenshots relative to the initial working directory; use a
@@ -124,6 +128,16 @@ next package. To check a downloaded binary:
 python3 tools/smoke-linux.py /absolute/path/to/ArrowPuzzle
 ```
 
+This production check requires `xdotool` and an X11 display (or Xvfb). It uses
+external input to verify startup, ignored QA variables, no files on F12 or
+Control+F12, and clean Escape shutdown. It does not rely on in-game hooks.
+For the separate deterministic QA scenarios, use:
+
+```bash
+python3 tools/smoke-linux.py build/linux-debug/arrow_puzzle --debug-hooks
+python3 tools/check-production-binary.py build/linux/arrow_puzzle
+```
+
 **Build and test** (`.github/workflows/build.yml`) checks branch pushes, PRs and
 manual runs on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. Linux
 includes Mesa/Xvfb rendering, glyphs and extracted-package smoke checks. Download
@@ -166,7 +180,10 @@ python3 tools/smoke-linux.py out/linux-package/ArrowPuzzle-dev-local-linux-x64.A
 ```
 
 CI creates the AppImage on Ubuntu 22.04/GCC only, after the extracted tar passes,
-and repeats the seven isolated game scenarios through extraction-and-run.
+and checks production startup/input through extraction-and-run. The seven
+capture/save/resume scenarios run on a separate Debug build;
+release packaging accepts only Release. Both platforms also scan the Release
+binary for capture hook/hotkey signatures before release packaging.
 Normal FUSE mounting is not verified in the current VM; extraction-and-run is.
 Local checks also exercised real X11 Ctrl zoom/fit, a returning head drag that
 must not launch, unchanged saved progress, Alt+Enter/Escape and focus switching.

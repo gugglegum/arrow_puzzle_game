@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Removed
+
+- Screenshot/GIF capture shortcuts, including raylib's built-in F12 and
+  Control+F12 behavior, so accidental key presses do not create files.
+
+### Changed
+
+- Compile screenshot/scenario environment hooks only in Debug. Release binaries
+  and packages exclude them; CI checks the packaged game through external X11
+  input and runs capture scenarios on a separate Debug build.
+
 ## [0.5.0] - 2026-10-30
 
 ### Added

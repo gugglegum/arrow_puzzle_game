@@ -20,7 +20,11 @@ hooks. Use those references instead of maintaining duplicate procedures here.
 - Start screenshot smoke checks with MENU=1 and FRAME=4 to avoid unintended
   board generation. Captures must be viewed. Clear environment hooks afterward
   when reusing a shell; SCREENSHOT intentionally forces redraws, so leave it
-  empty when measuring idle behavior.
+  empty when measuring idle behavior. **Hooks work only in Debug builds.** Use
+  `build/windows-msvc-debug/arrow_puzzle.exe` or `build/linux-debug/arrow_puzzle`.
+  Release/RelWithDebInfo ignore all scenario variables; do not use a release
+  artifact for environment-driven capture. F12/Control+F12 are disabled in all
+  configurations, including raylib's built-in screenshot/GIF handlers.
 - Pinned raylib's `TakeScreenshot` discards the directory part of its filename
   and writes under its storage base (the initial working directory on GLFW).
   An absolute screenshot environment value does not relocate the image. Check
@@ -44,6 +48,7 @@ different machine.
 | --- | --- |
 | CMake/Ninja absent from PATH | The build helper also checks the standard CLion installation |
 | Fresh compiler detection fails in Debug with a PDB-service error | `-DCMAKE_TRY_COMPILE_CONFIGURATION=Release` worked for an isolated Release configure |
+| Actual MSVC Debug compilation fails with C1902 | Local reconfiguration with `-DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded` worked by using embedded debug information; keep this machine workaround out of project-wide compiler defaults |
 | Persistence tests cannot atomically replace files in default TEMP | Use a fresh workspace `build/` directory for child-process TEMP/TMP |
 | LNK1104 or access denial on an existing output | Match the running EXE to the output path; AGENTS.md authorizes stopping that process and rebuilding in place. Check permissions if no matching process exists |
 | Local GitHub CLI call has a transient TLS/permission error | Retry/check the actual error before changing credentials or declaring the service unavailable |

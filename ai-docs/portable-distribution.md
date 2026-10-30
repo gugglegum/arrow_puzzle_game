@@ -6,6 +6,29 @@ persistent game files stay in one chosen directory. This is a preference and
 design proposal, not an instruction to change storage behavior or release assets
 yet. No portable mode was implemented in this discussion.
 
+## Accepted screenshot policy
+
+The user contacted the initial GPT-5.6 Sol chat and reports that it added F12
+without a user request for debugging convenience. The user has now explicitly
+requested removal: accidental presses should not create unwanted files, and
+players can use their own screenshot tools. The later clarification requires
+the remaining environment hooks to work **only in Debug builds**.
+
+- Remove the game's F12 handler and README control entries.
+- Disable raylib's independent `SUPPORT_SCREEN_CAPTURE` and
+  `SUPPORT_GIF_RECORDING` handlers in every configuration; otherwise F12 and
+  Control+F12 could still create PNG/GIF files after removing the game handler.
+- `ARROWPUZZLE_SCREENSHOT_HOOKS=$<CONFIG:Debug>` conditionally compiles the
+  environment parsing, deterministic seed/scenario setup, captures, and related
+  save/exit behavior. Release and RelWithDebInfo contain none of those hooks.
+- CI keeps the seven capture/save/resume scenarios on a separate Debug build.
+  The real Release binary and its tar/AppImage packages are checked through
+  external X11 input, with capture variables set and F12/Control+F12 pressed:
+  they must create no image, ignore developer variables, and exit normally.
+  A binary scan also rejects hook strings and raylib capture filename patterns.
+- The existing 0.5.0 draft/tag/packages are historical artifacts and are not
+  replaced by this source change. New builds receive the changed policy.
+
 ## Current implementation, checked after the Linux port
 
 - `Game::run()` constructs the default `Persistence` object.
@@ -99,23 +122,19 @@ If implementing portable mode:
 - Report an unwritable portable directory instead of silently falling back to
   the user's home; hidden fallback would defeat the user's stated preference.
 - Do not silently import, move, overwrite, or delete existing XDG/adjacent saves.
-- Audit other game-owned outputs, especially F12 screenshots, which currently
-  go to raylib's initial working directory. The promise concerns permanent game
-  files; OS-managed records and temporary AppImage mounting/extraction are a
-  separate matter.
+- Audit other permanent game-owned outputs. F12 screenshots were removed by the
+  accepted policy above; Debug-only QA captures are an explicit development
+  action. OS-managed records and temporary AppImage mounting/extraction remain
+  separate matters.
 - Verify archive and AppImage launch paths, read-only failures, save/resume,
   different working directories, copying/renaming just the executable, and
   absence of writes to the user's normal config/data directories. Preserve
   Windows behavior and existing progress.
 
-The screenshot mentioned in this discussion is the existing **F12** command in
-`Game.cpp`: it writes `arrow-puzzle-screenshot.png` to raylib's storage base,
-initialized from the working directory. It is an explicit user action, not
-background capture during normal gameplay. Separate `ARROWPUZZLE_SCREENSHOT`
-hooks deliberately produce captures for automated QA. The user asked what was
-meant by screenshots; no request to add, remove, or automatically take them was
-made. Routing all permanent game-owned outputs consistently is a future
-portable-mode requirement, not a change already made here.
+The earlier discussion referred to the then-existing **F12** command, which
+wrote `arrow-puzzle-screenshot.png` relative to the initial working directory.
+The user later explicitly requested its removal, as recorded above. The
+separate `ARROWPUZZLE_SCREENSHOT` hooks remain for deliberate Debug-only QA.
 
 The user then said they did not recall requesting screenshot functionality.
 The complete, non-shallow Git history places both `KEY_F12` and
@@ -125,8 +144,8 @@ entry, in root commit `d5ebdb911b857a8dcd5c5bb3dc4ff58038816245`
 repository, not who requested it or whether it was authorized. No user request
 for this feature appears in the current conversation. Do not treat its existing
 code/documentation as evidence of acceptance or as a requirement to retain it.
-The explicit F12 product shortcut and the separate automated QA capture hooks
-are distinct concerns; this follow-up did not request a behavior change.
+The explicit F12 product shortcut and automated QA hooks are distinct concerns;
+the subsequent removal request supersedes the earlier unconfirmed status.
 
 This discussion does not authorize changing the prepared 0.5.0 draft, its tag,
 attested packages, or publication state. Treat any later implementation and

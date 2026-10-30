@@ -64,6 +64,8 @@ jobs:
           persist-credentials: false
       - name: Build Release and run the complete headless test suite
         run: ./tools/build-windows.ps1 -Configuration Release
+      - name: Reject developer capture functionality in the release binary
+        run: python tools/check-production-binary.py build/windows-msvc/arrow_puzzle.exe
       - name: Package the executable and notices
         id: package
         run: ./tools/package-windows.ps1 -Version $env:PACKAGE_VERSION
@@ -122,17 +124,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential ninja-build git curl python3-venv \
             libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev \
-            libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth
+            libxcursor-dev libxinerama-dev libgl1-mesa-dri xvfb xauth xdotool
           python3 -m venv "$RUNNER_TEMP/arrow-cmake"
           "$RUNNER_TEMP/arrow-cmake/bin/pip" install cmake==3.28.3
           echo "$RUNNER_TEMP/arrow-cmake/bin" >> "$GITHUB_PATH"
       - name: Build Release and run the complete headless test suite
         run: ./tools/build-linux.sh
-      - name: Check rendering and text with Mesa
+      - name: Check rendering, text and developer capture scenarios
         run: |
+          python3 tools/check-production-binary.py build/linux/arrow_puzzle
           cmake --build build/linux --parallel 2 --target arrow_render_tests arrow_ui_text_tests
           xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_render_tests
           xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests
+          cmake --preset linux-debug -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$GITHUB_WORKSPACE/build/linux/_deps/raylib-src"
+          cmake --build build/linux-debug --parallel 2 --target arrow_puzzle
+          xvfb-run -a -s '-screen 0 1280x1024x24' python3 tools/smoke-linux.py \
+            build/linux-debug/arrow_puzzle --debug-hooks --output-dir out/linux-qa-smoke
       - name: Package the Linux archive
         id: package
         run: python3 tools/package-linux.py --version "$PACKAGE_VERSION"
@@ -205,6 +212,8 @@ jobs:
             build/linux/Testing/Temporary/LastTest.log
             out/linux-smoke/**/*.png
             out/linux-smoke/**/*.log
+            out/linux-qa-smoke/**/*.png
+            out/linux-qa-smoke/**/*.log
             out/appimage-smoke/**/*.png
             out/appimage-smoke/**/*.log
           if-no-files-found: warn

@@ -264,14 +264,18 @@ ctest --test-dir build\windows-msvc --output-on-failure
 
 ## 7. Автоматизированные визуальные проверки
 
-`Game.cpp` поддерживает переменные окружения, чтобы проверять UI без ручного
-клика:
+UI-проверки через переменные окружения компилируются только в Debug. Release
+и RelWithDebInfo исключают этот код и строки переменных. Во всех конфигурациях
+отключены F12/Control+F12 из raylib. Упаковка требует Release, поэтому хуки
+разработки не попадают в релизный пакет:
 
 ```powershell
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug --parallel 2
 $env:ARROWPUZZLE_SEED = "747"
 $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
 $env:ARROWPUZZLE_DIFFICULTY = "2"
-& .\build\windows-msvc\arrow_puzzle.exe
+& .\build\windows-msvc-debug\arrow_puzzle.exe
 ```
 
 Доступные hooks:

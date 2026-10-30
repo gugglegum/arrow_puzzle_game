@@ -784,6 +784,7 @@ std::optional<std::size_t> hitTest(
     return best;
 }
 
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
 std::string environmentValue(const char* name) {
 #if defined(_MSC_VER)
     char* rawValue = nullptr;
@@ -820,6 +821,7 @@ std::optional<std::uint32_t> unsignedFromEnvironment(
     }
     return static_cast<std::uint32_t>(parsed);
 }
+#endif
 
 } // namespace
 
@@ -851,11 +853,10 @@ int Game::run() {
     Screen screen = Screen::MainMenu;
     bool activeGame = false;
 
-    std::uint32_t seed = unsignedFromEnvironment(
-        "ARROWPUZZLE_SEED"
-    ).value_or(
-        static_cast<std::uint32_t>(std::time(nullptr))
-    );
+    std::uint32_t seed = static_cast<std::uint32_t>(std::time(nullptr));
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
+    seed = unsignedFromEnvironment("ARROWPUZZLE_SEED").value_or(seed);
+#endif
     GeneratorOptions currentGeneratorOptions{
         kDefaultColumns,
         kDefaultRows,
@@ -1015,8 +1016,10 @@ int Game::run() {
     bool generationOverlayRendered = false;
     std::string generationError;
     bool closeRequested = false;
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
     const std::string automatedScreenshot =
         environmentValue("ARROWPUZZLE_SCREENSHOT");
+    const bool captureActive = !automatedScreenshot.empty();
     const int automatedScreenshotFrame = static_cast<int>(std::max(
         std::uint32_t{1},
         unsignedFromEnvironment(
@@ -1092,6 +1095,9 @@ int Game::run() {
         );
     bool automatedSecondLaunchDone = false;
     int renderedFrames = 0;
+#else
+    constexpr bool captureActive = false;
+#endif
 
     float boardWidth =
         kBoardPadding * 2.0F + board.columns() * kCellSize;
@@ -1247,7 +1253,9 @@ int Game::run() {
             generationError.clear();
             screen = Screen::Playing;
             resetCamera();
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
             renderedFrames = 0;
+#endif
             return true;
         };
 
@@ -1305,6 +1313,7 @@ int Game::run() {
         screen = Screen::MainMenu;
     };
 
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
     if (!automatedScreenshot.empty() &&
         automatedMenuScreen == 0) {
         if (automatedResume &&
@@ -1334,6 +1343,7 @@ int Game::run() {
             startGeneration(currentGeneratorOptions);
         }
     }
+#endif
 
     const auto hasForwardMotion = [&arrows]() {
         return std::ranges::any_of(
@@ -1754,16 +1764,20 @@ int Game::run() {
                     savedGame.reset();
                 }
                 resetCamera();
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
                 renderedFrames = 0;
                 applyAutomatedInitialSetup();
+#endif
                 if (screen != Screen::Playing) {
                     (void)persistCurrentGame();
                 }
             } catch (const std::exception& error) {
                 generationError = error.what();
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
                 if (!automatedScreenshot.empty()) {
                     automatedInitialSetupPending = false;
                 }
+#endif
                 TraceLog(
                     LOG_ERROR,
                     "Level generation failed: %s",
@@ -1771,9 +1785,11 @@ int Game::run() {
                 );
             } catch (...) {
                 generationError = "Unknown generation error";
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
                 if (!automatedScreenshot.empty()) {
                     automatedInitialSetupPending = false;
                 }
+#endif
                 TraceLog(
                     LOG_ERROR,
                     "Level generation failed with an unknown error"
@@ -1806,10 +1822,6 @@ int Game::run() {
                 closeRequested = true;
             }
         }
-        if (IsKeyPressed(KEY_F12)) {
-            TakeScreenshot("arrow-puzzle-screenshot.png");
-        }
-
         if (screen != Screen::Playing) {
             pressedSoundButton = false;
             pressedHudMenuButton = false;
@@ -1939,7 +1951,7 @@ int Game::run() {
                 generationInProgress,
                 windowFocused
             };
-            if (automatedScreenshot.empty() &&
+            if (!captureActive &&
                 delta < 0.1F &&
                 !activatedMenuButton.has_value() &&
                 lastDrawnScreen == menuScreen &&
@@ -2181,6 +2193,7 @@ int Game::run() {
             }
             EndDrawing();
             lastDrawnScreen = menuScreen;
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
             ++renderedFrames;
             if (!automatedScreenshot.empty() &&
                 automatedMenuScreen != 0 &&
@@ -2188,6 +2201,7 @@ int Game::run() {
                 TakeScreenshot(automatedScreenshot.c_str());
                 closeRequested = true;
             }
+#endif
             continue;
         }
 
@@ -2280,6 +2294,7 @@ int Game::run() {
             startGeneration(currentGeneratorOptions);
         }
 
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
         if (!automatedScreenshot.empty() &&
             !automatedSecondLaunchDone &&
             automatedSecondLaunch.has_value() &&
@@ -2297,6 +2312,7 @@ int Game::run() {
                 }
             }
         }
+#endif
 
         const bool launchInputAvailable =
             IsWindowFocused() &&
@@ -2861,7 +2877,7 @@ int Game::run() {
             guideCell,
             generationError
         };
-        if (automatedScreenshot.empty() &&
+        if (!captureActive &&
             !endAnimation.changed &&
             delta < 0.1F &&
             !generationInProgress &&
@@ -3102,6 +3118,7 @@ int Game::run() {
 
         lastDrawnScreen = Screen::Playing;
 
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
         ++renderedFrames;
         if (!automatedScreenshot.empty() &&
             !automatedInitialSetupPending &&
@@ -3110,12 +3127,17 @@ int Game::run() {
             TakeScreenshot(automatedScreenshot.c_str());
             closeRequested = true;
         }
+#endif
     }
 
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
     if (automatedScreenshot.empty() ||
         automatedSaveOnExit) {
+#endif
         (void)persistCurrentGame();
+#if ARROWPUZZLE_SCREENSHOT_HOOKS
     }
+#endif
     if (generationFuture.valid()) {
         const BoardPalette& palette = boardPalette(settings.boardTheme);
         while (generationFuture.wait_for(

@@ -6,15 +6,81 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
+import signal
 import struct
 import subprocess
 import tempfile
+import time
+
+
+def production_smoke(executable, appimage, work, env):
+    """Drive the real packaged binary through X11, without in-game QA hooks."""
+    if shutil.which("xdotool") is None:
+        raise RuntimeError("The production smoke check needs xdotool (run under X11 or Xvfb)")
+    # These must be ignored: in particular the game must remain in the main menu
+    # and must not capture a frame or exit before the explicit Escape below.
+    env = env | {
+        "ARROWPUZZLE_SCREENSHOT": "unexpected.png",
+        "ARROWPUZZLE_SCREENSHOT_FRAME": "1",
+        "ARROWPUZZLE_SCREENSHOT_MENU": "3",
+        "ARROWPUZZLE_SEED": "747",
+        "ARROWPUZZLE_DIFFICULTY": "1",
+        "ARROWPUZZLE_RESUME": "1",
+        "ARROWPUZZLE_SAVE_ON_EXIT": "1",
+    }
+    command = [str(executable)] + (["--appimage-extract-and-run"] if appimage else [])
+    with (work / "production.log").open("w") as log:
+        process = subprocess.Popen(command, cwd=work, env=env, stdout=log,
+                                   stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            window = None
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline and process.poll() is None:
+                found = subprocess.run(
+                    ["xdotool", "search", "--onlyvisible", "--name", "^Arrow Puzzle$"],
+                    text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=3)
+                for candidate in found.stdout.split():
+                    owner = subprocess.run(["xdotool", "getwindowpid", candidate], text=True,
+                                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                           timeout=3)
+                    try:
+                        if os.getpgid(int(owner.stdout.strip())) == process.pid:
+                            window = candidate
+                            break
+                    except (ValueError, ProcessLookupError):
+                        continue
+                if window is not None:
+                    break
+                time.sleep(0.1)
+            if window is None:
+                raise RuntimeError(f"Production game did not open its window; see {work / 'production.log'}")
+            subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True, timeout=5)
+            time.sleep(0.3)
+            for key in ("F12", "ctrl+F12", "ctrl+F12"):
+                subprocess.run(["xdotool", "key", "--window", window, "--delay", "80", key],
+                               check=True, timeout=5)
+                time.sleep(0.2)
+            if process.poll() is not None:
+                raise RuntimeError("Production game exited in response to developer capture variables")
+            if list(work.rglob("*.png")) or list(work.rglob("*.gif")):
+                raise RuntimeError("F12/Control+F12 or developer variables created a capture")
+            subprocess.run(["xdotool", "keydown", "--window", window, "Escape"], check=True, timeout=5)
+            if process.wait(timeout=15) != 0:
+                raise RuntimeError("Production game did not exit cleanly")
+            if not (work / "config/arrow-puzzle/settings.txt").is_file():
+                raise RuntimeError("Production game did not initialize isolated settings")
+            print("Production startup, ignored QA variables, F12/Control+F12, and clean exit passed")
+        finally:
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGTERM)
+                process.wait(timeout=10)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path)
     parser.add_argument("--appimage", action="store_true", help="Use the FUSE-free AppImage extraction path")
+    parser.add_argument("--debug-hooks", action="store_true", help="Run capture scenarios with a Debug build")
     parser.add_argument("--output-dir", type=Path, default=Path("out/linux-smoke"))
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -45,6 +111,13 @@ def main():
         print(f"Passed: {name}", flush=True)
 
     try:
+        if not args.debug_hooks:
+            production_smoke(executable, args.appimage, work, env)
+            if set(program.iterdir()) != {executable}:
+                raise RuntimeError("The program wrote beside its executable")
+            return
+        if args.appimage or b"ARROWPUZZLE_SCREENSHOT" not in executable.read_bytes():
+            raise RuntimeError("--debug-hooks requires a Debug executable with screenshot hooks")
         capture("menu", ARROWPUZZLE_SCREENSHOT_MENU="1")
         capture("new-game", ARROWPUZZLE_SCREENSHOT_MENU="2")
         capture("settings", ARROWPUZZLE_SCREENSHOT_MENU="3")

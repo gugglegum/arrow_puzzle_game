@@ -138,7 +138,6 @@ another arrow's speed.
 | F11 or Left Alt+Enter | Toggle fullscreen |
 | Escape | Leave fullscreen, return to the menu, or close the main menu |
 | R | Generate a new board when no arrow is moving |
-| F12 | Save `arrow-puzzle-screenshot.png` in the working directory |
 
 Ctrl + = also zooms in without Shift. The numeric keypad's +, - and 0 work
 with either Ctrl key; holding a zoom shortcut repeats it. A left-button drag
@@ -291,11 +290,20 @@ alternate board configurations.
 
 ## Development hooks
 
+Screenshot and scenario hooks are compiled only in Debug. Release and
+RelWithDebInfo builds ignore these variables and have no screenshot keyboard
+shortcut. Build the Debug configuration explicitly:
+
+```powershell
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug --parallel 2
+```
+
 The initial board can be reproduced without changing the source:
 
 ```powershell
 $env:ARROWPUZZLE_SEED = "747"
-& .\build\windows-msvc\arrow_puzzle.exe
+& .\build\windows-msvc-debug\arrow_puzzle.exe
 ```
 
 For automated visual checks, set `ARROWPUZZLE_SCREENSHOT` to an output path.
@@ -304,7 +312,7 @@ The game captures a frame and exits automatically:
 ```powershell
 $env:ARROWPUZZLE_SEED = "747"
 $env:ARROWPUZZLE_SCREENSHOT = "$PWD\preview.png"
-& .\build\windows-msvc\arrow_puzzle.exe
+& .\build\windows-msvc-debug\arrow_puzzle.exe
 ```
 
 Additional screenshot-only hooks are available:

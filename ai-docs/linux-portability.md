@@ -1,5 +1,10 @@
 # Linux portability assessment
 
+Current screenshot policy: capture/scenario hooks are **Debug-only**; F12 and
+raylib's capture hotkeys were removed. See [the accepted policy](portable-distribution.md#accepted-screenshot-policy)
+and the Linux guide before running new QA. Packaged-binary capture evidence
+below describes earlier builds and is retained as historical evidence.
+
 ## Implemented native baseline (2026-10-30)
 
 The native build and desktop port are implemented on the shared source tree.

@@ -27,6 +27,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Flight, collisions, rollback, saves | [Runtime guide](../docs/en/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
 | Touchpad, click/drag safety, keyboard zoom/fit | [Runtime guide, section 8](../docs/en/RUNTIME.md) | `BoardPointerGesture.hpp`, `BoardPointerGestureTests.cpp`, `Game.cpp` |
 | Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/en/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
+| Debug-only screenshot hooks; no capture hotkeys | [Project guide, section 7](../docs/en/PROJECT_GUIDE.md), [capture policy](portable-distribution.md#accepted-screenshot-policy) | `Game.cpp`, CMake, `smoke-linux.py` |
 | Accepted rounded arrows, resource comparisons | [Rounding evaluation](rounded-arrows.md) | `ArrowStroke.hpp`, `BoardCoverageShader.hpp`, `RenderingTests.cpp` |
 | Linux build, Mint/VMware verification, packaging | [Linux progress](linux-portability.md), [developer guide](../docs/en/LINUX.md) | Linux presets/helpers, `Persistence.cpp`, `LinuxWindow.cpp`, workflows |
 | Portable package proposals and AppImage data paths | [Portable distribution discussion](portable-distribution.md) | `Persistence.cpp`, `Game.cpp`, `tools/appimage/AppRun` |

@@ -61,14 +61,18 @@ ctest --preset linux
 в соответствующие каталоги другой ОС при закрытой игре. Автоматического импорта
 файлов из каталога Linux-программы нет.
 
+Screenshot-хуки есть только в Debug. Release и RelWithDebInfo исключают их;
+горячие клавиши создания снимков отключены во всех конфигурациях.
 Для QA задавайте временные абсолютные XDG-пути, сохраняя личный прогресс:
 
 ```bash
+cmake --preset linux-debug
+cmake --build build/linux-debug --parallel 2 --target arrow_puzzle
 mkdir -p "$PWD/out/linux-smoke"
 cd out/linux-smoke
 XDG_CONFIG_HOME="$PWD/config" XDG_DATA_HOME="$PWD/data" \
     ARROWPUZZLE_SCREENSHOT=menu.png ARROWPUZZLE_SCREENSHOT_MENU=1 \
-    ARROWPUZZLE_SCREENSHOT_FRAME=4 ../../build/linux/arrow_puzzle
+    ARROWPUZZLE_SCREENSHOT_FRAME=4 ../../build/linux-debug/arrow_puzzle
 ```
 
 raylib сохраняет скриншоты относительно начального рабочего каталога: задавайте
@@ -127,6 +131,16 @@ sha256sum --check --ignore-missing ../SHA256SUMS.txt
 python3 tools/smoke-linux.py /absolute/path/to/ArrowPuzzle
 ```
 
+Эта проверка обычной игры требует `xdotool` и X11 либо Xvfb. Внешний ввод
+проверяет запуск, игнорирование QA-переменных, отсутствие файлов после F12 и
+Control+F12 и штатное завершение по Escape. Внутриигровые хуки не используются.
+Отдельные детерминированные QA-сценарии запускаются так:
+
+```bash
+python3 tools/smoke-linux.py build/linux-debug/arrow_puzzle --debug-hooks
+python3 tools/check-production-binary.py build/linux/arrow_puzzle
+```
+
 **Build and test** (`.github/workflows/build.yml`) проверяет push в ветки, PR
 и ручные запуски на Windows/MSVC, Ubuntu 22.04/GCC и Ubuntu 24.04/Clang. Для
 Linux выполняются проверки рендера/текста Mesa/Xvfb и распакованного пакета.
@@ -169,7 +183,10 @@ python3 tools/smoke-linux.py out/linux-package/ArrowPuzzle-dev-local-linux-x64.A
 ```
 
 CI создаёт AppImage только на Ubuntu 22.04/GCC после проверки распакованного
-архива и повторяет семь изолированных сценариев игры через extraction-and-run.
+архива и проверяет запуск/ввод обычной игры через extraction-and-run. Семь
+сценариев снимков/save/resume выполняются на отдельной Debug-сборке; релизная
+упаковка принимает только Release. Перед упаковкой обе платформы также
+проверяют обычный бинарник на отсутствие строк capture-хуков и горячих клавиш.
 Обычное монтирование FUSE в текущей VM не проверено; extraction-and-run проверен.
 Локально также проверены реальные X11-вводы Ctrl zoom/fit, drag от головы с
 возвратом без запуска, неизменность прогресса, Alt+Enter/Escape и смена фокуса.

@@ -16,9 +16,13 @@ CTest suites on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. It also
 checks release assembly guards: mixed commits/versions, dirty metadata,
 modified packages/binaries, missing signatures and invalid draft inputs.
 
-Linux rendering/text checks use Mesa/Xvfb. Both the unpacked tar and AppImage
-run through menus, themes, no-audio startup and CRLF save/resume scenarios with
-isolated XDG data and a read-only program directory. Interactive GPU/input and
+Linux rendering/text checks use Mesa/Xvfb. A separate Debug executable
+runs menus, themes, no-audio startup and CRLF save/resume capture scenarios.
+The normal executable excludes those hooks; both unpacked tar and AppImage are
+checked through external X11 input for startup, ignored QA variables, no captures
+on F12/Control+F12 and clean exit, with isolated XDG data and a read-only program
+directory. Packaging accepts only Release. Binary signature checks also
+reject capture hooks/hotkeys in production files. Interactive GPU/input and
 audio-device checks still need a desktop. Development artifacts are retained
 for 14 days and do not carry the release workflow's provenance attestations.
 

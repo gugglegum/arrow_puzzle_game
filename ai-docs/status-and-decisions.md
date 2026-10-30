@@ -4,6 +4,27 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Screenshot cleanup, unreleased (2026-10-30)
+
+The user confirmed with the initial chat that F12 capture was added without a
+request, then explicitly asked to remove it and keep screenshot hooks only in
+**Debug builds**. The game handler and both README control entries are removed.
+Raylib's independent F12/Control+F12 screenshot/GIF handlers are also disabled;
+removing only the game handler would leave those active. Environment-driven
+capture/seed/scenario code is conditionally compiled only for Debug; Release
+and RelWithDebInfo ignore it. See [the capture policy](portable-distribution.md#accepted-screenshot-policy).
+
+Local Windows checks passed: clean Release build, all five CTest suites, all
+13 release-assembly guard tests, a production-binary signature check, and actual
+F12/Control+F12 input with QA variables set (no captures, clean shutdown).
+The separate Debug build produced visually inspected menu/board captures.
+Linux CI now runs the seven scenario checks on Debug, and tests the actual
+Release tar/AppImage externally through X11 without capture hooks. Its new
+run remains to be verified after this implementation is pushed.
+
+The prepared 0.5.0 tag/draft/assets have not been changed by this source update;
+this policy applies to new builds. Existing progress/settings are preserved.
+
 ## Common Windows/Linux 0.5.0 draft preparation (2026-10-30)
 
 The user now explicitly requested one common draft with Windows and Linux,
