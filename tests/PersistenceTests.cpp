@@ -260,6 +260,7 @@ void testDefaultSettingsAreCreated() {
     require(settings.crosshairGuides, "Crosshair guides must default to on");
     require(settings.sounds, "Sounds must default to on");
     require(settings.boardTheme == arrow::BoardTheme::Dark, "Board theme must default to dark");
+    require(settings.language == arrow::Language::Auto, "Language must default to Auto");
     require(
         std::filesystem::is_regular_file(persistence.settingsPath()),
         "Loading missing settings must create settings.txt"
@@ -284,6 +285,37 @@ void testDefaultSettingsAreCreated() {
     );
     require(text.find("sounds=on") != std::string::npos, "Default sound setting was not written");
     require(text.find("board_theme=dark") != std::string::npos, "Default board theme was not written");
+    require(text.find("language=auto") != std::string::npos, "Default language was not written");
+}
+
+void testLanguageUpgradeAndRepair() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    const std::string legacy = "format=arrow-puzzle-settings\nversion=1\narrow_loops=off\n"
+        "flying_arrow_collisions=off\ncrosshair_guides=off\nsounds=off\nboard_theme=light\n";
+    for (const char* suffix : {"", "language=unknown\n", "language=\n"}) {
+        writeText(persistence.settingsPath(), legacy + suffix);
+        auto settings = persistence.loadSettings();
+        require(settings.language == arrow::Language::Auto, "Missing/invalid language must use Auto");
+        require(!settings.arrowLoops && !settings.flyingArrowCollisions && !settings.crosshairGuides && !settings.sounds &&
+                settings.boardTheme == arrow::BoardTheme::Light, "Language migration changed other settings");
+        require(readText(persistence.settingsPath()).find("language=auto\n") != std::string::npos,
+                "Language was not repaired canonically");
+        for (int i = 0; i < static_cast<int>(arrow::Language::Count); ++i) {
+            const auto language = static_cast<arrow::Language>(i);
+            require(persistence.setLanguage(settings, language), "Language setter failed");
+            require(persistence.loadSettings() == settings, "Language was not restored");
+        }
+        const auto previous = settings;
+        const auto bytes = readText(persistence.settingsPath());
+        require(!persistence.setLanguage(settings, arrow::Language::Count) && settings == previous &&
+                readText(persistence.settingsPath()) == bytes, "Invalid language damaged settings");
+    }
+    const arrow::Persistence blocked{temporary.path() / "not-a-directory"};
+    writeText(blocked.directory(), "file blocks settings directory");
+    arrow::Settings settings;
+    require(!blocked.setLanguage(settings, arrow::Language::Russian) && settings.language == arrow::Language::Auto,
+            "Failed write changed language in memory");
 }
 
 void testMissingSettingsUseDefaultsAndPreserveExplicitOff() {
@@ -689,6 +721,7 @@ int main() {
         testPortableDirectories();
         testSeparateDirectories();
         testDefaultSettingsAreCreated();
+        testLanguageUpgradeAndRepair();
         testMissingSettingsUseDefaultsAndPreserveExplicitOff();
         testSettingsRoundTripAndAutomaticSetters();
         testBoardThemeUpgradeAndRepair();

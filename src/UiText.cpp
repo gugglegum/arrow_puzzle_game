@@ -1,5 +1,6 @@
 #include "UiText.hpp"
 #include "UiFontData.hpp"
+#include "arrow/Localization.hpp"
 
 #include <rlgl.h>
 
@@ -31,6 +32,37 @@ namespace {
 
 constexpr int kPadding = 2;
 constexpr std::size_t kMaximumCachedLabels = 128;
+
+bool containsCjk(const char* text) {
+    for (const char* p = text; *p;) {
+        int bytes = 0;
+        const int codepoint = GetCodepointNext(p, &bytes);
+        if (codepoint >= 0x2E80) return true;
+        p += bytes;
+    }
+    return false;
+}
+
+std::vector<int> codepointsForFont(bool cjk) {
+    std::vector<int> result;
+    for (int cp = 32; cp < 127; ++cp) result.push_back(cp);
+    const auto append = [&](const char* label) {
+        for (const char* p = label; *p;) {
+            int bytes = 0;
+            const int cp = GetCodepointNext(p, &bytes);
+            if ((cjk && cp >= 0x2E80) || (!cjk && cp < 0x2E80)) result.push_back(cp);
+            p += bytes;
+        }
+    };
+    for (int l = 1; l < static_cast<int>(Language::Count); ++l) {
+        const auto language = static_cast<Language>(l);
+        append(languageName(language));
+        for (int t = 0; t < static_cast<int>(Text::Count); ++t) append(translate(static_cast<Text>(t), language));
+    }
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+}
 
 // An alpha-only font atlas discards ClearType's three independent coverages.
 // Multiply the destination by the native RGB mask, then add the covered ink.
@@ -69,17 +101,19 @@ struct UiText::Impl {
 
     std::list<Label> labels;
     std::size_t textureBytes{};
-    std::map<int, Font> fallbackFonts;
+    std::map<std::pair<int, bool>, Font> fallbackFonts;
     Shader shader{};
     int inkPassLocation{-1};
 #if defined(_WIN32)
     HANDLE fontResource{};
+    HANDLE cjkFontResource{};
     HDC dc{};
-    std::map<int, HFONT> fonts;
+    std::map<std::pair<int, bool>, HFONT> fonts;
     DWORD quality{DEFAULT_QUALITY};
 
-    HFONT fontForSize(int size) {
-        if (const auto found = fonts.find(size); found != fonts.end()) {
+    HFONT fontForSize(int size, bool cjk) {
+        const auto key = std::pair{size, cjk};
+        if (const auto found = fonts.find(key); found != fonts.end()) {
             return found->second;
         }
         // Positive height requests the full character cell, matching the UI's
@@ -87,9 +121,9 @@ struct UiText::Impl {
         HFONT font = CreateFontW(
             size, 0, 0, 0, FW_MEDIUM, FALSE, FALSE, FALSE, ANSI_CHARSET,
             OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, quality,
-            DEFAULT_PITCH, L"Inter Medium"
+            DEFAULT_PITCH, cjk ? L"Arrow Puzzle CJK" : L"Inter Medium"
         );
-        fonts.emplace(size, font);
+        fonts.emplace(key, font);
         return font;
     }
 
@@ -100,7 +134,7 @@ struct UiText::Impl {
         std::wstring wide(static_cast<std::size_t>(length), L'\0');
         MultiByteToWideChar(CP_UTF8, 0, text, -1, wide.data(), length);
         wide.pop_back();
-        HFONT font = fontForSize(size);
+        HFONT font = fontForSize(size, containsCjk(text));
         if (font == nullptr) return label;
         const HGDIOBJ oldFont = SelectObject(dc, font);
 
@@ -181,6 +215,10 @@ struct UiText::Impl {
             const_cast<unsigned char*>(assets::kUiFontData),
             static_cast<DWORD>(assets::kUiFontDataSize), nullptr, &count
         );
+        cjkFontResource = AddFontMemResourceEx(
+            const_cast<unsigned char*>(assets::kCjkFontData),
+            static_cast<DWORD>(assets::kCjkFontDataSize), nullptr, &count
+        );
         dc = CreateCompatibleDC(nullptr);
         BOOL smoothing = FALSE;
         UINT smoothingType = 0;
@@ -209,22 +247,27 @@ struct UiText::Impl {
 
     bool native() const {
 #if defined(_WIN32)
-        return fontResource != nullptr && dc != nullptr && inkPassLocation >= 0;
+        return fontResource != nullptr && cjkFontResource != nullptr && dc != nullptr && inkPassLocation >= 0;
 #else
         return false;
 #endif
     }
 
-    Font fallback(int size) {
-        if (const auto found = fallbackFonts.find(size); found != fallbackFonts.end()) {
+    Font fallback(int size, bool cjk) {
+        const auto key = std::pair{size, cjk};
+        if (const auto found = fallbackFonts.find(key); found != fallbackFonts.end()) {
             return found->second;
         }
+        static auto latinCodepoints = codepointsForFont(false);
+        static auto cjkCodepoints = codepointsForFont(true);
+        auto& codepoints = cjk ? cjkCodepoints : latinCodepoints;
         Font font = LoadFontFromMemory(
-            ".ttf", assets::kUiFontData, static_cast<int>(assets::kUiFontDataSize),
-            size, nullptr, 0
+            ".ttf", cjk ? assets::kCjkFontData : assets::kUiFontData,
+            static_cast<int>(cjk ? assets::kCjkFontDataSize : assets::kUiFontDataSize),
+            size, codepoints.data(), static_cast<int>(codepoints.size())
         );
         SetTextureFilter(font.texture, TEXTURE_FILTER_POINT);
-        fallbackFonts.emplace(size, font);
+        fallbackFonts.emplace(key, font);
         return font;
     }
 
@@ -279,6 +322,8 @@ struct UiText::Impl {
         fonts.clear();
         if (fontResource != nullptr) RemoveFontMemResourceEx(fontResource);
         fontResource = nullptr;
+        if (cjkFontResource != nullptr) RemoveFontMemResourceEx(cjkFontResource);
+        cjkFontResource = nullptr;
 #endif
     }
 };
@@ -291,7 +336,14 @@ Vector2 UiText::measure(const char* text, float size, float spacing) {
     if (impl_->native()) {
         if (const auto* label = impl_->label(text, pixels, spacing)) return label->extent;
     }
-    return MeasureTextEx(impl_->fallback(pixels), text, size, spacing);
+    return MeasureTextEx(impl_->fallback(pixels, containsCjk(text)), text, size, spacing);
+}
+
+float UiText::fitSize(const char* text, float size, float spacing, float width) {
+    // Integer sizes preserve the raster-at-display-size contract on both backends.
+    size = std::max(1.0F, std::floor(size));
+    while (size > 1.0F && measure(text, size, spacing).x > width) size -= 1.0F;
+    return size;
 }
 
 void UiText::draw(const char* text, Vector2 position, float size, float spacing, Color color) {
@@ -321,7 +373,7 @@ void UiText::draw(const char* text, Vector2 position, float size, float spacing,
             return;
         }
     }
-    DrawTextEx(impl_->fallback(pixels), text, position, size, spacing, color);
+    DrawTextEx(impl_->fallback(pixels, containsCjk(text)), text, position, size, spacing, color);
 }
 
 void UiText::release() { impl_->release(); }

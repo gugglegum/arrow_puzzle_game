@@ -8,7 +8,7 @@ python3 tools/check-production-binary.py build/linux/arrow_puzzle
 python3 tools/check-production-binary.py build/linux/arrow_puzzle_portable --portable
 cmake --build build/linux --parallel 2 --target arrow_render_tests arrow_ui_text_tests
 xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_render_tests
-xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests
+xvfb-run -a -s '-screen 0 1280x1024x24' ./build/linux/arrow_ui_text_tests out/localization-ui
 cmake --preset linux-debug "$@" \
   -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$project_root/build/linux/_deps/raylib-src"
 cmake --build build/linux-debug --parallel 2 --target arrow_puzzle arrow_puzzle_portable

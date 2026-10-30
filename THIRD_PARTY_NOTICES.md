@@ -14,6 +14,17 @@ The complete license is included at
 [`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt) in both the
 source tree and binary release archives.
 
+## Noto Sans SC / Arrow Puzzle CJK
+
+Arrow Puzzle embeds a modified weight-500 UI subset of Noto Sans SC, renamed
+Arrow Puzzle CJK. It provides Simplified Chinese glyphs on Windows and Linux.
+
+- [Pinned Google Fonts source](https://github.com/google/fonts/tree/a85815a42757630ce188fdad368c2dfc444d4773/ofl/notosanssc)
+- Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'
+- License: SIL Open Font License, Version 1.1
+- Complete license: [`assets/fonts/NotoSansSC-LICENSE.txt`](assets/fonts/NotoSansSC-LICENSE.txt), included in binary archives.
+- Reproduction and source digest: [`assets/fonts/README.md`](assets/fonts/README.md).
+
 ## raylib 5.5
 
 Arrow Puzzle downloads raylib 5.5 at configure time and links it statically.

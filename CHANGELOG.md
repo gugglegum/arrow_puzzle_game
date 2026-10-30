@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Interface language selector with Auto, English, Spanish, French, German,
+  Portuguese, Simplified Chinese, Russian and Ukrainian. Changes apply
+  immediately and are saved automatically. Auto uses the Windows UI language
+  or Linux message locale, with English fallback for unsupported languages.
+- Translations and Chinese font glyphs embedded in both ordinary and portable
+  executables; translated menus, hints, HUD, generation and result screens.
+
 ### Removed
 
 - Screenshot/GIF capture shortcuts, including raylib's built-in F12 and

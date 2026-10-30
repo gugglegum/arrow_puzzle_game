@@ -4,6 +4,12 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Interface localization, unreleased (2026-10-30)
+
+Auto and eight explicit languages are implemented for Windows/Linux, with
+embedded translations and Chinese glyphs. See [localization](localization.md)
+for source entry points, font reproduction and verification status.
+
 ## Unified ordinary/portable builds, unreleased (2026-10-30)
 
 The user requested six packages: Windows ZIP, Linux tar.gz, and Linux AppImage,

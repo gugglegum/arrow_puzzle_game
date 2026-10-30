@@ -85,6 +85,7 @@ jobs:
             out/linux-qa-smoke/**/*.log
             out/appimage-smoke/**/*.png
             out/appimage-smoke/**/*.log
+            out/localization-ui/*.png
           if-no-files-found: warn
           retention-days: 14
 

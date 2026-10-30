@@ -25,6 +25,7 @@ The current stack is:
 - statically linked raylib;
 - only the C++ standard library outside raylib;
 - an Inter font embedded in the EXE.
+- compiled-in translations for eight languages and an embedded Chinese font subset.
 
 Windows x64 remains the main platform. Native Linux x86-64 is also built and
 tested; see [Linux development](LINUX.md) for prerequisites and validation limits.
@@ -84,6 +85,7 @@ src/
   MotionKinematics.cpp     Pure numerical motion functions
   MotionResolver.cpp       Pure collision classification
   Persistence.cpp          Versioned text formats and atomic replacement
+  Localization.cpp         Embedded translations and Windows/Linux locale detection
   Game.cpp                 raylib, UI, input, camera, animation, main loop
   BoardPointerGesture.hpp  Click/drag threshold and launch cancellation
   StaticBoardGeometry.*    Geometry caching and analytic antialiasing
@@ -126,6 +128,7 @@ CMake targets:
 - `arrow_puzzle_portable`: the same GUI with adjacent settings/save storage;
 - `arrow_tests`: generator, level quality, kinematics, and collisions;
 - `arrow_persistence_tests`: settings and saved games;
+- `arrow_localization_tests`: catalogs, language cycling and system locale resolution;
 - `arrow_menu_selection_tests`: window-free menu-selection logic;
 - `arrow_board_pointer_tests`: window-free click/drag and launch-cancellation checks;
 - `arrow_end_screen_tests`: window-free result-state/timing checks.

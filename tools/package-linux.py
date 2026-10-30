@@ -94,6 +94,7 @@ def main():
         font_licenses = stage / "assets/fonts"
         font_licenses.mkdir(parents=True)
         shutil.copy2(ROOT / "assets/fonts/Inter-LICENSE.txt", font_licenses)
+        shutil.copy2(ROOT / "assets/fonts/NotoSansSC-LICENSE.txt", font_licenses)
         version_header = (build / "generated/BuildVersion.hpp").read_text()
         version_label = re.search(r'kVersionLabel\[\] = "([^"]+)"', version_header).group(1)
         compiler = re.search(r"^CMAKE_CXX_COMPILER:[^=]+=(.+)$", cache, re.MULTILINE).group(1)

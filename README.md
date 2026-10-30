@@ -141,8 +141,9 @@ another arrow's speed.
 | Ctrl + 0 | Fit and centre the whole board in the window |
 | Middle mouse button + drag | Pan the board |
 | Up / Down | Move the current menu selection |
+| Left / Right | Change the selected board theme or interface language |
 | Enter | Activate the selected menu item |
-| Space | Change the selected setting, including board theme |
+| Space | Change the selected setting, including theme and language |
 | Top-left back arrow | Save the unfinished game and return to the menu |
 | HUD speaker button | Toggle sound |
 | F11 or Left Alt+Enter | Toggle fullscreen |
@@ -160,6 +161,15 @@ New arrows may be launched while other arrows are moving forward. Input is
 temporarily locked while collided arrows are paused or rewinding.
 
 ## Menus, settings, and saves
+
+Current source builds include **Language** in Settings. Use the side arrows or
+Left/Right keys to cycle through Auto, English, Español, Français, Deutsch,
+Português, 简体中文 (Simplified Chinese), Русский and Українська. Enter/Space
+also advances the selection. Changes apply immediately and save automatically.
+Auto is the default: it follows the Windows UI language or Linux message
+locale and uses English when that language is unsupported. Translations and
+all required fonts are embedded, so language switching works offline with
+the executable alone.
 
 The New game menu provides four board sizes:
 

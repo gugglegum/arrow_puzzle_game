@@ -1,6 +1,7 @@
 #pragma once
 
 #include <raylib.h>
+#include "arrow/Localization.hpp"
 
 #include <array>
 #include <optional>
@@ -21,7 +22,8 @@ public:
     void show(Outcome outcome, float delay = 0.0F);
     Update update(float delta);
     void draw(UiText& text, int width, int height, float top,
-              std::optional<int> hovered, std::optional<int> pressed) const;
+              std::optional<int> hovered, std::optional<int> pressed,
+              Language language = Language::English) const;
 
     // Gameplay ends immediately; the result may still be waiting to appear.
     [[nodiscard]] bool active() const { return outcome_ != Outcome::None; }

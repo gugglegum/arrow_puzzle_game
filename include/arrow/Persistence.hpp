@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arrow/Board.hpp"
+#include "arrow/Localization.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -17,6 +18,7 @@ struct Settings {
     bool crosshairGuides{true};
     bool sounds{true};
     BoardTheme boardTheme{BoardTheme::Dark};
+    Language language{Language::Auto};
 
     auto operator<=>(const Settings&) const = default;
 };
@@ -75,6 +77,7 @@ public:
         bool enabled
     ) const noexcept;
     [[nodiscard]] bool setBoardTheme(Settings& settings, BoardTheme theme) const noexcept;
+    [[nodiscard]] bool setLanguage(Settings& settings, Language language) const noexcept;
 
     [[nodiscard]] std::optional<SavedGame> loadSavedGame() const noexcept;
     [[nodiscard]] bool saveSavedGame(const SavedGame& game) const noexcept;

@@ -32,6 +32,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Linux build, Mint/VMware verification, packaging | [Linux progress](linux-portability.md), [developer guide](../docs/en/LINUX.md) | Linux presets/helpers, `Persistence.cpp`, `LinuxWindow.cpp`, workflows |
 | Ordinary/portable builds and AppImage data paths | [Accepted storage contract](portable-distribution.md) | `Persistence.cpp`, `Game.cpp`, packaging/CI |
 | Menus, themes, sound, end screens | [Runtime guide](../docs/en/RUNTIME.md) | `MenuSelection.hpp`, `EndScreen.cpp`, `GameAudio.cpp` |
+| Interface languages, Auto locale, embedded CJK font | [Localization notes](localization.md), [runtime guide](../docs/en/RUNTIME.md#interface-localization) | `Localization.cpp`, `UiText.cpp`, `MenuScreen.cpp`, `Persistence.cpp` |
 | Release procedure and verification | [Release guide](../docs/en/RELEASING.md) | `cmake/`, `tools/`, `.github/workflows/` |
 | Previously verified release evidence | [Release history](release-history.md) | Tagged source and Actions run |
 

@@ -51,6 +51,7 @@ foreach ($filename in @('README.md', 'README_RU.md', 'CHANGELOG.md', 'LICENSE', 
 $fontLicenseDirectory = Join-Path $stage 'assets\fonts'
 New-Item -ItemType Directory -Path $fontLicenseDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\fonts\Inter-LICENSE.txt') -Destination $fontLicenseDirectory
+Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\fonts\NotoSansSC-LICENSE.txt') -Destination $fontLicenseDirectory
 Copy-Item -LiteralPath (Join-Path $projectRoot 'docs') -Destination (Join-Path $stage 'docs') -Recurse
 $commit = & git -C $projectRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Could not identify the source commit.' }

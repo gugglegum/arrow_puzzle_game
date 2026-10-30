@@ -90,7 +90,7 @@ enum class Screen {
 };
 
 struct DifficultyPreset {
-    const char* label;
+    Text label;
     int columns;
     int rows;
     int maximumLength;
@@ -98,10 +98,10 @@ struct DifficultyPreset {
 };
 
 constexpr std::array<DifficultyPreset, 4> kDifficultyPresets{{
-    {"Simple", 20, 20, 30, 8},
-    {"Middle", 40, 40, 60, 8},
-    {"Hard", 80, 80, 120, 8},
-    {"Very Hard", 160, 160, 960, 8}
+    {Text::Simple, 20, 20, 30, 8},
+    {Text::Middle, 40, 40, 60, 8},
+    {Text::Hard, 80, 80, 120, 8},
+    {Text::VeryHard, 160, 160, 960, 8}
 }};
 
 enum class Motion {
@@ -230,11 +230,12 @@ void drawCenteredText(
     TextStyle style,
     Color color
 ) {
+    style.size = font.fitSize(text, style.size, style.spacing, GetScreenWidth() - 32.0F);
     const Vector2 size = measureText(font, text, style);
     drawText(
         font,
         text,
-        {centerX - size.x * 0.5F, y},
+        {std::clamp(centerX - size.x * 0.5F, 12.0F, GetScreenWidth() - size.x - 12.0F), y},
         style,
         color
     );
@@ -252,7 +253,7 @@ Rectangle hudMenuButtonRectangle() {
     return {22.0F, 21.0F, 40.0F, 40.0F};
 }
 
-void drawHudMenuButton(UiText& font, bool hovered, bool pressed, const BoardPalette& palette) {
+void drawHudMenuButton(UiText& font, bool hovered, bool pressed, const BoardPalette& palette, Language language) {
     const Rectangle bounds = hudMenuButtonRectangle();
     DrawRectangleRounded(bounds, 0.22F, 8, hovered && pressed ? palette.buttonPressed
         : hovered ? palette.buttonHovered : palette.button);
@@ -262,10 +263,10 @@ void drawHudMenuButton(UiText& font, bool hovered, bool pressed, const BoardPale
     DrawLineEx({center.x + 8, center.y}, {center.x - 8, center.y}, 1.8F, ink);
     DrawLineEx({center.x - 8, center.y}, {center.x - 2, center.y - 6}, 1.8F, ink);
     DrawLineEx({center.x - 8, center.y}, {center.x - 2, center.y + 6}, 1.8F, ink);
-    if (hovered) drawCenteredText(font, "Main menu", center.x, 4, kMenuVersionText, palette.muted);
+    if (hovered) drawCenteredText(font, translate(Text::MainMenu, language), center.x, 4, kMenuVersionText, palette.muted);
 }
 
-void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed, const BoardPalette& palette) {
+void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed, const BoardPalette& palette, Language language) {
     const Rectangle bounds = soundButtonRectangle();
     const Color fill = hovered && pressed ? palette.buttonPressed
         : enabled || hovered ? palette.buttonHovered : palette.button;
@@ -289,7 +290,7 @@ void drawSoundButton(UiText& font, bool enabled, bool hovered, bool pressed, con
         DrawLineEx({center.x + 5.0F, center.y + 4.0F}, {center.x + 12.0F, center.y - 4.0F}, 1.8F, ink);
     }
     if (hovered) {
-        drawCenteredText(font, enabled ? "Sounds: ON" : "Sounds: OFF",
+        drawCenteredText(font, translate(enabled ? Text::SoundsOn : Text::SoundsOff, language),
                          center.x, 4.0F, kMenuVersionText, palette.muted);
     }
 }
@@ -843,6 +844,9 @@ int Game::run() {
     Persistence persistence;
 #endif
     Settings settings = persistence.loadSettings();
+    const Language detectedLanguage = systemLanguage();
+    Language uiLanguage = resolveLanguage(settings.language, detectedLanguage);
+    const auto tr = [&](Text id) { return translate(id, uiLanguage); };
     GameAudio gameAudio;
     EndScreen endScreen;
     gameAudio.setEnabled(settings.sounds);
@@ -1805,11 +1809,23 @@ int Game::run() {
         const bool generationBlocksInput =
             generationInProgress || !generationError.empty();
 
-        if (IsKeyPressed(KEY_F11) ||
-            (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_ENTER))) {
+        // A press and release can both arrive during one idle menu poll.
+        // IsKeyPressed alone then sees only the released state; the event
+        // queue retains the tap. Drain it here so it cannot leak into gameplay.
+        std::array<bool, 512> menuKeyPresses{};
+        if (screen != Screen::Playing) {
+            for (int key = GetKeyPressed(); key != 0; key = GetKeyPressed()) {
+                if (key > 0 && key < static_cast<int>(menuKeyPresses.size())) menuKeyPresses[key] = true;
+            }
+        }
+        const auto menuKeyPressed = [&](int key) {
+            return IsKeyPressed(key) || menuKeyPresses[key];
+        };
+        if (menuKeyPressed(KEY_F11) ||
+            (IsKeyDown(KEY_LEFT_ALT) && menuKeyPressed(KEY_ENTER))) {
             toggleDesktopFullscreen();
         }
-        if (IsKeyPressed(KEY_ESCAPE)) {
+        if (menuKeyPressed(KEY_ESCAPE)) {
             if (
 #if defined(__linux__)
                 isLinuxDesktopFullscreen()
@@ -1837,7 +1853,7 @@ int Game::run() {
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
                 ? 4
-                : menuScreen == Screen::SettingsMenu ? 6 : 5;
+                : menuScreen == Screen::SettingsMenu ? 7 : 5;
             const auto menuItemEnabled = [&](int index) {
                 if (index < 0 || index >= menuItemCount) {
                     return false;
@@ -1888,16 +1904,17 @@ int Game::run() {
             menuSelection.updatePointer(mousePosition.x, mousePosition.y,
                 hoveredMenuButton, windowFocused && IsCursorOnScreen());
             menuSelection.validate(menuItemCount, menuItemEnabled);
-            if (windowFocused && IsKeyPressed(KEY_UP)) {
+            if (windowFocused && menuKeyPressed(KEY_UP)) {
                 menuSelection.move(-1, menuItemCount, menuItemEnabled);
                 pressedMenuButton.reset();
             }
-            if (windowFocused && IsKeyPressed(KEY_DOWN)) {
+            if (windowFocused && menuKeyPressed(KEY_DOWN)) {
                 menuSelection.move(1, menuItemCount, menuItemEnabled);
                 pressedMenuButton.reset();
             }
 
             std::optional<int> activatedMenuButton;
+            int menuChangeDirection = 1;
             if (!windowFocused) {
                 pressedMenuButton.reset();
             } else {
@@ -1917,6 +1934,13 @@ int Game::run() {
                             static_cast<int>(menuScreen) * 16 +
                                 *hoveredMenuButton) {
                         activatedMenuButton = *hoveredMenuButton;
+                        if (menuScreen == Screen::SettingsMenu && (*hoveredMenuButton == 4 || *hoveredMenuButton == 5)) {
+                            const Rectangle bounds = menuButtonRectangle(*hoveredMenuButton, menuItemCount);
+                            const float choiceWidth = *hoveredMenuButton == 5 ? 148.0F : 96.0F;
+                            const float choiceLeft = bounds.x + bounds.width - choiceWidth - 20;
+                            if (mousePosition.x >= choiceLeft && mousePosition.x < choiceLeft + choiceWidth * 0.5F)
+                                menuChangeDirection = -1;
+                        }
                     }
                     pressedMenuButton.reset();
                 }
@@ -1926,10 +1950,10 @@ int Game::run() {
                     IsKeyDown(KEY_RIGHT_ALT);
                 const bool enterPressed =
                     !altDown &&
-                    (IsKeyPressed(KEY_ENTER) ||
-                     IsKeyPressed(KEY_KP_ENTER));
+                    (menuKeyPressed(KEY_ENTER) ||
+                     menuKeyPressed(KEY_KP_ENTER));
                 const bool spacePressed =
-                    IsKeyPressed(KEY_SPACE);
+                    menuKeyPressed(KEY_SPACE);
                 if (enterPressed &&
                     menuItemEnabled(menuSelection.selected())) {
                     activatedMenuButton =
@@ -1938,9 +1962,15 @@ int Game::run() {
                 } else if (
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
-                    menuSelection.selected() <= 4) {
+                    menuSelection.selected() <= 5) {
                     activatedMenuButton =
                         menuSelection.selected();
+                    pressedMenuButton.reset();
+                }
+                if (menuScreen == Screen::SettingsMenu && menuSelection.selected() >= 4 && menuSelection.selected() <= 5 &&
+                    !altDown && (menuKeyPressed(KEY_LEFT) || menuKeyPressed(KEY_RIGHT))) {
+                    activatedMenuButton = menuSelection.selected();
+                    menuChangeDirection = menuKeyPressed(KEY_LEFT) ? -1 : 1;
                     pressedMenuButton.reset();
                 }
             }
@@ -1977,6 +2007,7 @@ int Game::run() {
                     static_cast<int>(menuScreen) * 16 + index;
                 std::optional<bool> toggle;
                 std::optional<BoardTheme> theme;
+                std::optional<Language> languageChoice;
                 if (menuScreen == Screen::SettingsMenu && index < 4) {
                     const std::array<bool, 4> values{{settings.arrowLoops, settings.flyingArrowCollisions,
                         settings.crosshairGuides, settings.sounds}};
@@ -1985,6 +2016,7 @@ int Game::run() {
                 if (menuScreen == Screen::SettingsMenu && index == 4) {
                     theme = settings.boardTheme;
                 }
+                if (menuScreen == Screen::SettingsMenu && index == 5) languageChoice = settings.language;
                 MenuScreen::drawButton(
                     uiText,
                     bounds,
@@ -1996,7 +2028,9 @@ int Game::run() {
                         selectedMenuButton == index,
                     pressedMenuButton == id && hoveredMenuButton == index,
                     toggle,
-                    theme
+                    theme,
+                    languageChoice,
+                    uiLanguage
                 );
                 return enabled &&
                        activatedMenuButton == index;
@@ -2005,14 +2039,14 @@ int Game::run() {
             BeginDrawing();
             ClearBackground(Color{10, 20, 41, 255});
             MenuScreen::drawBackground(GetScreenWidth(), GetScreenHeight());
-            MenuScreen::drawHeading(uiText, menuPage, GetScreenWidth(), GetScreenHeight(), menuItemCount);
+            MenuScreen::drawHeading(uiText, menuPage, GetScreenWidth(), GetScreenHeight(), menuItemCount, uiLanguage);
 
             if (screen == Screen::MainMenu) {
                 constexpr int buttonCount = 4;
                 if (menuButton(
                         0,
                         menuButtonRectangle(0, buttonCount),
-                        "New game",
+                        tr(Text::NewGame),
                         !generationInProgress
                     )) {
                     screen = Screen::NewGameMenu;
@@ -2020,7 +2054,7 @@ int Game::run() {
                 if (menuButton(
                         1,
                         menuButtonRectangle(1, buttonCount),
-                        "Resume game",
+                        tr(Text::ResumeGame),
                         resumeAvailable &&
                             !generationInProgress
                     )) {
@@ -2037,14 +2071,14 @@ int Game::run() {
                 if (menuButton(
                         2,
                         menuButtonRectangle(2, buttonCount),
-                        "Settings"
+                        tr(Text::Settings)
                     )) {
                     screen = Screen::SettingsMenu;
                 }
                 if (menuButton(
                         3,
                         menuButtonRectangle(3, buttonCount),
-                        "Exit"
+                        tr(Text::Exit)
                     )) {
                     (void)persistCurrentGame();
                     closeRequested = true;
@@ -2052,13 +2086,13 @@ int Game::run() {
                 if (generationInProgress) {
                     MenuScreen::drawFooter(
                         uiText,
-                        "Level generation is finishing in the background",
+                        tr(Text::BackgroundGeneration),
                         GetScreenWidth(), GetScreenHeight(), menuItemCount
                     );
                 } else {
                     MenuScreen::drawFooter(
                         uiText,
-                        "Up / Down navigate    Enter select",
+                        tr(Text::MenuHint),
                         GetScreenWidth(), GetScreenHeight(), menuItemCount
                     );
                 }
@@ -2080,7 +2114,7 @@ int Game::run() {
                                 index,
                                 buttonCount
                             ),
-                            preset.label
+                            tr(preset.label)
                         )) {
                         continue;
                     }
@@ -2098,21 +2132,21 @@ int Game::run() {
                 if (menuButton(
                         4,
                         menuButtonRectangle(4, buttonCount),
-                        "Back"
+                        tr(Text::Back)
                     )) {
                     screen = Screen::MainMenu;
                 }
                 MenuScreen::drawFooter(
                     uiText,
-                    "Up / Down navigate    Enter select    Esc back",
+                    tr(Text::DifficultyHint),
                     GetScreenWidth(), GetScreenHeight(), menuItemCount
                 );
             } else if (screen == Screen::SettingsMenu) {
-                constexpr int buttonCount = 6;
+                constexpr int buttonCount = 7;
                 if (menuButton(
                         0,
                         menuButtonRectangle(0, buttonCount),
-                        "Arrow loops"
+                        tr(Text::ArrowLoops)
                     )) {
                     if (!persistence.setArrowLoops(
                             settings,
@@ -2127,7 +2161,7 @@ int Game::run() {
                 if (menuButton(
                         1,
                         menuButtonRectangle(1, buttonCount),
-                        "Flying arrow collisions"
+                        tr(Text::FlyingCollisions)
                     )) {
                     if (!persistence.setFlyingArrowCollisions(
                             settings,
@@ -2142,7 +2176,7 @@ int Game::run() {
                 if (menuButton(
                         2,
                         menuButtonRectangle(2, buttonCount),
-                        "Crosshair guides"
+                        tr(Text::CrosshairGuides)
                     )) {
                     if (!persistence.setCrosshairGuides(settings, !settings.crosshairGuides)) {
                         TraceLog(LOG_WARNING, "Could not save crosshair guide setting");
@@ -2151,14 +2185,14 @@ int Game::run() {
                 if (menuButton(
                         3,
                         menuButtonRectangle(3, buttonCount),
-                        "Sounds"
+                        tr(Text::Sounds)
                     )) {
                     setSoundsEnabled(!settings.sounds);
                 }
                 if (menuButton(
                         4,
                         menuButtonRectangle(4, buttonCount),
-                        "Board theme"
+                        tr(Text::BoardTheme)
                     )) {
                     const BoardTheme next = settings.boardTheme == BoardTheme::Dark ? BoardTheme::Light : BoardTheme::Dark;
                     if (persistence.setBoardTheme(settings, next)) invalidateStaticBoard();
@@ -2167,14 +2201,22 @@ int Game::run() {
                 if (menuButton(
                         5,
                         menuButtonRectangle(5, buttonCount),
-                        "Back"
+                        tr(Text::InterfaceLanguage)
+                    )) {
+                    if (persistence.setLanguage(settings, cycleLanguage(settings.language, menuChangeDirection)))
+                        uiLanguage = resolveLanguage(settings.language, detectedLanguage);
+                    else TraceLog(LOG_WARNING, "Could not save language setting");
+                }
+                if (menuButton(
+                        6,
+                        menuButtonRectangle(6, buttonCount),
+                        tr(Text::Back)
                     )) {
                     screen = Screen::MainMenu;
                 }
                 MenuScreen::drawFooter(
                     uiText,
-                    "Up / Down navigate    Enter / Space toggle"
-                    "    Saved automatically",
+                    tr(Text::SettingsHint),
                     GetScreenWidth(), GetScreenHeight(), menuItemCount
                 );
             }
@@ -2902,10 +2944,9 @@ int Game::run() {
         ClearBackground(palette.background);
         if (!generationInProgress && generationError.empty() &&
             remaining > 0 && lives > 0) {
-            const char* help =
-                "Click: launch   LMB/MMB drag: pan   Wheel/Ctrl +/-: zoom   Ctrl 0: fit   F11: fullscreen   Esc: menu";
+            const char* help = tr(Text::Help);
             if (measureText(uiText, help, kHelpText).x > GetScreenWidth() - 32.0F) {
-                help = "Click: launch   Drag: pan   Wheel/Ctrl +/-: zoom   Ctrl 0: fit";
+                help = tr(Text::HelpCompact);
             }
             drawCenteredText(
                 uiText,
@@ -2955,10 +2996,10 @@ int Game::run() {
         );
         const std::string countText =
             generationInProgress
-            ? "GENERATING"
+            ? tr(Text::Generating)
             : !generationError.empty()
-                ? "GENERATION FAILED"
-                : "ARROWS  " + std::to_string(remaining);
+                ? tr(Text::GenerationFailed)
+                : std::string(tr(Text::Arrows)) + "  " + std::to_string(remaining);
         TextStyle countStyle = kHudText;
         const float countLeft = 80.0F + brandSize.x + 20.0F;
         const float countRight = soundButtonRectangle().x - 16.0F;
@@ -2983,8 +3024,8 @@ int Game::run() {
             countStyle,
             palette.muted
         );
-        drawHudMenuButton(uiText, hudMenuButtonHovered, pressedHudMenuButton, palette);
-        drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton, palette);
+        drawHudMenuButton(uiText, hudMenuButtonHovered, pressedHudMenuButton, palette, uiLanguage);
+        drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton, palette, uiLanguage);
         for (int index = 0; index < 3; ++index) {
             drawHeart(
                 {
@@ -3049,7 +3090,7 @@ int Game::run() {
                 48,
                 palette.flight
             );
-            const char* title = "GENERATING LEVEL";
+            const char* title = tr(Text::GeneratingLevel);
             drawCenteredText(
                 uiText,
                 title,
@@ -3059,7 +3100,7 @@ int Game::run() {
                 palette.ink
             );
             const char* detail =
-                "Searching for an interesting puzzle...";
+                tr(Text::SearchingPuzzle);
             drawCenteredText(
                 uiText,
                 detail,
@@ -3082,7 +3123,7 @@ int Game::run() {
                 (GetScreenHeight() +
                  static_cast<int>(kHudHeight)) /
                 2;
-            const char* title = "GENERATION FAILED";
+            const char* title = tr(Text::GenerationFailed);
             drawCenteredText(
                 uiText,
                 title,
@@ -3092,7 +3133,7 @@ int Game::run() {
                 palette.error
             );
             const char* retry =
-                "Press R to try another level  /  Esc for menu";
+                tr(Text::RetryGeneration);
             drawCenteredText(
                 uiText,
                 retry,
@@ -3101,15 +3142,9 @@ int Game::run() {
                 kErrorActionText,
                 palette.ink
             );
-            std::string errorDetail = generationError;
-            constexpr std::size_t maximumErrorLength = 90;
-            if (errorDetail.size() > maximumErrorLength) {
-                errorDetail.resize(maximumErrorLength - 3);
-                errorDetail += "...";
-            }
             drawCenteredText(
                 uiText,
-                errorDetail.c_str(),
+                tr(Text::GenerationErrorDetail),
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 static_cast<float>(centerY) + 31.0F,
                 kErrorDetailText,
@@ -3117,7 +3152,7 @@ int Game::run() {
             );
         } else if (endScreen.visible()) {
             endScreen.draw(uiText, GetScreenWidth(), GetScreenHeight(), kHudHeight,
-                           endButtonHovered, pressedEndButton);
+                           endButtonHovered, pressedEndButton, uiLanguage);
         }
 
         EndDrawing();
@@ -3178,7 +3213,7 @@ int Game::run() {
             );
             drawCenteredText(
                 uiText,
-                "FINISHING LEVEL GENERATION",
+                tr(Text::FinishingGeneration),
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 43.0F,
                 kOverlayTitleText,
@@ -3186,7 +3221,7 @@ int Game::run() {
             );
             drawCenteredText(
                 uiText,
-                "The game will close automatically...",
+                tr(Text::ClosingGame),
                 static_cast<float>(GetScreenWidth()) * 0.5F,
                 spinnerCenter.y + 79.0F,
                 kOverlayDetailText,

@@ -1,4 +1,9 @@
 #include "UiText.hpp"
+#include "UiFontData.hpp"
+#include "MenuScreen.hpp"
+#include "EndScreen.hpp"
+#include "arrow/Persistence.hpp"
+#include <rlgl.h>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -18,6 +23,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -76,6 +82,108 @@ void checkGlyphsAndLayout(arrow::UiText& text, RenderTexture2D target) {
 #endif
     }
     std::cout << "Nonempty antialiased glyphs and layout checked at ten UI sizes\n";
+}
+
+void checkTranslationGlyphs() {
+    std::array<std::vector<int>, 2> codepoints;
+    const auto append = [&](const char* label) {
+        for (const char* p = label; *p;) {
+            int bytes = 0;
+            const int cp = GetCodepointNext(p, &bytes);
+            require(cp != 0xFFFD && (cp != '?' || *p == '?'), "Invalid UTF-8 in catalog");
+            codepoints[cp >= 0x2E80 ? 1 : 0].push_back(cp);
+            p += bytes;
+        }
+    };
+    for (int l = 0; l < static_cast<int>(arrow::Language::Count); ++l) {
+        const auto language = static_cast<arrow::Language>(l);
+        append(arrow::languageName(language));
+        for (int t = 0; t < static_cast<int>(arrow::Text::Count); ++t)
+            append(arrow::translate(static_cast<arrow::Text>(t), language));
+    }
+    for (int cjk = 0; cjk < 2; ++cjk) {
+        auto& points = codepoints[cjk];
+        std::sort(points.begin(), points.end());
+        points.erase(std::unique(points.begin(), points.end()), points.end());
+        auto* glyphs = LoadFontData(cjk ? arrow::assets::kCjkFontData : arrow::assets::kUiFontData,
+            static_cast<int>(cjk ? arrow::assets::kCjkFontDataSize : arrow::assets::kUiFontDataSize),
+            24, points.data(), static_cast<int>(points.size()), FONT_DEFAULT);
+        require(glyphs != nullptr, "Embedded font did not load");
+        bool complete = true;
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            if (glyphs[i].image.data == nullptr) {
+                std::cerr << "Missing embedded glyph U+" << std::hex << points[i] << std::dec << '\n';
+                complete = false;
+            }
+        }
+        UnloadFontData(glyphs, static_cast<int>(points.size()));
+        require(complete, "Embedded fonts do not cover every translation");
+    }
+    std::cout << "All translated characters are present in the two embedded fonts\n";
+}
+
+void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
+    using arrow::Text;
+    using arrow::MenuScreen;
+    constexpr std::array main{Text::NewGame, Text::ResumeGame, Text::Settings, Text::Exit};
+    constexpr std::array difficulty{Text::Simple, Text::Middle, Text::Hard, Text::VeryHard, Text::Back};
+    constexpr std::array settings{Text::ArrowLoops, Text::FlyingCollisions, Text::CrosshairGuides,
+        Text::Sounds, Text::BoardTheme, Text::InterfaceLanguage, Text::Back};
+    for (int width : {720, 1100}) {
+        const int height = width == 720 ? 600 : 900;
+        SetWindowSize(width, height);
+        PollInputEvents();
+        for (int l = 1; l < static_cast<int>(arrow::Language::Count); ++l) {
+            const auto language = static_cast<arrow::Language>(l);
+            for (const auto page : {MenuScreen::Page::Main, MenuScreen::Page::Difficulty, MenuScreen::Page::Settings}) {
+                const int count = page == MenuScreen::Page::Main ? 4 : page == MenuScreen::Page::Difficulty ? 5 : 7;
+                const auto layout = MenuScreen::layout(width, height, count);
+                BeginDrawing();
+                MenuScreen::drawBackground(width, height);
+                MenuScreen::drawHeading(text, page, width, height, count, language);
+                for (int i = 0; i < count; ++i) {
+                    const auto bounds = layout.button(i);
+                    require(bounds.y >= layout.panel.y + 120 && bounds.y + bounds.height < layout.panel.y + layout.panel.height - 35,
+                            "Translated settings rows overlap heading or footer");
+                    const auto id = page == MenuScreen::Page::Main ? main[i] : page == MenuScreen::Page::Difficulty ? difficulty[i] : settings[i];
+                    const char* label = arrow::translate(id, language);
+                    const auto size = text.fitSize(label, 19, 0.2F, bounds.width - 200);
+                    require(text.measure(label, size, 0.2F).x <= bounds.width - 200, "Localized title does not fit");
+                    MenuScreen::drawButton(text, bounds, label, page, i, i != 1 || page != MenuScreen::Page::Main,
+                        false, false,
+                        page == MenuScreen::Page::Settings && i < 4 ? std::optional<bool>{i != 1} : std::nullopt,
+                        page == MenuScreen::Page::Settings && i == 4 ? std::optional{arrow::BoardTheme::Dark} : std::nullopt,
+                        page == MenuScreen::Page::Settings && i == 5 ? std::optional{language} : std::nullopt, language);
+                }
+                MenuScreen::drawFooter(text, arrow::translate(page == MenuScreen::Page::Main ? Text::MenuHint :
+                    page == MenuScreen::Page::Difficulty ? Text::DifficultyHint : Text::SettingsHint, language), width, height, count);
+                if (screenshots) {
+                    const std::string filename = std::string(page == MenuScreen::Page::Main ? "main-" :
+                        page == MenuScreen::Page::Difficulty ? "difficulty-" : "settings-") +
+                        arrow::languageCode(language) + "-" + std::to_string(width) + ".png";
+                    rlDrawRenderBatchActive();
+                    TakeScreenshot(filename.c_str());
+                }
+                EndDrawing();
+            }
+            for (const bool won : {false, true}) {
+                arrow::EndScreen screen;
+                screen.show(won ? arrow::EndScreen::Outcome::Victory : arrow::EndScreen::Outcome::Defeat);
+                for (int i = 0; i < 500; ++i) screen.update(1.0F / 60.0F);
+                BeginDrawing();
+                ClearBackground(BLACK);
+                screen.draw(text, width, height, 82, std::nullopt, std::nullopt, language);
+                if (screenshots) {
+                    const std::string filename = std::string(won ? "victory-" : "defeat-") +
+                        arrow::languageCode(language) + "-" + std::to_string(width) + ".png";
+                    rlDrawRenderBatchActive();
+                    TakeScreenshot(filename.c_str());
+                }
+                EndDrawing();
+            }
+        }
+    }
+    std::cout << "All eight languages rendered at 720x600 and 1100x900\n";
 }
 
 #if defined(_WIN32)
@@ -181,7 +289,11 @@ void checkCache(arrow::UiText& text, RenderTexture2D target) {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc == 2) {
+        std::filesystem::create_directories(argv[1]);
+        std::filesystem::current_path(argv[1]);
+    }
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
     InitWindow(kWidth, kHeight, "Arrow Puzzle native text tests");
@@ -191,6 +303,7 @@ int main() {
         arrow::UiText text;
         try {
             checkGlyphsAndLayout(text, target);
+            checkTranslationGlyphs();
 #if defined(_WIN32)
             require(text.usesWindowsSmoothing(), "Windows text backend is unavailable");
             for (const int size : {15, 17, 18, 19, 20, 22, 24, 25, 26, 34}) {
@@ -199,6 +312,7 @@ int main() {
             checkComposition(text, target);
 #endif
             checkCache(text, target);
+            checkTranslatedScreens(text, argc == 2);
             text.release();
             require(text.cachedBytes() == 0, "Text cache was not released");
             std::cout << "Native UI text checks passed\n";

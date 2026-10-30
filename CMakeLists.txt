@@ -60,6 +60,7 @@ add_library(arrow_core STATIC
     src/MotionKinematics.cpp
     src/MotionResolver.cpp
     src/Persistence.cpp
+    src/Localization.cpp
 )
 
 target_include_directories(arrow_core PUBLIC include)
@@ -92,6 +93,20 @@ add_custom_command(
         "${ARROWPUZZLE_UI_FONT}"
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedUiFont.cmake"
     COMMENT "Embedding Inter UI font"
+    VERBATIM
+)
+
+set(ARROWPUZZLE_EMBEDDED_CJK_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/EmbeddedCjkFont.cpp")
+add_custom_command(
+    OUTPUT "${ARROWPUZZLE_EMBEDDED_CJK_SOURCE}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ArrowPuzzleCJK-Medium.ttf"
+        "-DOUTPUT_FILE=${ARROWPUZZLE_EMBEDDED_CJK_SOURCE}"
+        "-DHEADER_NAME=UiFontData.hpp"
+        "-DSYMBOL_NAME=kCjkFontData"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+    DEPENDS assets/fonts/ArrowPuzzleCJK-Medium.ttf cmake/EmbedBinary.cmake
+    COMMENT "Embedding Chinese UI font"
     VERBATIM
 )
 
@@ -144,6 +159,7 @@ endforeach()
 
 set(ARROWPUZZLE_GAME_SOURCES
     "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+    "${ARROWPUZZLE_EMBEDDED_CJK_SOURCE}"
     ${ARROWPUZZLE_EMBEDDED_SOUND_SOURCES}
     ${ARROWPUZZLE_EMBEDDED_ICON_SOURCES}
     src/AppIcon.cpp
@@ -227,6 +243,15 @@ if(ARROWPUZZLE_BUILD_TESTS)
 
     add_test(NAME arrow_tests COMMAND arrow_tests)
 
+    add_executable(arrow_localization_tests tests/LocalizationTests.cpp)
+    target_link_libraries(arrow_localization_tests PRIVATE arrow_core)
+    if(MSVC)
+        target_compile_options(arrow_localization_tests PRIVATE /W4 /permissive- /utf-8)
+    else()
+        target_compile_options(arrow_localization_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME arrow_localization_tests COMMAND arrow_localization_tests)
+
     # Explicit measurement tool: run each seed in a fresh process. It reports
     # generation time/peak working set separately from independent verification.
     add_executable(arrow_generator_benchmark EXCLUDE_FROM_ALL tests/GeneratorBenchmark.cpp)
@@ -288,9 +313,10 @@ if(ARROWPUZZLE_BUILD_TESTS)
         src/EndScreen.cpp
         src/UiText.cpp
         "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+        "${ARROWPUZZLE_EMBEDDED_CJK_SOURCE}"
     )
     target_include_directories(arrow_end_screen_tests PRIVATE src)
-    target_link_libraries(arrow_end_screen_tests PRIVATE raylib)
+    target_link_libraries(arrow_end_screen_tests PRIVATE raylib arrow_core)
     if(MSVC)
         target_compile_options(arrow_end_screen_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
@@ -310,10 +336,13 @@ if(ARROWPUZZLE_BUILD_TESTS)
     add_executable(arrow_ui_text_tests EXCLUDE_FROM_ALL
         tests/UiTextTests.cpp
         src/UiText.cpp
+        src/MenuScreen.cpp
+        src/EndScreen.cpp
         "${ARROWPUZZLE_EMBEDDED_FONT_SOURCE}"
+        "${ARROWPUZZLE_EMBEDDED_CJK_SOURCE}"
     )
     target_include_directories(arrow_ui_text_tests PRIVATE src)
-    target_link_libraries(arrow_ui_text_tests PRIVATE raylib)
+    target_link_libraries(arrow_ui_text_tests PRIVATE raylib arrow_core)
     if(MSVC)
         target_compile_options(arrow_ui_text_tests PRIVATE /W4 /permissive- /utf-8)
     endif()

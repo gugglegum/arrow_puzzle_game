@@ -66,6 +66,33 @@ def production_smoke(executable, appimage, work, env, settings_path):
                 raise RuntimeError("Production game exited in response to developer capture variables")
             if list(work.rglob("*.png")) or list(work.rglob("*.gif")):
                 raise RuntimeError("F12/Control+F12 or developer variables created a capture")
+            def key(name):
+                subprocess.run(["xdotool", "key", "--window", window, "--delay", "80", name],
+                               check=True, timeout=5)
+                time.sleep(0.15)
+
+            def expect_language(code):
+                contents = settings_path.read_text()
+                if f"language={code}\n" not in contents:
+                    raise RuntimeError(f"Language selector did not save {code}; see {work / 'production.log'}")
+
+            # Fresh menu: Down skips disabled Resume and selects Settings.
+            # Up wraps from the first setting to Back, then to Language.
+            for name in ("Down", "Return", "Up", "Up"):
+                key(name)
+            expect_language("auto")
+            for name, language in (("Right", "en"), ("Left", "auto"),
+                                   ("Left", "uk"), ("Right", "auto"),
+                                   ("space", "en"), ("Return", "es")):
+                key(name)
+                expect_language(language)
+            # Return to Auto for later smoke scenarios; the other preferences
+            # and every save remain independent of the interface language.
+            for name in ("Left", "Left"):
+                key(name)
+            expect_language("auto")
+            key("Escape")
+            print("Production language selector: Left/Right, wraparound, Enter/Space and saved values passed")
             subprocess.run(["xdotool", "keydown", "--window", window, "Escape"], check=True, timeout=5)
             if process.wait(timeout=15) != 0:
                 raise RuntimeError("Production game did not exit cleanly")

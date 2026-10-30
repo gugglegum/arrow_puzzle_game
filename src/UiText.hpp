@@ -19,6 +19,8 @@ public:
     UiText& operator=(const UiText&) = delete;
 
     Vector2 measure(const char* text, float size, float spacing);
+    // Shrink translated labels to their actual available width without truncating UTF-8.
+    float fitSize(const char* text, float size, float spacing, float width);
     void draw(const char* text, Vector2 position, float size, float spacing, Color color);
     void release(); // Call before closing the graphics context.
 

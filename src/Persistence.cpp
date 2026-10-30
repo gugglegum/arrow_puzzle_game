@@ -493,6 +493,7 @@ Settings Persistence::loadSettings() const noexcept {
         bool crosshairGuidesSeen = false;
         bool soundsSeen = false;
         bool boardThemeSeen = false;
+        bool languageSeen = false;
         std::string line;
         while (std::getline(input, line)) {
             if (line.size() > kMaximumLineLength) {
@@ -535,13 +536,18 @@ Settings Persistence::loadSettings() const noexcept {
                 boardThemeSeen = value == "light" || value == "dark";
                 if (boardThemeSeen) settings.boardTheme = value == "light" ? BoardTheme::Light : BoardTheme::Dark;
                 canonical = canonical && boardThemeSeen;
+            } else if (key == "language") {
+                const auto parsed = languageFromCode(value);
+                languageSeen = parsed.has_value();
+                settings.language = parsed.value_or(Language::Auto);
+                canonical = canonical && languageSeen;
             }
         }
         if (!input.eof()) {
             canonical = false;
         }
         canonical = canonical && formatSeen && versionSeen &&
-                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen && boardThemeSeen;
+                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen && boardThemeSeen && languageSeen;
         if (!formatSeen || !versionSeen) {
             settings = {};
         }
@@ -558,6 +564,7 @@ Settings Persistence::loadSettings() const noexcept {
 
 bool Persistence::saveSettings(const Settings& settings) const noexcept {
     if (settings.boardTheme != BoardTheme::Light && settings.boardTheme != BoardTheme::Dark) return false;
+    if (!isValidLanguage(settings.language)) return false;
     return writeAtomically(settingsPath(), [&settings](std::ostream& output) {
         output << "format=" << kSettingsFormat << '\n'
                << "version=" << kSettingsVersion << '\n'
@@ -568,7 +575,8 @@ bool Persistence::saveSettings(const Settings& settings) const noexcept {
                << "crosshair_guides="
                << (settings.crosshairGuides ? "on" : "off") << '\n'
                << "sounds=" << (settings.sounds ? "on" : "off") << '\n'
-               << "board_theme=" << (settings.boardTheme == BoardTheme::Dark ? "dark" : "light") << '\n';
+               << "board_theme=" << (settings.boardTheme == BoardTheme::Dark ? "dark" : "light") << '\n'
+               << "language=" << languageCode(settings.language) << '\n';
         return static_cast<bool>(output);
     });
 }
@@ -625,6 +633,14 @@ bool Persistence::setSounds(Settings& settings, bool enabled) const noexcept {
 bool Persistence::setBoardTheme(Settings& settings, BoardTheme theme) const noexcept {
     Settings changed = settings;
     changed.boardTheme = theme;
+    if (!saveSettings(changed)) return false;
+    settings = changed;
+    return true;
+}
+
+bool Persistence::setLanguage(Settings& settings, Language language) const noexcept {
+    Settings changed = settings;
+    changed.language = language;
     if (!saveSettings(changed)) return false;
     settings = changed;
     return true;

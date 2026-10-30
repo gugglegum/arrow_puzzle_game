@@ -23,7 +23,9 @@ float randomUnit(std::uint32_t& state) {
     return static_cast<float>(state & 0xFFFFFFU) / 16777216.0F;
 }
 
-void centered(UiText& text, const char* label, float x, float y, float size, float spacing, Color color) {
+void centered(UiText& text, const char* label, float x, float y, float size, float spacing, Color color,
+              float maxWidth = 556.0F) {
+    size = text.fitSize(label, size, spacing, maxWidth);
     const Vector2 measured = text.measure(label, size, spacing);
     text.draw(label, {std::round(x - measured.x * 0.5F), std::round(y)}, size, spacing, color);
 }
@@ -157,8 +159,9 @@ void EndScreen::drawFireworks(int width, int height, float top) const {
 }
 
 void EndScreen::draw(UiText& text, int width, int height, float top,
-                     std::optional<int> hovered, std::optional<int> pressed) const {
+                     std::optional<int> hovered, std::optional<int> pressed, Language language) const {
     if (!visible()) return;
+    const auto tr = [&](Text id) { return translate(id, language); };
     const bool won = outcome_ == Outcome::Victory;
     const Color accent = won ? kGold : kCoral;
     const int y = static_cast<int>(top) + 1;
@@ -196,14 +199,15 @@ void EndScreen::draw(UiText& text, int width, int height, float top,
         DrawLineEx({badge.x + 9, badge.y - 9}, {badge.x - 9, badge.y + 9}, 3.5F, Fade(accent, progress));
     }
     const float offset = cardY + 148 - centerY;
-    centered(text, won ? "PUZZLE COMPLETE" : "OUT OF LIVES", centerX, centerY - 92 + offset,
+    centered(text, tr(won ? Text::PuzzleComplete : Text::OutOfLives), centerX, centerY - 92 + offset,
         13, 3, Fade(kQuiet, progress));
-    const float titleSize = std::floor(std::min(74.0F, cardWidth * 0.115F));
-    centered(text, won ? "YOU WON!" : "GAME OVER", centerX, centerY - 59 + offset + 3,
+    const char* title = tr(won ? Text::YouWon : Text::GameOver);
+    const float titleSize = text.fitSize(title, std::floor(std::min(74.0F, cardWidth * 0.115F)), 2, cardWidth - 48);
+    centered(text, title, centerX, centerY - 59 + offset + 3,
         titleSize, 2, Fade(BLACK, progress * 0.3F));
-    centered(text, won ? "YOU WON!" : "GAME OVER", centerX, centerY - 59 + offset,
+    centered(text, title, centerX, centerY - 59 + offset,
         titleSize, 2, Fade(accent, progress));
-    centered(text, won ? "Every arrow found its way." : "Take a breath. Try a new puzzle.",
+    centered(text, tr(won ? Text::VictoryDetail : Text::DefeatDetail),
         centerX, centerY + 25 + offset, 18, 0.2F, Fade(kLight, progress));
     for (int index = 0; index < 2; ++index) {
         const Rectangle bounds = buttonRectangle(index, width, height, top);
@@ -213,10 +217,10 @@ void EndScreen::draw(UiText& text, int width, int height, float top,
             : down ? Color{50, 66, 90, 255} : highlighted ? Color{40, 57, 81, 255} : Color{30, 46, 68, 255};
         DrawRectangleRounded(bounds, 0.25F, 8, Fade(fill, progress));
         if (index == 1) DrawRectangleRoundedLinesEx(bounds, 0.25F, 8, 1, Fade(kQuiet, highlighted ? 0.8F : 0.4F));
-        centered(text, index == 0 ? "Play again" : "Main menu", bounds.x + bounds.width * 0.5F,
-            bounds.y + 12, 17, 0.2F, Fade(index == 0 ? Color{28, 34, 48, 255} : kLight, progress));
+        centered(text, tr(index == 0 ? Text::PlayAgain : Text::MainMenu), bounds.x + bounds.width * 0.5F,
+            bounds.y + 12, 17, 0.2F, Fade(index == 0 ? Color{28, 34, 48, 255} : kLight, progress), bounds.width - 24);
     }
-    centered(text, "R  new puzzle     Esc  main menu", centerX, centerY + 135 + offset,
+    centered(text, tr(Text::EndHint), centerX, centerY + 135 + offset,
         12, 0.2F, Fade(kQuiet, progress * 0.7F));
     EndScissorMode();
 }
