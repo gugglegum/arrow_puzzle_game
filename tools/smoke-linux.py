@@ -101,16 +101,31 @@ def production_smoke(executable, appimage, work, env, settings_path):
             # Target the visible rows explicitly in the standard 1100x900
             # fixture; page transitions reset shared mouse/keyboard selection.
             point(550, 547, click=True)  # Main menu: Settings.
-            point(550, 657)              # Settings: Language (no activation).
+            def expect_drag(enabled):
+                value = "on" if enabled else "off"
+                contents = settings_path.read_text()
+                if f"left_button_drag={value}\n" not in contents:
+                    raise RuntimeError(f"Left-button dragging did not save {value}: {contents!r}")
+
+            expect_drag(True)
+            point(550, 541, click=True)  # Settings: Left-button dragging.
+            expect_drag(False)
+            key("space")
+            expect_drag(True)
+            key("Return")
+            expect_drag(False)
+            point(550, 541, click=True)
+            expect_drag(True)
+            point(550, 671)              # Settings: Language (no activation).
             expect_language("auto")
             for name, language in (("Right", "en"), ("Left", "auto"),
                                    ("Left", "uk"), ("Right", "auto"),
                                    ("space", "en"), ("Return", "es")):
                 key(name)
                 expect_language(language, name)
-            point(673, 657, click=True)
+            point(673, 671, click=True)
             expect_language("en", "left mouse chevron")
-            point(796, 657, click=True)
+            point(796, 671, click=True)
             expect_language("es", "right mouse chevron")
             # Return to Auto for later smoke scenarios; the other preferences
             # and every save remain independent of the interface language.
@@ -118,6 +133,7 @@ def production_smoke(executable, appimage, work, env, settings_path):
                 key(name)
             expect_language("auto")
             key("Escape")
+            print("Production left-button dragging: default, mouse, Enter/Space and saved values passed")
             print("Production language selector: Left/Right, wraparound, Enter/Space and saved values passed")
             subprocess.run(["xdotool", "keydown", "--window", window, "Escape"], check=True, timeout=5)
             if process.wait(timeout=15) != 0:

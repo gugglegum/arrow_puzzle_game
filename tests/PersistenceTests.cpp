@@ -259,6 +259,7 @@ void testDefaultSettingsAreCreated() {
     );
     require(settings.crosshairGuides, "Crosshair guides must default to on");
     require(settings.sounds, "Sounds must default to on");
+    require(settings.leftButtonDrag, "Left-button dragging must default to on");
     require(settings.boardTheme == arrow::BoardTheme::Dark, "Board theme must default to dark");
     require(settings.language == arrow::Language::Auto, "Language must default to Auto");
     require(
@@ -284,6 +285,7 @@ void testDefaultSettingsAreCreated() {
         "Default crosshair guide setting was not written"
     );
     require(text.find("sounds=on") != std::string::npos, "Default sound setting was not written");
+    require(text.find("left_button_drag=on") != std::string::npos, "Default left-button drag setting was not written");
     require(text.find("board_theme=dark") != std::string::npos, "Default board theme was not written");
     require(text.find("language=auto") != std::string::npos, "Default language was not written");
 }
@@ -321,15 +323,15 @@ void testLanguageUpgradeAndRepair() {
 void testMissingSettingsUseDefaultsAndPreserveExplicitOff() {
     TemporaryDirectory temporary;
     const arrow::Persistence persistence{temporary.path()};
-    constexpr std::array<std::string_view, 4> keys{{
-        "arrow_loops", "flying_arrow_collisions", "crosshair_guides", "sounds"
+    constexpr std::array<std::string_view, 5> keys{{
+        "arrow_loops", "flying_arrow_collisions", "crosshair_guides", "sounds", "left_button_drag"
     }};
-    constexpr std::array<bool arrow::Settings::*, 4> members{{
+    constexpr std::array<bool arrow::Settings::*, 5> members{{
         &arrow::Settings::arrowLoops, &arrow::Settings::flyingArrowCollisions,
-        &arrow::Settings::crosshairGuides, &arrow::Settings::sounds
+        &arrow::Settings::crosshairGuides, &arrow::Settings::sounds, &arrow::Settings::leftButtonDrag
     }};
 
-    for (unsigned missing = 0; missing < 16; ++missing) {
+    for (unsigned missing = 0; missing < (1U << keys.size()); ++missing) {
         std::string contents = "format=arrow-puzzle-settings\nversion=1\nboard_theme=light\n";
         arrow::Settings expected;
         expected.boardTheme = arrow::BoardTheme::Light;
@@ -398,6 +400,12 @@ void testSettingsRoundTripAndAutomaticSetters() {
     require(!settings.sounds && !persistence.loadSettings().sounds, "Sounds did not stay disabled");
     require(persistence.setSounds(settings, true), "Enabling sounds failed");
     require(settings.sounds && persistence.loadSettings().sounds, "Sounds did not stay enabled");
+    require(persistence.setLeftButtonDrag(settings, false), "Disabling left-button dragging failed");
+    require(!settings.leftButtonDrag && persistence.loadSettings() == settings,
+            "Left-button dragging did not stay disabled");
+    require(persistence.setLeftButtonDrag(settings, true), "Enabling left-button dragging failed");
+    require(settings.leftButtonDrag && persistence.loadSettings() == settings,
+            "Left-button dragging did not stay enabled");
     require(persistence.setBoardTheme(settings, arrow::BoardTheme::Light), "Choosing a light board failed");
     require(settings.boardTheme == arrow::BoardTheme::Light && persistence.loadSettings() == settings,
             "Light board theme did not persist");
@@ -436,6 +444,30 @@ void testBoardThemeUpgradeAndRepair() {
     const arrow::Persistence blocked{blockedPath};
     require(!blocked.setBoardTheme(unchanged, arrow::BoardTheme::Light) && unchanged == upgraded,
             "Failed board theme write changed the active preference");
+}
+
+void testLeftButtonDragUpgradeAndRepair() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    const std::string legacy = "format=arrow-puzzle-settings\nversion=1\narrow_loops=off\n"
+        "flying_arrow_collisions=off\ncrosshair_guides=off\nsounds=off\nboard_theme=light\nlanguage=ru\n";
+    arrow::Settings expected;
+    expected.arrowLoops = expected.flyingArrowCollisions = expected.crosshairGuides = expected.sounds = false;
+    expected.boardTheme = arrow::BoardTheme::Light;
+    expected.language = arrow::Language::Russian;
+    for (const char* suffix : {"", "left_button_drag=invalid\n", "left_button_drag=\n"}) {
+        writeText(persistence.settingsPath(), legacy + suffix);
+        require(persistence.loadSettings() == expected,
+                "Missing/invalid left-button dragging changed existing preferences");
+        require(readText(persistence.settingsPath()).find("left_button_drag=on\n") != std::string::npos,
+                "Left-button dragging was not repaired canonically");
+    }
+    const auto blockedPath = temporary.path() / "not-a-directory";
+    writeText(blockedPath, "keep");
+    const arrow::Persistence blocked{blockedPath};
+    auto unchanged = expected;
+    require(!blocked.setLeftButtonDrag(unchanged, false) && unchanged == expected && readText(blockedPath) == "keep",
+            "Failed left-button drag write changed active settings or an unrelated file");
 }
 
 void testSoundsUpgradeAndRepair() {
@@ -725,6 +757,7 @@ int main() {
         testMissingSettingsUseDefaultsAndPreserveExplicitOff();
         testSettingsRoundTripAndAutomaticSetters();
         testBoardThemeUpgradeAndRepair();
+        testLeftButtonDragUpgradeAndRepair();
         testSoundsUpgradeAndRepair();
         testCrosshairGuidesUpgradeAndRepair();
         testMalformedSettingsAreRepaired();

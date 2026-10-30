@@ -102,6 +102,7 @@ int main() {
         checkMenu(4);
         checkMenu(5);
         checkMenu(6);
+        checkMenu(8);
         checkAvailabilityChanges();
         std::cout << "Menu selection tests passed: persistent hover, gaps, keyboard navigation, "
                      "stationary pointer, click/activation, wrap, disabled rows, focus and page changes.\n";

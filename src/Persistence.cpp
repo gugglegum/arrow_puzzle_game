@@ -492,6 +492,7 @@ Settings Persistence::loadSettings() const noexcept {
         bool collisionsSeen = false;
         bool crosshairGuidesSeen = false;
         bool soundsSeen = false;
+        bool leftButtonDragSeen = false;
         bool boardThemeSeen = false;
         bool languageSeen = false;
         std::string line;
@@ -532,6 +533,9 @@ Settings Persistence::loadSettings() const noexcept {
             } else if (key == "sounds") {
                 soundsSeen = parseBool(value, settings.sounds);
                 canonical = canonical && soundsSeen;
+            } else if (key == "left_button_drag") {
+                leftButtonDragSeen = parseBool(value, settings.leftButtonDrag);
+                canonical = canonical && leftButtonDragSeen;
             } else if (key == "board_theme") {
                 boardThemeSeen = value == "light" || value == "dark";
                 if (boardThemeSeen) settings.boardTheme = value == "light" ? BoardTheme::Light : BoardTheme::Dark;
@@ -547,7 +551,8 @@ Settings Persistence::loadSettings() const noexcept {
             canonical = false;
         }
         canonical = canonical && formatSeen && versionSeen &&
-                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen && boardThemeSeen && languageSeen;
+                    arrowLoopsSeen && collisionsSeen && crosshairGuidesSeen && soundsSeen &&
+                    leftButtonDragSeen && boardThemeSeen && languageSeen;
         if (!formatSeen || !versionSeen) {
             settings = {};
         }
@@ -575,6 +580,7 @@ bool Persistence::saveSettings(const Settings& settings) const noexcept {
                << "crosshair_guides="
                << (settings.crosshairGuides ? "on" : "off") << '\n'
                << "sounds=" << (settings.sounds ? "on" : "off") << '\n'
+               << "left_button_drag=" << (settings.leftButtonDrag ? "on" : "off") << '\n'
                << "board_theme=" << (settings.boardTheme == BoardTheme::Dark ? "dark" : "light") << '\n'
                << "language=" << languageCode(settings.language) << '\n';
         return static_cast<bool>(output);
@@ -626,6 +632,14 @@ bool Persistence::setSounds(Settings& settings, bool enabled) const noexcept {
     if (!saveSettings(changed)) {
         return false;
     }
+    settings = changed;
+    return true;
+}
+
+bool Persistence::setLeftButtonDrag(Settings& settings, bool enabled) const noexcept {
+    Settings changed = settings;
+    changed.leftButtonDrag = enabled;
+    if (!saveSettings(changed)) return false;
     settings = changed;
     return true;
 }

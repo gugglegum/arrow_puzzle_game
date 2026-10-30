@@ -128,7 +128,7 @@ void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
     constexpr std::array main{Text::NewGame, Text::ResumeGame, Text::Settings, Text::Exit};
     constexpr std::array difficulty{Text::Simple, Text::Middle, Text::Hard, Text::VeryHard, Text::Back};
     constexpr std::array settings{Text::ArrowLoops, Text::FlyingCollisions, Text::CrosshairGuides,
-        Text::Sounds, Text::BoardTheme, Text::InterfaceLanguage, Text::Back};
+        Text::Sounds, Text::LeftButtonDrag, Text::BoardTheme, Text::InterfaceLanguage, Text::Back};
     for (int width : {720, 1100}) {
         const int height = width == 720 ? 600 : 900;
         SetWindowSize(width, height);
@@ -136,7 +136,7 @@ void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
         for (int l = 1; l < static_cast<int>(arrow::Language::Count); ++l) {
             const auto language = static_cast<arrow::Language>(l);
             for (const auto page : {MenuScreen::Page::Main, MenuScreen::Page::Difficulty, MenuScreen::Page::Settings}) {
-                const int count = page == MenuScreen::Page::Main ? 4 : page == MenuScreen::Page::Difficulty ? 5 : 7;
+                const int count = page == MenuScreen::Page::Main ? 4 : page == MenuScreen::Page::Difficulty ? 5 : 8;
                 const auto layout = MenuScreen::layout(width, height, count);
                 BeginDrawing();
                 MenuScreen::drawBackground(width, height);
@@ -151,9 +151,9 @@ void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
                     require(text.measure(label, size, 0.2F).x <= bounds.width - 200, "Localized title does not fit");
                     MenuScreen::drawButton(text, bounds, label, page, i, i != 1 || page != MenuScreen::Page::Main,
                         false, false,
-                        page == MenuScreen::Page::Settings && i < 4 ? std::optional<bool>{i != 1} : std::nullopt,
-                        page == MenuScreen::Page::Settings && i == 4 ? std::optional{arrow::BoardTheme::Dark} : std::nullopt,
-                        page == MenuScreen::Page::Settings && i == 5 ? std::optional{language} : std::nullopt, language);
+                        page == MenuScreen::Page::Settings && i < 5 ? std::optional<bool>{i != 1} : std::nullopt,
+                        page == MenuScreen::Page::Settings && i == 5 ? std::optional{arrow::BoardTheme::Dark} : std::nullopt,
+                        page == MenuScreen::Page::Settings && i == 6 ? std::optional{language} : std::nullopt, language);
                 }
                 MenuScreen::drawFooter(text, arrow::translate(page == MenuScreen::Page::Main ? Text::MenuHint :
                     page == MenuScreen::Page::Difficulty ? Text::DifficultyHint : Text::SettingsHint, language), width, height, count);

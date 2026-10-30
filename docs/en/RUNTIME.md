@@ -153,6 +153,12 @@ pending launch. Launch input is blocked during rewind, collision pause, moving
 hit-stop, generation, and after the last life is lost; this does not prevent
 left-button panning while camera input is available.
 
+`Settings::leftButtonDrag` (default true, `left_button_drag=on|off`) is sampled
+when a board press starts. With it off, the gesture returns no pan displacement
+but still cancels launch beyond the threshold, including return-to-origin and
+release-frame movement. Ordinary left clicks and middle-button panning retain
+their behavior. Both full and compact help strings reflect the selected mode.
+
 Camera controls:
 
 - Wheel zooms around the pointer.
@@ -321,13 +327,15 @@ arrow_loops=on|off
 flying_arrow_collisions=on|off
 crosshair_guides=on|off
 sounds=on|off
+left_button_drag=on|off
 board_theme=dark|light
 language=auto|en|es|fr|de|pt|zh|ru|uk
 ```
 
 A missing or noncanonical file is repaired with safe values. Menu changes are
 written immediately and update in-memory Settings only after a successful write.
-Loops, flying collisions, guides, and sounds default to on, and theme to Dark.
+Loops, flying collisions, guides, sounds, and left-button dragging default to on,
+and theme to Dark.
 Missing keys receive these defaults while valid old preferences, including
 explicit off values, are retained; the format version remains 1.
 
@@ -342,7 +350,8 @@ then `LANG`. GNU `LANGUAGE` preferences apply unless the effective locale is
 C/POSIX (including C.UTF-8). Unsupported languages fall back to English;
 regional variants match by language, and all zh variants use Simplified Chinese.
 
-The seventh settings row is Back; Language precedes it. Both language and theme
+The eighth settings row is Back; Language precedes it. Left-button dragging
+is the fifth row, before theme. Both language and theme
 accept Left/Right or their mouse chevrons; Enter/Space advances. Changes apply
 immediately after a successful settings write, with no restart. All menus,
 descriptions, hints, HUD and generation/result messages use the same catalog.

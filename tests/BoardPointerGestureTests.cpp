@@ -88,6 +88,34 @@ void checkCancellation() {
     expect(gesture.release(8) == 8, "A new board press inherited the old drag");
 }
 
+void checkDisabledPanning() {
+    arrow::BoardPointerGesture gesture;
+    gesture.begin(100, 200, 7, false);
+    expectMovement(gesture.move(103, 204), 0, 0);
+    expect(gesture.release(7) == 7, "Disabling panning blocked a click with jitter");
+
+    // Check arrow and empty-space presses, including release-frame movement.
+    for (const auto pressed : {std::optional<std::size_t>{7}, std::optional<std::size_t>{}}) {
+        gesture.begin(100, 200, pressed, false);
+        expectMovement(gesture.move(120, 215), 0, 0);
+        expectMovement(gesture.move(100, 200), 0, 0);
+        expect(!gesture.release(7), "Disabled panning rearmed a drag at its origin");
+
+        gesture.begin(100, 200, pressed, false);
+        expectMovement(gesture.move(200, 200), 0, 0);
+        expect(!gesture.release(7), "Disabled panning launched on release-frame movement");
+    }
+
+    gesture.begin(100, 200, 7, false);
+    gesture.cancelLaunch();
+    expect(!gesture.release(7), "Disabled panning ignored launch cancellation");
+    gesture.begin(100, 200, 7, false);
+    expect(gesture.release(7) == 7, "Disabled panning blocked the next click");
+    gesture.begin(100, 200, 7, true);
+    expectMovement(gesture.move(120, 200), 20, 0);
+    expect(!gesture.release(7), "Re-enabled panning launched its arrow");
+}
+
 } // namespace
 
 int main() {
@@ -95,8 +123,9 @@ int main() {
         checkClicks();
         checkDrags();
         checkCancellation();
+        checkDisabledPanning();
         std::cout << "Board pointer tests passed: clicks, jitter, threshold, arrow/empty-space "
-                     "drags, return to origin, release movement and cancellation.\n";
+                     "drags, return to origin, release movement, cancellation and disabled panning.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Board pointer test failure: " << error.what() << '\n';

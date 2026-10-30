@@ -1853,7 +1853,7 @@ int Game::run() {
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
                 ? 4
-                : menuScreen == Screen::SettingsMenu ? 7 : 5;
+                : menuScreen == Screen::SettingsMenu ? 8 : 5;
             const auto menuItemEnabled = [&](int index) {
                 if (index < 0 || index >= menuItemCount) {
                     return false;
@@ -1934,9 +1934,9 @@ int Game::run() {
                             static_cast<int>(menuScreen) * 16 +
                                 *hoveredMenuButton) {
                         activatedMenuButton = *hoveredMenuButton;
-                        if (menuScreen == Screen::SettingsMenu && (*hoveredMenuButton == 4 || *hoveredMenuButton == 5)) {
+                        if (menuScreen == Screen::SettingsMenu && (*hoveredMenuButton == 5 || *hoveredMenuButton == 6)) {
                             const Rectangle bounds = menuButtonRectangle(*hoveredMenuButton, menuItemCount);
-                            const float choiceWidth = *hoveredMenuButton == 5 ? 148.0F : 96.0F;
+                            const float choiceWidth = *hoveredMenuButton == 6 ? 148.0F : 96.0F;
                             const float choiceLeft = bounds.x + bounds.width - choiceWidth - 20;
                             if (mousePosition.x >= choiceLeft && mousePosition.x < choiceLeft + choiceWidth * 0.5F)
                                 menuChangeDirection = -1;
@@ -1962,12 +1962,12 @@ int Game::run() {
                 } else if (
                     spacePressed &&
                     menuScreen == Screen::SettingsMenu &&
-                    menuSelection.selected() <= 5) {
+                    menuSelection.selected() <= 6) {
                     activatedMenuButton =
                         menuSelection.selected();
                     pressedMenuButton.reset();
                 }
-                if (menuScreen == Screen::SettingsMenu && menuSelection.selected() >= 4 && menuSelection.selected() <= 5 &&
+                if (menuScreen == Screen::SettingsMenu && menuSelection.selected() >= 5 && menuSelection.selected() <= 6 &&
                     !altDown && (menuKeyPressed(KEY_LEFT) || menuKeyPressed(KEY_RIGHT))) {
                     activatedMenuButton = menuSelection.selected();
                     menuChangeDirection = menuKeyPressed(KEY_LEFT) ? -1 : 1;
@@ -2008,15 +2008,15 @@ int Game::run() {
                 std::optional<bool> toggle;
                 std::optional<BoardTheme> theme;
                 std::optional<Language> languageChoice;
-                if (menuScreen == Screen::SettingsMenu && index < 4) {
-                    const std::array<bool, 4> values{{settings.arrowLoops, settings.flyingArrowCollisions,
-                        settings.crosshairGuides, settings.sounds}};
+                if (menuScreen == Screen::SettingsMenu && index < 5) {
+                    const std::array<bool, 5> values{{settings.arrowLoops, settings.flyingArrowCollisions,
+                        settings.crosshairGuides, settings.sounds, settings.leftButtonDrag}};
                     toggle = values[index];
                 }
-                if (menuScreen == Screen::SettingsMenu && index == 4) {
+                if (menuScreen == Screen::SettingsMenu && index == 5) {
                     theme = settings.boardTheme;
                 }
-                if (menuScreen == Screen::SettingsMenu && index == 5) languageChoice = settings.language;
+                if (menuScreen == Screen::SettingsMenu && index == 6) languageChoice = settings.language;
                 MenuScreen::drawButton(
                     uiText,
                     bounds,
@@ -2142,7 +2142,7 @@ int Game::run() {
                     GetScreenWidth(), GetScreenHeight(), menuItemCount
                 );
             } else if (screen == Screen::SettingsMenu) {
-                constexpr int buttonCount = 7;
+                constexpr int buttonCount = 8;
                 if (menuButton(
                         0,
                         menuButtonRectangle(0, buttonCount),
@@ -2192,6 +2192,15 @@ int Game::run() {
                 if (menuButton(
                         4,
                         menuButtonRectangle(4, buttonCount),
+                        tr(Text::LeftButtonDrag)
+                    )) {
+                    if (!persistence.setLeftButtonDrag(settings, !settings.leftButtonDrag)) {
+                        TraceLog(LOG_WARNING, "Could not save left-button drag setting");
+                    }
+                }
+                if (menuButton(
+                        5,
+                        menuButtonRectangle(5, buttonCount),
                         tr(Text::BoardTheme)
                     )) {
                     const BoardTheme next = settings.boardTheme == BoardTheme::Dark ? BoardTheme::Light : BoardTheme::Dark;
@@ -2199,8 +2208,8 @@ int Game::run() {
                     else TraceLog(LOG_WARNING, "Could not save board theme");
                 }
                 if (menuButton(
-                        5,
-                        menuButtonRectangle(5, buttonCount),
+                        6,
+                        menuButtonRectangle(6, buttonCount),
                         tr(Text::InterfaceLanguage)
                     )) {
                     if (persistence.setLanguage(settings, cycleLanguage(settings.language, menuChangeDirection)))
@@ -2208,8 +2217,8 @@ int Game::run() {
                     else TraceLog(LOG_WARNING, "Could not save language setting");
                 }
                 if (menuButton(
-                        6,
-                        menuButtonRectangle(6, buttonCount),
+                        7,
+                        menuButtonRectangle(7, buttonCount),
                         tr(Text::Back)
                     )) {
                     screen = Screen::MainMenu;
@@ -2438,7 +2447,7 @@ int Game::run() {
             if (cameraInputAvailable && !middleDown && pressInGameplay) {
                 const auto armedArrow = launchInputAvailable
                     ? hitTest(GetScreenToWorld2D(pressMouse, camera), arrows) : std::nullopt;
-                boardPointer.begin(pressMouse.x, pressMouse.y, armedArrow);
+                boardPointer.begin(pressMouse.x, pressMouse.y, armedArrow, settings.leftButtonDrag);
             }
         }
         if (!launchInputAvailable || cameraNavigated) boardPointer.cancelLaunch();
@@ -2944,9 +2953,9 @@ int Game::run() {
         ClearBackground(palette.background);
         if (!generationInProgress && generationError.empty() &&
             remaining > 0 && lives > 0) {
-            const char* help = tr(Text::Help);
+            const char* help = tr(settings.leftButtonDrag ? Text::Help : Text::HelpMiddleDrag);
             if (measureText(uiText, help, kHelpText).x > GetScreenWidth() - 32.0F) {
-                help = tr(Text::HelpCompact);
+                help = tr(settings.leftButtonDrag ? Text::HelpCompact : Text::HelpMiddleDragCompact);
             }
             drawCenteredText(
                 uiText,

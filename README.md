@@ -135,7 +135,7 @@ another arrow's speed.
 | Input | Action |
 | --- | --- |
 | Left mouse button click | Launch an idle arrow on release |
-| Left mouse button + drag | Pan the board, starting on an arrow or empty space |
+| Left mouse button + drag | Pan from an arrow or empty space when Left-button dragging is ON (default) |
 | Mouse wheel | Zoom at the pointer |
 | Ctrl + + / Ctrl + - | Zoom at the centre of the visible gameplay area |
 | Ctrl + 0 | Fit and centre the whole board in the window |
@@ -156,6 +156,9 @@ starts after moving more than 6 screen pixels and cancels the arrow launch
 for that press, even if you return to the starting point before releasing.
 Small pointer movements still count as a click when released over the same
 arrow. Presses on the top-panel buttons keep their normal button behaviour.
+Turn **Left-button dragging** OFF in Settings to pan only with the middle mouse
+button. Left drags then leave the board stationary and still cancel arrow launches;
+ordinary left clicks continue to launch arrows. The control hint follows this setting.
 
 New arrows may be launched while other arrows are moving forward. Input is
 temporarily locked while collided arrows are paused or rewinding.
@@ -194,8 +197,9 @@ retry instead of falling back to a simpler board.
 
 **Crosshair guides** highlight exposed dots along the row and column nearest
 the pointer. **Sounds** enables the embedded effects; the HUD speaker button
-changes the same preference. All four options (Arrow loops, Flying arrow
-collisions, Crosshair guides, and Sounds) default to ON when `settings.txt` or
+changes the same preference. **Left-button dragging** enables touchpad-friendly
+panning; the middle mouse button always pans. All five options (Arrow loops,
+Flying arrow collisions, Crosshair guides, Sounds, and Left-button dragging) default to ON when `settings.txt` or
 the corresponding key is missing; explicitly saved OFF values are preserved.
 **Board theme** defaults to Dark and can be switched to Light; it affects the
 board and HUD, while menus and result screens stay dark. Its selector turns

@@ -9,6 +9,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Left-button dragging** setting, enabled by default and saved automatically.
+  Disabling it keeps panning on the middle mouse button and updates the control
+  hints; left clicks still launch arrows and drags still cancel launches.
 - Interface language selector with Auto, English, Spanish, French, German,
   Portuguese, Simplified Chinese, Russian and Ukrainian. Changes apply
   immediately and are saved automatically. Auto uses the Windows UI language

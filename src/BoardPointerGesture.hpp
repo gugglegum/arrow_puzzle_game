@@ -7,6 +7,7 @@ namespace arrow {
 
 // A board press becomes either a click or a drag. Once it crosses the screen-
 // space threshold, returning to the press position cannot turn it into a click.
+// Disabling panning suppresses displacement while retaining this launch guard.
 class BoardPointerGesture {
 public:
     struct Movement {
@@ -16,9 +17,10 @@ public:
 
     void reset() { *this = BoardPointerGesture{}; }
 
-    void begin(float x, float y, std::optional<std::size_t> arrow) {
+    void begin(float x, float y, std::optional<std::size_t> arrow, bool panEnabled = true) {
         reset();
         active_ = true;
+        panEnabled_ = panEnabled;
         startX_ = previousX_ = x;
         startY_ = previousY_ = y;
         pressedArrow_ = arrow;
@@ -35,7 +37,7 @@ public:
             cancelLaunch();
         }
         Movement movement;
-        if (dragging_) {
+        if (dragging_ && panEnabled_) {
             // Include the initial displacement when the drag first starts.
             movement = wasDragging ? Movement{x - previousX_, y - previousY_}
                                    : Movement{dx, dy};
@@ -60,6 +62,7 @@ private:
     static constexpr float kDragThreshold = 6.0F;
     bool active_ = false;
     bool dragging_ = false;
+    bool panEnabled_ = true;
     float startX_{};
     float startY_{};
     float previousX_{};

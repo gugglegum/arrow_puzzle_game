@@ -4,6 +4,31 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Optional left-button dragging, unreleased (2026-10-30)
+
+The user requested a boolean **Left-button dragging** setting, on by default,
+so mouse users can restrict panning to the middle button. It is the fifth
+settings row, before theme/language; Back is now eighth. Version-1 settings
+gain `left_button_drag=on|off`; missing/invalid values use on while existing
+preferences are retained. Changes save immediately and apply on the next press.
+`BoardPointerGesture` still cancels launches after the 6-pixel threshold even
+with panning off. Both full/compact hints follow the setting in all eight
+languages. Small-window row text uses tighter vertical spacing. The Linux
+production smoke's Language coordinates follow the new layout.
+
+Validation: both Windows Release executables build; all six default suites
+pass, including 32 combinations of missing/explicit-off boolean keys and
+invalid/failed-write checks. The UI suite passes glyph coverage and all eight
+languages at 720x600/1100x900; Russian and Chinese settings captures were
+visually inspected. The CJK subset was regenerated from the pinned original.
+An isolated probe around production Game.cpp passes mouse/Enter/Space toggles,
+restart persistence, both left-drag modes, middle panning, return-to-origin,
+release-frame movement and ordinary click launches. A renamed standalone
+portable Release starts with the default on and shuts down cleanly. Evidence
+is in ignored `out/left-drag-settings/`; the probe is not production code.
+Linux production smoke also checks the new toggle with real X11 input;
+its next CI run is the cross-platform verification, not a physical desktop test.
+
 ## Interface localization, unreleased (2026-10-30)
 
 Auto and eight explicit languages are implemented for Windows/Linux, with

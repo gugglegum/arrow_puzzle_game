@@ -47,7 +47,7 @@ void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
             DrawRectangleRounded({center.x - 13 + bar * 7.0F, center.y + 10 - height, 4, height},
                 0.4F, 4, Fade(ink, bar <= index ? 1.0F : 0.18F));
         }
-    } else if (page != MenuScreen::Page::Main && index == (page == MenuScreen::Page::Settings ? 6 : 4)) {
+    } else if (page != MenuScreen::Page::Main && index == (page == MenuScreen::Page::Settings ? 7 : 4)) {
         DrawLineEx({center.x + 9, center.y}, {center.x - 9, center.y}, 1.8F, ink);
         DrawLineEx({center.x - 9, center.y}, {center.x - 3, center.y - 6}, 1.8F, ink);
         DrawLineEx({center.x - 9, center.y}, {center.x - 3, center.y + 6}, 1.8F, ink);
@@ -88,7 +88,11 @@ void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
         DrawTriangleFan(cone.data(), static_cast<int>(cone.size()), ink);
         DrawRing({center.x, center.y}, 7, 8.5F, -50, 50, 16, ink);
         DrawRing({center.x, center.y}, 11, 12.5F, -50, 50, 16, ink);
-    } else if (index == 5) {
+    } else if (index == 4) {
+        DrawRectangleRoundedLinesEx({center.x - 8, center.y - 12, 16, 24}, 0.8F, 12, 1.5F, ink);
+        DrawLineEx({center.x, center.y - 11}, {center.x, center.y - 2}, 1.5F, ink);
+        DrawRectangleRounded({center.x - 5, center.y - 9, 3, 6}, 0.5F, 4, ink);
+    } else if (index == 6) {
         DrawRing(center, 10, 11.5F, 0, 360, 32, ink);
         DrawEllipseLines(static_cast<int>(center.x), static_cast<int>(center.y), 5, 11, ink);
         DrawLineEx({center.x - 10, center.y}, {center.x + 10, center.y}, 1.5F, ink);
@@ -102,10 +106,10 @@ const char* description(MenuScreen::Page page, int index, bool enabled, Language
     constexpr std::array main{Text::NewGameDetail, Text::ResumeDetail, Text::SettingsDetail, Text::ExitDetail};
     constexpr std::array difficulty{Text::Cells20, Text::Cells40, Text::Cells80, Text::Cells160};
     constexpr std::array settings{Text::LoopsDetail, Text::CollisionsDetail, Text::GuidesDetail,
-        Text::SoundsDetail, Text::ThemeDetail, Text::LanguageDetail};
+        Text::SoundsDetail, Text::LeftButtonDragDetail, Text::ThemeDetail, Text::LanguageDetail};
     if (page == MenuScreen::Page::Main)
         return translate(index == 1 && !enabled ? Text::NoSavedPuzzle : main[index], language);
-    if (index == (page == MenuScreen::Page::Settings ? 6 : 4)) return nullptr;
+    if (index == (page == MenuScreen::Page::Settings ? 7 : 4)) return nullptr;
     return translate(page == MenuScreen::Page::Settings ? settings[index] : difficulty[index], language);
 }
 
@@ -213,14 +217,15 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
     icon(page, index, center, enabled ? primarySelected ? ink : highlighted ? accent : kQuiet : secondary);
     const char* detail = description(page, index, enabled, language);
     const bool compact = bounds.height < 57;
+    const bool tight = bounds.height < 44;
     const float reserved = toggle ? 120.0F : theme ? 132.0F : languageChoice ? 184.0F : 44.0F;
     const float labelWidth = bounds.width - 64 - reserved;
     const float titleSize = text.fitSize(label, compact ? 16.0F : 19.0F, 0.2F, labelWidth);
     const float detailSize = detail ? text.fitSize(detail, compact ? 11.0F : 13.0F, 0.1F, labelWidth) : 0;
     const float labelX = bounds.x + 64;
     if (detail != nullptr) {
-        text.draw(label, {labelX, std::round(bounds.y + (compact ? 7.0F : 10.0F))}, titleSize, 0.2F, ink);
-        text.draw(detail, {labelX, std::round(bounds.y + (compact ? 28.0F : 35.0F))}, detailSize, 0.1F, secondary);
+        text.draw(label, {labelX, std::round(bounds.y + (tight ? 4.0F : compact ? 7.0F : 10.0F))}, titleSize, 0.2F, ink);
+        text.draw(detail, {labelX, std::round(bounds.y + (tight ? 22.0F : compact ? 28.0F : 35.0F))}, detailSize, 0.1F, secondary);
     } else {
         const Vector2 size = text.measure(label, titleSize, 0.2F);
         text.draw(label, {labelX, std::round(bounds.y + (bounds.height - size.y) * 0.5F)}, titleSize, 0.2F, ink);

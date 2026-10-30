@@ -17,6 +17,7 @@ struct Settings {
     bool flyingArrowCollisions{true};
     bool crosshairGuides{true};
     bool sounds{true};
+    bool leftButtonDrag{true};
     BoardTheme boardTheme{BoardTheme::Dark};
     Language language{Language::Auto};
 
@@ -76,6 +77,7 @@ public:
         Settings& settings,
         bool enabled
     ) const noexcept;
+    [[nodiscard]] bool setLeftButtonDrag(Settings& settings, bool enabled) const noexcept;
     [[nodiscard]] bool setBoardTheme(Settings& settings, BoardTheme theme) const noexcept;
     [[nodiscard]] bool setLanguage(Settings& settings, Language language) const noexcept;
 
