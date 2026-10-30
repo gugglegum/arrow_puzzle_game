@@ -31,6 +31,10 @@ def production_smoke(executable, appimage, work, env, settings_path):
         "ARROWPUZZLE_SAVE_ON_EXIT": "1",
     }
     command = [str(executable)] + (["--appimage-extract-and-run"] if appimage else [])
+    # Xvfb starts its pointer in the screen centre. On a page transition that
+    # stationary pointer can select a setting beneath it, overriding the
+    # keyboard fixture's assumed first row. Start outside all menu rows.
+    subprocess.run(["xdotool", "mousemove", "0", "0"], check=True, timeout=5)
     with (work / "production.log").open("w") as log:
         process = subprocess.Popen(command, cwd=work, env=env, stdout=log,
                                    stderr=subprocess.STDOUT, start_new_session=True)
