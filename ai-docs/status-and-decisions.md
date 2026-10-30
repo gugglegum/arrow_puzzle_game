@@ -20,7 +20,10 @@ F12/Control+F12 input with QA variables set (no captures, clean shutdown).
 The separate Debug build produced visually inspected menu/board captures.
 Linux CI now runs the seven scenario checks on Debug, and tests the actual
 Release tar/AppImage externally through X11 without capture hooks. Its new
-run remains to be verified after this implementation is pushed.
+[Build and test run 40980109765](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40980109765)
+passed all three jobs on `5ad2325`: Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu
+24.04/Clang, including Debug captures and production archive/AppImage input
+checks. The normal local Windows EXE was rebuilt from that implementation.
 
 The prepared 0.5.0 tag/draft/assets have not been changed by this source update;
 this policy applies to new builds. Existing progress/settings are preserved.
