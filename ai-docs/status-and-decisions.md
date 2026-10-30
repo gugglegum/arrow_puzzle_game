@@ -1,10 +1,31 @@
 # Status, accepted decisions, and open work
 
-Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
+Snapshot: 2026-10-30, preparing the complete 0.5.0 release. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
-## Settings caption alignment, unreleased (2026-10-30)
+## Release 0.5.0 authorization (2026-10-30)
+
+The user now explicitly requests updating all documentation, committing/pushing
+and publishing 0.5.0. This supersedes the earlier draft-only and preserve-old-
+candidate limits. Live GitHub inspection confirmed release `428459388` is still
+an unpublished draft, with the old three-package candidate on `fe0f697` (tag
+object `44caae05b69507fa873e5510a9f0ce7c01b3816e`). Refresh that unpublished
+candidate from the current accepted implementation and updated docs/screenshots,
+then verify the complete six-package release before publishing it as Latest.
+The four existing published versions must retain their tags/assets. The old
+candidate inventory is preserved under ignored `out/release-0.5.0-final/`.
+Release documentation now consolidates the 0.5.0 changelog, six direct package
+links, storage/migration guidance, six-suite counts, font notices and bilingual
+publication/verification procedures. All seven shared screenshots were freshly
+captured from the current Debug portable executable with an explicit English
+fixture and the local release-preview label, then visually inspected. The
+preview setting was restored to OFF. A local audit passed 27 Markdown files
+and 164 local links/anchors; all 16 release-assembly guard tests passed.
+The implementation/QA notes below record the work included in 0.5.0; statements
+about the old draft remaining untouched describe their historical task scope.
+
+## Settings caption alignment, included in 0.5.0 (2026-10-30)
 
 The user noticed that ON/OFF and theme captions looked too high and asked to
 check horizontal centring for different word lengths. Before captures confirm
@@ -33,7 +54,7 @@ jobs passed the 96 pixel checks with 0.5-pixel maximum error on both axes,
 all eight languages at both sizes, six core suites and the existing packaged
 game checks. Linux rendering was verified through Xvfb/Mesa.
 
-## Optional left-button dragging, unreleased (2026-10-30)
+## Optional left-button dragging, included in 0.5.0 (2026-10-30)
 
 The user requested a boolean **Left-button dragging** setting, on by default,
 so mouse users can restrict panning to the middle button. It is the fifth
@@ -63,7 +84,7 @@ package variants (ordinary/portable tar and AppImage on GCC; both tar builds
 also on Clang), alongside the existing language-selector checks. This is
 CI/Xvfb verification, not a new physical Linux desktop session.
 
-## Interface localization, unreleased (2026-10-30)
+## Interface localization, included in 0.5.0 (2026-10-30)
 
 Auto and eight explicit languages are implemented for Windows/Linux, with
 embedded translations and Chinese glyphs. See [localization](localization.md)
@@ -72,7 +93,7 @@ Implementation head `8348520` passed Windows/MSVC, Ubuntu 22.04/GCC and
 Ubuntu 24.04/Clang in [CI run 40997859109](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40997859109),
 including translated rendering and real packaged Linux selector input checks.
 
-## Unified ordinary/portable builds, unreleased (2026-10-30)
+## Unified ordinary/portable builds, included in 0.5.0 (2026-10-30)
 
 The user requested six packages: Windows ZIP, Linux tar.gz, and Linux AppImage,
 each ordinary and portable. This is four executable variants from shared
@@ -112,7 +133,7 @@ The downloaded attested Windows portable EXE also passed local startup after
 being copied/renamed alone: adjacent settings, ignored capture variables,
 no F12/Control+F12 captures and clean exit (`out/storage-ci-startup-20261030-063230/`).
 
-## Screenshot cleanup, unreleased (2026-10-30)
+## Screenshot cleanup, included in 0.5.0 (2026-10-30)
 
 The user confirmed with the initial chat that F12 capture was added without a
 request, then explicitly asked to remove it and keep screenshot hooks only in
@@ -136,7 +157,7 @@ checks. The normal local Windows EXE was rebuilt from that implementation.
 The prepared 0.5.0 tag/draft/assets have not been changed by this source update;
 this policy applies to new builds. Existing progress/settings are preserved.
 
-## Common Windows/Linux 0.5.0 draft preparation (2026-10-30)
+## Historical common Windows/Linux 0.5.0 draft preparation (2026-10-30)
 
 The user now explicitly requested one common draft with Windows and Linux,
 including verification of all files, checksums and provenance. Publication is

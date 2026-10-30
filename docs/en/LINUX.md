@@ -29,7 +29,7 @@ From the repository root:
 ./build/linux/arrow_puzzle
 ```
 
-The helper configures Release, builds with two workers, and runs all five
+The helper configures Release, builds with two workers, and runs all six
 headless CTest suites. It forwards additional CMake configuration arguments.
 It builds `arrow_puzzle` (user storage) and `arrow_puzzle_portable` (adjacent
 storage) from the same sources.

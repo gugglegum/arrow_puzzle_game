@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-30
+
 ### Added
 
 - **Left-button dragging** setting, enabled by default and saved automatically.
@@ -18,30 +20,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   or Linux message locale, with English fallback for unsupported languages.
 - Translations and Chinese font glyphs embedded in both ordinary and portable
   executables; translated menus, hints, HUD, generation and result screens.
-
-### Removed
-
-- Screenshot/GIF capture shortcuts, including raylib's built-in F12 and
-  Control+F12 behavior, so accidental key presses do not create files.
-
-### Changed
-
-- Centre switch and board-theme captions using their visible glyph bounds.
-  ON/OFF labels account for their individual widths and the space beside the
-  switch knob; the language selector retains its existing layout.
-- Build ordinary and portable executables for both platforms. Ordinary Windows
-  builds use `%LOCALAPPDATA%\ArrowPuzzle`; ordinary Linux builds retain XDG.
-  Portable builds keep settings/saves beside the executable or outer AppImage,
-  with the mode compiled in and no sidecar or filename dependency.
-- Produce six packages: Windows ZIP, Linux tar.gz and Linux AppImage, each in
-  ordinary and `-portable` variants, with mode-aware validation and provenance.
-- Compile screenshot/scenario environment hooks only in Debug. Release binaries
-  and packages exclude them; CI checks the packaged game through external X11
-  input and runs capture scenarios on a separate Debug build.
-
-## [0.5.0] - 2026-10-30
-
-### Added
 
 - An application icon with two rounded, grid-aligned arrows, embedded in the
   Windows executable and used for the game window and Linux AppImage.
@@ -59,8 +37,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   archive launch/save verification. Linux tar.gz packaging removes build RPATHs.
 
 - Native Linux x86-64 build presets/helper, XDG settings and save directories,
-  and window-manager-controlled X11/XWayland fullscreen. Windows retains portable
-  files beside the EXE and its existing borderless fullscreen implementation.
+  and window-manager-controlled X11/XWayland fullscreen. Windows keeps its
+  existing borderless fullscreen implementation.
 
 - Touchpad-friendly board controls: left-button dragging, Ctrl + + / - (also
   Ctrl + = and keypad keys) for centred zoom, and Ctrl + 0 to fit the full board.
@@ -68,13 +46,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   gesture, even after returning to the starting point. Updated in-game hints
   and both documentation editions.
 
-### Fixed
-
-- Enforce the existing Simple length/bend quality checks and Hard opening-move
-  limits during candidate selection, including with libstdc++ random sequences.
-  Reject candidates below the quality floor instead of returning a weak board.
-
 ### Changed
+
+- Centre switch and board-theme captions using their visible glyph bounds.
+  ON/OFF labels account for their individual widths and the space beside the
+  switch knob; the language selector retains its existing layout.
+- Build ordinary and portable executables for both platforms. Ordinary Windows
+  builds use `%LOCALAPPDATA%\ArrowPuzzle`; ordinary Linux builds retain XDG.
+  Portable builds keep settings/saves beside the executable or outer AppImage,
+  with the mode compiled in and no sidecar or filename dependency.
+- Produce six packages: Windows ZIP, Linux tar.gz and Linux AppImage, each in
+  ordinary and `-portable` variants, with mode-aware validation and provenance.
+- Compile screenshot/scenario environment hooks only in Debug. Release binaries
+  and packages exclude them; CI checks the packaged game through external X11
+  input and runs capture scenarios on a separate Debug build.
 
 - The Board theme selector now has a light fill and contrasting dark label and
   chevrons when Light is chosen.
@@ -84,6 +69,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Rounded arrowhead vertices and 90-degree body bends, with matching geometry
   during flight and rewind. Analytic pixel coverage preserves thin strokes;
   merged moving segments and integrated end caps reduce geometry storage.
+
+### Fixed
+
+- Enforce the existing Simple length/bend quality checks and Hard opening-move
+  limits during candidate selection, including with libstdc++ random sequences.
+  Reject candidates below the quality floor instead of returning a weak board.
+
+### Removed
+
+- Screenshot/GIF capture shortcuts, including raylib's built-in F12 and
+  Control+F12 behavior, so accidental key presses do not create files.
 
 ## [0.4.0] - 2026-10-29
 

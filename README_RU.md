@@ -6,11 +6,12 @@ Arrow Puzzle — минималистичная головоломка для П
 поле из стрелок. Игра написана на C++20 с использованием raylib
 и поддерживает сборку для Windows и Linux.
 
-Версия **0.5.0** добавляет нативные пакеты для Linux, закруглённые стрелки,
-иконку приложения и управление полем с тачпада. Доступны поля 20 x 20,
+Версия **0.5.0** добавляет нативные пакеты для Linux, обычные и portable-сборки,
+восемь языков интерфейса, закруглённые стрелки, иконку приложения и отключаемое
+перетаскивание левой кнопкой для тачпада. Доступны поля 20 x 20,
 40 x 40, 80 x 80 и экспериментальное 160 x 160, тёмная и светлая темы
 игрового поля, отключаемые звуки и анимированные финальные экраны.
-Текущие обычные сборки сохраняют данные в LocalAppData в Windows и в каталогах
+Обычные сборки сохраняют данные в LocalAppData в Windows и в каталогах
 XDG config/data в Linux. Сборки с суффиксом `portable` хранят настройки и
 незавершённую партию рядом с исполняемым файлом.
 
@@ -26,32 +27,37 @@ XDG config/data в Linux. Сборки с суффиксом `portable` хран
 
 | Настройки | Победа и фейерверк |
 | :---: | :---: |
-| [![Настройки звука, темы игрового поля и правил игры](docs/screenshots/settings.png)](docs/screenshots/settings.png) | [![Экран победы с красочным фейерверком](docs/screenshots/victory.png)](docs/screenshots/victory.png) |
+| [![Настройки языка, управления, звука и правил игры](docs/screenshots/settings.png)](docs/screenshots/settings.png) | [![Экран победы с красочным фейерверком](docs/screenshots/victory.png)](docs/screenshots/victory.png) |
 
-Very Hard (160 x 160), созданный новым алгоритмом версии 0.4.0:
+Very Hard (160 x 160), созданный алгоритмом от фронтов, добавленным в 0.4.0:
 
 [![Very Hard с разнообразными стрелками на периметре](docs/screenshots/very-hard.png)](docs/screenshots/very-hard.png)
 
 ## Скачать
 
-Последнюю сборку для Windows x64 можно скачать в разделе
-[GitHub Releases](https://github.com/gugglegum/arrow_puzzle_game/releases/latest).
-Распакуйте ZIP-архив и запустите `ArrowPuzzle.exe`. Сам EXE полностью
-автономен; сопровождающие текстовые файлы содержат лицензии и не нужны игре
-для запуска.
+Скачать [Arrow Puzzle 0.5.0](https://github.com/gugglegum/arrow_puzzle_game/releases/tag/v0.5.0):
 
-В релиз 0.5.0 также входят пакеты tar.gz и AppImage для Linux x86-64.
-Требования и запуск AppImage без FUSE описаны в [инструкции Linux](docs/ru/LINUX.md).
-До публикации черновик виден только сопровождающим репозитория.
+| Платформа / формат | Обычная версия | Portable |
+| --- | --- | --- |
+| Windows x64 / ZIP | [ZIP](https://github.com/gugglegum/arrow_puzzle_game/releases/download/v0.5.0/ArrowPuzzle-0.5.0-windows-x64.zip) | [Portable ZIP](https://github.com/gugglegum/arrow_puzzle_game/releases/download/v0.5.0/ArrowPuzzle-0.5.0-windows-x64-portable.zip) |
+| Linux x86-64 / tar.gz | [tar.gz](https://github.com/gugglegum/arrow_puzzle_game/releases/download/v0.5.0/ArrowPuzzle-0.5.0-linux-x64.tar.gz) | [Portable tar.gz](https://github.com/gugglegum/arrow_puzzle_game/releases/download/v0.5.0/ArrowPuzzle-0.5.0-linux-x64-portable.tar.gz) |
+| Linux x86-64 / AppImage | [AppImage](https://github.com/gugglegum/arrow_puzzle_game/releases/download/v0.5.0/ArrowPuzzle-0.5.0-linux-x64.AppImage) | [Portable AppImage](https://github.com/gugglegum/arrow_puzzle_game/releases/download/v0.5.0/ArrowPuzzle-0.5.0-linux-x64-portable.AppImage) |
 
-Сценарий следующего релиза создаёт шесть пакетов: ZIP для Windows, tar.gz и
-AppImage для Linux, каждый в обычном и `-portable` варианте. Обычная Windows-версия
+Распакуйте Windows ZIP и запустите `ArrowPuzzle.exe` или `ArrowPuzzle-portable.exe`.
+Шрифты, переводы и звуки встроены: исполняемый файл работает самостоятельно.
+Требования Linux, запуск из tar.gz и AppImage без FUSE описаны в
+[инструкции Linux](docs/ru/LINUX.md).
+
+Каждый формат доступен в обычном и `-portable` варианте. Обычная Windows-версия
 хранит `settings.txt` и `savegame.txt` в `%LOCALAPPDATA%\ArrowPuzzle\`.
 Portable хранит оба файла рядом с `ArrowPuzzle-portable.exe`,
 `ArrowPuzzle-portable` или внешним файлом `.AppImage`. Режим встроен в программу:
 можно извлечь только исполняемый файл или переименовать его. Каталог portable
 должен быть доступен для записи. Ранее выпущенные пакеты сохраняют прежнее
-поведение; существующие сохранения автоматически не переносятся.
+поведение; существующие сохранения автоматически не переносятся. Чтобы продолжить
+старую Windows-партию в обычной версии, закройте игру и скопируйте лежащие рядом
+с прежним EXE `settings.txt` и `savegame.txt` в `%LOCALAPPDATA%\ArrowPuzzle\`.
+Либо выберите portable и оставьте оба файла рядом с её EXE.
 
 Релизные сборки компилируются и тестируются в **GitHub Actions**. В пакеты
 включены сведения о сборке, а рядом с файлами доступен общий список SHA-256.
@@ -115,6 +121,7 @@ Portable хранит оба файла рядом с `ArrowPuzzle-portable.exe`
 - Отключаемые самопроходы и штрафы за столкновения летящих стрелок
 - Автоматическое сохранение настроек и незавершённой партии в пользовательском
   каталоге либо рядом с исполняемым файлом в portable-версии
+- Восемь встроенных языков интерфейса с автоматическим выбором по системе
 - Три жизни и анимированный возврат после столкновения
 - Точки сетки, открывающиеся после ухода стрелок, и отключаемая подсветка осей
 - Независимое непрерывно ускоряющееся движение без ограничения скорости
@@ -171,7 +178,7 @@ Portable хранит оба файла рядом с `ArrowPuzzle-portable.exe`
 
 ## Меню, настройки и сохранения
 
-В текущих сборках из исходников в настройках появился пункт **Язык**.
+В версии 0.5.0 в настройках доступен пункт **Язык**.
 Стрелками по бокам или клавишами влево/вправо можно выбрать Auto, English,
 Español, Français, Deutsch, Português, 简体中文 (китайский упрощённый), Русский
 или Українська. Enter/Пробел также переключает на следующий язык. Интерфейс
@@ -454,7 +461,7 @@ Windows x64 остаётся основной платформой разраб�
 использует X11/XWayland и OpenGL 3.3; см. [сборку и проверки Linux](docs/ru/LINUX.md).
 Первые нативные проверки выполнены на Linux Mint 22.3 в VMware. Native Wayland,
 Android, другие архитектуры и расширенная проверка рабочих столов остаются
-дальнейшей работой. Релизы Linux пока не опубликованы.
+дальнейшей работой. Версия 0.5.0 включает обычные и portable-пакеты tar.gz/AppImage.
 
 В обычной Linux-версии настройки находятся в `~/.config/arrow-puzzle/settings.txt`, прогресс —
 в `~/.local/share/arrow-puzzle/savegame.txt` (учитываются абсолютные XDG-пути).
@@ -475,3 +482,7 @@ raylib 5.5 распространяется по неизменённой лиц
 Включённый в проект шрифт Inter 4.1 остаётся под лицензией SIL Open Font
 License 1.1. Полный текст лицензии находится в
 [`assets/fonts/Inter-LICENSE.txt`](assets/fonts/Inter-LICENSE.txt).
+
+Встроенный Arrow Puzzle CJK — переименованный поднабор Noto Sans SC под той же
+SIL OFL 1.1; см. [лицензию](assets/fonts/NotoSansSC-LICENSE.txt). Воспроизведение
+поднабора описано в `assets/fonts/README.md` исходного репозитория.

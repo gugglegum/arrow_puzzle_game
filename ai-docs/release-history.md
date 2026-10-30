@@ -7,6 +7,11 @@ from completed releases, not a second procedure or a claim about a future build.
 
 ## 0.5.0 draft (2026-10-30)
 
+Historical pre-release candidate, superseded by the user's later request to
+publish 0.5.0 from the current accepted source with six ordinary/portable
+packages. The details below record the earlier three-package draft and its
+checks; they do not describe the final public 0.5.0 artifact identities.
+
 - The user authorized a common Windows/Linux draft and file/provenance
   verification, explicitly excluding publication. The draft exists as
   **Arrow Puzzle v0.5.0**, created by `github-actions[bot]`, release ID

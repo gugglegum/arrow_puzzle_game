@@ -11,7 +11,7 @@ manual. The workflow never creates/moves tags or publishes a release.
 ## Development checks before release
 
 The separate **Build and test** workflow (`build.yml`) runs on branch pushes,
-pull requests and manual dispatch. It builds Release and runs the five default
+pull requests and manual dispatch. It builds Release and runs the six default
 CTest suites on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. It also
 checks release assembly guards: mixed commits/versions, dirty metadata,
 modified packages/binaries, missing signatures and invalid draft inputs.
@@ -64,6 +64,25 @@ Historical Windows-only releases retain their original assets and workflow
 revision. Rerunning an old published tag does not add Linux to that release.
 No personal access token or signing secret is required by the release workflow.
 
+## Publishing a verified draft
+
+With the maintainer's request to publish the version, download the combined
+artifact and independently check all six packages, ten checksum subjects,
+six metadata records and eleven provenance subjects (including the manifest).
+Inspect current screenshots, offline documentation links and unpacked startup.
+Recheck that the tag still identifies the exact tested source and the release
+is still a draft before publishing it as a stable Latest release:
+
+```bash
+gh release edit vX.Y.Z --draft=false --prerelease=false --latest
+```
+
+Then confirm public unauthenticated access to the page and every asset, the
+Latest release API result, and unchanged identities/hashes for older releases.
+Record publication evidence in a later documentation commit without moving the
+published tag. Replacing an unpublished candidate requires the maintainer's
+authorization and a fresh complete build; published tags/assets are immutable.
+
 ## Files and provenance
 
 | Common draft asset | Contents / purpose |
@@ -95,8 +114,9 @@ Each build-info file also has a `-portable.json` counterpart. Metadata records
 mode too. The Windows bundle covers both ZIPs and both EXEs; the Linux bundle
 covers both tar archives, both ELFs and both AppImages. There are four executable
 variants and six packages. Ordinary Windows storage is
-`%LOCALAPPDATA%\ArrowPuzzle\`; ordinary Linux storage uses XDG. The older 0.5.0
-draft/tag/assets retain their original three-package layout and behavior.
+`%LOCALAPPDATA%\ArrowPuzzle\`; ordinary Linux storage uses XDG. Release 0.5.0
+uses this six-package layout: sixteen attached files in total, comprising six
+packages, six metadata JSON files, three signature bundles and one manifest.
 
 Each platform uses the same Release build/packaging helpers as local development.
 raylib, actions and AppImage tooling/runtime are pinned. Linux uses CMake

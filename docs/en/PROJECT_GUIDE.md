@@ -2,7 +2,7 @@
 
 **English** | [Русский](../ru/PROJECT_GUIDE.md)
 
-This guide was reviewed for version 0.4.0 on 2026-10-29. It introduces the
+This guide was reviewed for version 0.5.0 on 2026-10-30. It introduces the
 implementation and development workflow. User-facing information is in the
 root `README.md` and `README_RU.md`.
 
@@ -228,7 +228,7 @@ For native Linux build commands and presets, see [LINUX.md](LINUX.md).
 
 ## 6. Testing
 
-Full CTest runs five test suites:
+Full CTest runs six test suites:
 
 ```powershell
 ctest --test-dir build\windows-msvc --output-on-failure
@@ -334,6 +334,7 @@ After editing:
 - Project code: MIT, `LICENSE`.
 - raylib 5.5: zlib/libpng, `THIRD_PARTY_NOTICES.md`.
 - Inter 4.1: SIL OFL 1.1, `assets/fonts/Inter-LICENSE.txt`.
+- Arrow Puzzle CJK (Noto Sans SC subset): SIL OFL 1.1, `assets/fonts/NotoSansSC-LICENSE.txt`.
 
 The CMake project version is 0.5.0; check GitHub Releases for published versions.
 A release ZIP contains standalone `ArrowPuzzle.exe` (or `ArrowPuzzle-portable.exe`), both READMEs, changelog,

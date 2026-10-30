@@ -2,7 +2,7 @@
 
 **English** | [Русский](../ru/README.md)
 
-These guides describe the game's implementation, development, and releases.
+These guides cover Arrow Puzzle 0.5.0: implementation, development, and releases.
 They are shared technical documentation for developers and AI assistants.
 
 - [Project guide](PROJECT_GUIDE.md): project goals, architecture, models,
@@ -11,9 +11,9 @@ They are shared technical documentation for developers and AI assistants.
   metrics, and performance.
 - [Runtime](RUNTIME.md): simulation, motion, collisions, rendering, menus,
   settings, and saved games.
-- [Linux](LINUX.md): native build, XDG paths and desktop validation.
+- [Linux](LINUX.md): native build, ordinary/portable data paths and desktop validation.
 - [Releases](RELEASING.md): GitHub Actions builds, local previews, packaging,
-  and EXE/ZIP provenance verification.
+  and provenance verification for all six Windows/Linux download packages.
 - [Shared screenshots](../screenshots/): images used by both main README files.
 
 User-facing information is in [README.md](../../README.md) and

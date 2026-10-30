@@ -5,7 +5,7 @@ Choose a language / Выберите язык:
 - [English](en/README.md)
 - [Русский](ru/README.md)
 
-Both editions cover the same architecture, generator, runtime, development,
+Both editions cover Arrow Puzzle 0.5.0: architecture, generator, runtime, development,
 and release procedures. English is the primary edition; the Russian translation
 is maintained alongside it. Matching pages link to each other.
 

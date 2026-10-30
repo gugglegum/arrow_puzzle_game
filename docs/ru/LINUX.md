@@ -38,7 +38,7 @@ sudo apt-get install build-essential cmake ninja-build git python3 curl \
 ./build/linux/arrow_puzzle
 ```
 
-Скрипт конфигурирует Release, собирает в два потока и запускает все пять
+Скрипт конфигурирует Release, собирает в два потока и запускает все шесть
 наборов CTest без окна. Дополнительные аргументы передаются конфигурации CMake.
 Из общих исходников собираются `arrow_puzzle` (данные пользователя) и
 `arrow_puzzle_portable` (данные рядом с программой).

@@ -1,6 +1,6 @@
 # Portable distribution and AppImage data locations
 
-## Accepted storage contract (2026-10-30, unreleased)
+## Accepted storage contract (0.5.0, 2026-10-30)
 
 The user explicitly requested ordinary and portable builds on **both** OSes.
 This supersedes the earlier discussion-only proposal and the old Windows ZIP's
@@ -61,8 +61,10 @@ standalone game. Renaming the outer image is supported.
 - Windows QA should copy the portable Debug/Release executable to an isolated
   scratch directory; ordinary Debug now uses personal LocalAppData. Unit tests
   check KnownFolder path discovery without writing the actual profile.
-- Do not replace or republish the prepared v0.5.0 draft/tag/attested packages.
-  Verify the new pipeline with `create_release=false` on a branch instead.
+- The earlier draft-only task kept its three-package v0.5.0 candidate intact.
+  The user's later 0.5.0 publication request authorizes refreshing that still
+  unpublished candidate with this six-package layout. Published tags/assets
+  remain immutable; see the current release evidence and status notes.
 
 ## Accepted screenshot policy
 

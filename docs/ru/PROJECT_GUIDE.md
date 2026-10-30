@@ -2,7 +2,7 @@
 
 [English](../en/PROJECT_GUIDE.md) | **Русский**
 
-Документ синхронизирован с версией 0.4.0 на 29 октября 2026 года. Он
+Документ синхронизирован с версией 0.5.0 на 30 октября 2026 года. Он
 предназначен для быстрого погружения в устройство и разработку проекта. За
 пользовательским описанием игры следует обращаться к корневым `README.md` и
 `README_RU.md`.
@@ -233,7 +233,7 @@ ctest --preset windows-msvc
 
 ## 6. Тестирование
 
-Полный `ctest` запускает пять наборов тестов:
+Полный `ctest` запускает шесть наборов тестов:
 
 ```powershell
 ctest --test-dir build\windows-msvc --output-on-failure
@@ -341,6 +341,7 @@ Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'G
 - Код проекта: MIT, `LICENSE`.
 - raylib 5.5: zlib/libpng, `THIRD_PARTY_NOTICES.md`.
 - Inter 4.1: SIL OFL 1.1, `assets/fonts/Inter-LICENSE.txt`.
+- Arrow Puzzle CJK (поднабор Noto Sans SC): SIL OFL 1.1, `assets/fonts/NotoSansSC-LICENSE.txt`.
 
 Версия проекта в CMake — `0.5.0`; опубликованные релизы следует проверять в
 GitHub Releases. Релизный ZIP содержит автономный `ArrowPuzzle.exe` либо

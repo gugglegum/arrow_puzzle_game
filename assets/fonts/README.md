@@ -5,7 +5,7 @@ Russian and Ukrainian. Its license is in `Inter-LICENSE.txt`.
 
 `ArrowPuzzleCJK-Medium.ttf` is a modified, static weight-500 subset of Noto Sans
 SC, renamed **Arrow Puzzle CJK**. It contains basic Latin and all Chinese UI
-characters used in `src/Localization.cpp` (264 characters, 59,728 bytes initially).
+characters used in `src/Localization.cpp` (267 characters, 60,724 bytes in 0.5.0).
 It is embedded on Windows and Linux; no installed CJK font is required.
 The complete upstream license is in `NotoSansSC-LICENSE.txt` and accompanies
 all binary packages.

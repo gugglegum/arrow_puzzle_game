@@ -57,6 +57,8 @@ User-facing descriptions are [README.md](../README.md) and
   Record machine-specific workarounds only in the workflow notes.
 - Keep this index short. New topic pages should be reachable from here.
 
-Code reviewed for this initial roadmap: `8ebae99`, 2026-10-29. Documentation
-commits may follow that code baseline; inspect Git rather than assuming it is
-still HEAD. This folder is repository-local project memory, not runtime data.
+Documentation reviewed for the complete 0.5.0 release on 2026-10-30, including
+ordinary/portable packages, localization, optional left dragging and caption
+alignment. See release history for verified tagged-source identities; inspect
+Git rather than assuming a recorded source is still HEAD. This folder is
+repository-local project memory, not runtime data.
