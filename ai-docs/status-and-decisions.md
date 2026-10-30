@@ -9,6 +9,9 @@ this as current state.
 Auto and eight explicit languages are implemented for Windows/Linux, with
 embedded translations and Chinese glyphs. See [localization](localization.md)
 for source entry points, font reproduction and verification status.
+Implementation head `8348520` passed Windows/MSVC, Ubuntu 22.04/GCC and
+Ubuntu 24.04/Clang in [CI run 40997859109](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40997859109),
+including translated rendering and real packaged Linux selector input checks.
 
 ## Unified ordinary/portable builds, unreleased (2026-10-30)
 
