@@ -1,19 +1,25 @@
 # Status, accepted decisions, and open work
 
-Snapshot: 2026-10-30, preparing the complete 0.5.0 release. Check
+Snapshot: 2026-10-30, after publication and verification of 0.5.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
-## Release 0.5.0 authorization (2026-10-30)
+## Release 0.5.0 published (2026-10-30)
 
-The user now explicitly requests updating all documentation, committing/pushing
-and publishing 0.5.0. This supersedes the earlier draft-only and preserve-old-
+Public stable Latest 0.5.0 is published from `8f311b1`, with all six packages
+and sixteen attached files. Release and development CI, independent package/
+metadata/checksum/provenance verification and anonymous public downloads passed.
+See [release evidence](release-history.md#050-2026-10-30). The published v0.5.0
+tag must remain on that verified source when recording later documentation.
+
+The user explicitly requested updating all documentation, committing/pushing
+and publishing 0.5.0. This superseded the earlier draft-only and preserve-old-
 candidate limits. Live GitHub inspection confirmed release `428459388` is still
 an unpublished draft, with the old three-package candidate on `fe0f697` (tag
-object `44caae05b69507fa873e5510a9f0ce7c01b3816e`). Refresh that unpublished
-candidate from the current accepted implementation and updated docs/screenshots,
-then verify the complete six-package release before publishing it as Latest.
-The four existing published versions must retain their tags/assets. The old
+object `44caae05b69507fa873e5510a9f0ce7c01b3816e`). That unpublished candidate
+was refreshed from the accepted implementation and updated docs/screenshots,
+then independently verified and published as the complete six-package release.
+The four existing published versions retained their tags/assets. The old
 candidate inventory is preserved under ignored `out/release-0.5.0-final/`.
 Release documentation now consolidates the 0.5.0 changelog, six direct package
 links, storage/migration guidance, six-suite counts, font notices and bilingual

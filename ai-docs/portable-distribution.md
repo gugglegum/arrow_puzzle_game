@@ -4,7 +4,7 @@
 
 The user explicitly requested ordinary and portable builds on **both** OSes.
 This supersedes the earlier discussion-only proposal and the old Windows ZIP's
-implicit portable behavior. Existing release tags/assets are not changed.
+implicit portable behavior. Published release tags and assets are immutable.
 
 | Package family | Ordinary storage | Portable storage |
 | --- | --- | --- |
@@ -65,6 +65,8 @@ standalone game. Renaming the outer image is supported.
   The user's later 0.5.0 publication request authorizes refreshing that still
   unpublished candidate with this six-package layout. Published tags/assets
   remain immutable; see the current release evidence and status notes.
+- Final 0.5.0 is public with all six packages; independent checks and identities
+  are recorded in [release history](release-history.md#050-2026-10-30).
 
 ## Accepted screenshot policy
 

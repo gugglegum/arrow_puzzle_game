@@ -5,6 +5,61 @@ provenance policy, use [docs/en/RELEASING.md](../docs/en/RELEASING.md) and the a
 [version script](../cmake/GenerateBuildVersion.cmake). This page stores evidence
 from completed releases, not a second procedure or a claim about a future build.
 
+## 0.5.0 (2026-10-30)
+
+- Public stable [Arrow Puzzle v0.5.0](https://github.com/gugglegum/arrow_puzzle_game/releases/tag/v0.5.0),
+  release ID `428459388`, published `2026-10-30T13:06:12Z`, verified as Latest
+  and not a prerelease. The user explicitly authorized publication from the
+  current accepted implementation and refreshed documentation/screenshots.
+- Source commit `8f311b1292a39795cf1c9326ead1436e7dd37f92`; annotated tag object
+  `1f891264d881680d7ee922df1f7cee7c2d07fa72`. Both executable labels are `v0.5.0`.
+  The prior three-package candidate was still an unpublished draft when its
+  tag/assets were refreshed. The four older published releases were preserved.
+- [Release run 41058729556](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/41058729556)
+  passed all five jobs: source/version guards, Windows, Linux, common assembly
+  and draft update. [Development run 41058654081](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/41058654081)
+  passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang on the same source.
+- Six ordinary/portable packages and four executable variants; sixteen attached
+  files in total, including six metadata JSON files, three signature bundles
+  and SHA256SUMS.txt. GitHub's two automatic source archives are additional.
+  The common Actions artifact ID is `12977704453`.
+- Independent local verification passed all ten checksum subjects and all six
+  source/version/storage metadata records. All 27 packaged documents/images
+  match the tagged source in every package, allowing Git's declared text newline
+  conversion for the Windows LICENSE. Both AppImages were independently decoded
+  with 7-Zip; their internal ELFs equal the corresponding tar binaries, and
+  their launchers, icons, documentation and runtime notices match source.
+- All eleven `gh attestation verify --bundle` checks passed with repository,
+  release.yml signer, exact source digest, `refs/tags/v0.5.0` and hosted-runner
+  constraints: two Windows EXEs/two ZIPs, two Linux ELFs/two tar/two AppImages,
+  and the combined checksum manifest. Manifest SHA-256:
+  `a720444d61ffd1c6f68b3a773fd7e066fe66f28a1f00db6b61d8953252a1ea85`.
+- The attested Windows portable EXE passed renamed standalone startup from a
+  different working directory, adjacent default creation, preference retention
+  across restart and clean exit. Both primary local Windows targets were also
+  rebuilt from the release tag with the `v0.5.0` label.
+- Linux CI passed rendering/text, both Debug save/resume modes and real X11
+  packaged input checks for all four package variants. The release ELFs require
+  GLIBC 2.35, GLIBCXX 3.4.29 and CXXABI 1.3.13. This run uses Xvfb/Mesa and
+  AppImage extraction-and-run, not a new physical desktop/FUSE session.
+- After publication, all sixteen assets were downloaded anonymously and their
+  digests matched the independently verified files. The release page and both
+  automatic source archive endpoints returned HTTP 200; the Latest API returned
+  0.5.0. Older published release bodies, asset IDs/names/sizes/digests and all
+  remote tag refs were unchanged during publication.
+- Evidence and repeatable verification helpers are ignored under
+  `out/release-0.5.0-final/`. Preserve this published tag and its assets; later
+  documentation commits must not move it.
+
+| Package | SHA-256 |
+| --- | --- |
+| `ArrowPuzzle-0.5.0-windows-x64.zip` | `885ced15c02ff2428053ca2f16da08a7083aced1b6058ef0ccafc8a5483110ec` |
+| `ArrowPuzzle-0.5.0-windows-x64-portable.zip` | `f9a205098128177f47508b516a271808548ac8e70d823b105e210ccf99dcfc22` |
+| `ArrowPuzzle-0.5.0-linux-x64.tar.gz` | `4b3c50d0c15d7283d1f741b8c08ef0b5edef543679deacc7fa85bacff5ab2966` |
+| `ArrowPuzzle-0.5.0-linux-x64-portable.tar.gz` | `32f3d89ece59a8b6f9d694b97626f7236f94a943a883ad96a9d8b1bbda5d8c8f` |
+| `ArrowPuzzle-0.5.0-linux-x64.AppImage` | `4f3581471159c01d8d983b5c16c73fb62a624c65d61d8b2d268f7dcc061c76c3` |
+| `ArrowPuzzle-0.5.0-linux-x64-portable.AppImage` | `74ae0bd919b6b5638cd7b6f18a5be3c5f37609c6ff4a5573e9cc7300185c1405` |
+
 ## 0.5.0 draft (2026-10-30)
 
 Historical pre-release candidate, superseded by the user's later request to
@@ -17,9 +72,8 @@ checks; they do not describe the final public 0.5.0 artifact identities.
   **Arrow Puzzle v0.5.0**, created by `github-actions[bot]`, release ID
   `428459388`. The authenticated release page still shows **Draft** after
   saving its release notes. No publication was performed.
-- Current [draft link](https://github.com/gugglegum/arrow_puzzle_game/releases/tag/untagged-50194b5b61b957f06641).
-  GitHub regenerated its temporary `untagged-*` URL when the notes were saved;
-  use the repository Releases page if another save makes this link stale.
+- The temporary `untagged-*` draft URLs are historical. Use the stable public
+  0.5.0 release link above; this record describes the earlier candidate only.
 - Tag/source commit: `fe0f6973745a2d27a298865c6c709b7b4060e8c8`.
   Annotated v0.5.0 tag object: `44caae05b69507fa873e5510a9f0ce7c01b3816e`.
   CMake/package version is `0.5.0`; both executable labels are `v0.5.0`.
