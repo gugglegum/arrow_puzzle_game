@@ -122,6 +122,85 @@ void checkTranslationGlyphs() {
     std::cout << "All translated characters are present in the two embedded fonts\n";
 }
 
+Rectangle pixelBounds(const Image& image, Rectangle area, Color background) {
+    int left = image.width, top = image.height, right = -1, bottom = -1;
+    for (int y = static_cast<int>(area.y); y < area.y + area.height; ++y) {
+        for (int x = static_cast<int>(area.x); x < area.x + area.width; ++x) {
+            const Color pixel = GetImageColor(image, x, y);
+            if (std::max({std::abs(pixel.r - background.r), std::abs(pixel.g - background.g),
+                          std::abs(pixel.b - background.b)}) <= 3) continue;
+            left = std::min(left, x); top = std::min(top, y);
+            right = std::max(right, x); bottom = std::max(bottom, y);
+        }
+    }
+    require(right >= left, "Control label has no visible pixels");
+    return {static_cast<float>(left), static_cast<float>(top),
+            static_cast<float>(right - left + 1), static_cast<float>(bottom - top + 1)};
+}
+
+void checkControlLabelAlignment(arrow::UiText& text, RenderTexture2D target) {
+    float worstX = 0, worstY = 0;
+    for (int l = 1; l < static_cast<int>(arrow::Language::Count); ++l) {
+        const auto language = static_cast<arrow::Language>(l);
+        for (int state = 0; state < 4; ++state) {
+            const bool toggle = state < 2;
+            const bool on = state == 0;
+            const bool light = state == 2;
+            const auto id = toggle ? (on ? arrow::Text::On : arrow::Text::Off)
+                                   : (light ? arrow::Text::Light : arrow::Text::Dark);
+            const char* label = arrow::translate(id, language);
+            (void)text.measure(label, 11, 0.2F);
+            const auto cached = text.cachedBytes();
+            const Rectangle measured = text.inkBounds(label, 11, 0.2F);
+            require(text.cachedBytes() == cached, "Ink measurement allocated another text texture");
+            BeginTextureMode(target);
+            ClearBackground(BLACK);
+            text.draw(label, {8, 8}, 11, 0.2F, WHITE);
+            EndTextureMode();
+            Image image = LoadImageFromTexture(target.texture);
+            ImageFlipVertical(&image);
+            const auto actual = pixelBounds(image, {0, 0, kWidth, kHeight}, BLACK);
+            UnloadImage(image);
+            require(std::abs(actual.x - 8 - measured.x) <= 1 && std::abs(actual.y - 8 - measured.y) <= 1 &&
+                    std::abs(actual.width - measured.width) <= 1 && std::abs(actual.height - measured.height) <= 1,
+                    "Ink bounds do not match the rendered glyph pixels");
+
+            for (float height : {36.0F, 53.25F, 64.0F}) {
+                BeginTextureMode(target);
+                ClearBackground(BLACK);
+                arrow::MenuScreen::drawButton(text, {0, 0, kWidth, height}, "Control", arrow::MenuScreen::Page::Settings,
+                    toggle ? 0 : 5, true, false, false,
+                    toggle ? std::optional<bool>{on} : std::nullopt,
+                    toggle ? std::nullopt : std::optional{light ? arrow::BoardTheme::Light : arrow::BoardTheme::Dark},
+                    std::nullopt, language);
+                EndTextureMode();
+                image = LoadImageFromTexture(target.texture);
+                ImageFlipVertical(&image);
+                // Exclude the switch knob, rounded border and selector chevrons.
+                const Rectangle area{toggle ? (on ? 302.0F : 324.0F) : 301.0F,
+                    std::floor(height * 0.5F - 8), toggle ? 50.0F : 62.0F, 16};
+                const Color background = GetImageColor(image, static_cast<int>(area.x + area.width * 0.5F),
+                                                       static_cast<int>(area.y));
+                const auto ink = pixelBounds(image, area, background);
+                UnloadImage(image);
+                // Centre the text in the visible space between the circle and
+                // the opposite edge; theme labels sit between the two chevrons.
+                const float expectedX = toggle ? (on ? 326.5F : 349.5F) : 332.0F;
+                const float dx = std::abs(ink.x + ink.width * 0.5F - expectedX);
+                const float dy = std::abs(ink.y + ink.height * 0.5F - height * 0.5F);
+                worstX = std::max(worstX, dx); worstY = std::max(worstY, dy);
+                if (dx > 1 || dy > 1) std::cerr << "Misaligned " << label << " at height " << height
+                    << ": " << dx << ", " << dy << '\n';
+                require(dx <= 1 && dy <= 1, "Switch/theme label is not visually centred");
+            }
+        }
+    }
+    require(text.inkBounds("", 11, 0.2F).width == 0 && text.inkBounds(" ", 11, 0.2F).width == 0,
+            "Empty labels have visible ink bounds");
+    std::cout << "96 switch/theme pixel checks in all eight languages: max centre error "
+              << worstX << "px horizontal, " << worstY << "px vertical; no extra text textures\n";
+}
+
 void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
     using arrow::Text;
     using arrow::MenuScreen;
@@ -312,6 +391,7 @@ int main(int argc, char** argv) {
             checkComposition(text, target);
 #endif
             checkCache(text, target);
+            checkControlLabelAlignment(text, target);
             checkTranslatedScreens(text, argc == 2);
             text.release();
             require(text.cachedBytes() == 0, "Text cache was not released");

@@ -4,6 +4,29 @@ Snapshot: 2026-10-29, after publication and verification of 0.4.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Settings caption alignment, unreleased (2026-10-30)
+
+The user noticed that ON/OFF and theme captions looked too high and asked to
+check horizontal centring for different word lengths. Before captures confirm
+the Russian switch labels sit roughly 1-1.5 pixels high, with opposite small
+horizontal offsets. `UiText::inkBounds()` now supplies actual visible glyph
+bounds for the native Windows mask and the font-atlas path. Only switch/theme
+captions use this alignment; language rendering remains pixel-identical.
+Switch text uses the free space beside the visible knob. Native label records
+gain one Rectangle (at most 2 KiB across the bounded 128-label cache); there
+are no new text textures or persistent atlas allocations for ink measurement.
+
+Local native Windows and an isolated build of the atlas backend each pass
+96 GPU pixel checks across eight languages, both toggle states, both themes,
+and compact/fractional/normal row heights, with at most 0.5-pixel centre error.
+Native text composition, glyph coverage and cache checks pass as well. Settings
+captures at 720x600 and 1100x900 were inspected; the language rows match the
+before captures exactly in every language. Both Windows Release executables
+build, all six default suites pass, and a renamed lone portable EXE starts and
+exits cleanly outside the build tree. Evidence is in ignored
+`out/selector-alignment/`. The atlas probe exercises production text/menu code
+on the Windows OpenGL driver; it is not a native Linux desktop test.
+
 ## Optional left-button dragging, unreleased (2026-10-30)
 
 The user requested a boolean **Left-button dragging** setting, on by default,

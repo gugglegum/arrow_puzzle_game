@@ -19,6 +19,9 @@ public:
     UiText& operator=(const UiText&) = delete;
 
     Vector2 measure(const char* text, float size, float spacing);
+    // Visible pixels of a single-line label, relative to draw()'s origin.
+    // Unlike measure(), this excludes font leading and empty side bearings.
+    Rectangle inkBounds(const char* text, float size, float spacing);
     // Shrink translated labels to their actual available width without truncating UTF-8.
     float fitSize(const char* text, float size, float spacing, float width);
     void draw(const char* text, Vector2 position, float size, float spacing, Color color);

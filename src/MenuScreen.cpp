@@ -25,6 +25,13 @@ void centered(UiText& text, const char* label, float x, float y, float size, flo
     text.draw(label, {std::round(x - measured.x * 0.5F), std::round(y)}, size, spacing, color);
 }
 
+void centeredInk(UiText& text, const char* label, Rectangle area, float maxWidth, Color color) {
+    const float size = text.fitSize(label, 11, 0.2F, maxWidth);
+    const Rectangle ink = text.inkBounds(label, size, 0.2F);
+    text.draw(label, {area.x + (area.width - ink.width) * 0.5F - ink.x,
+                      area.y + (area.height - ink.height) * 0.5F - ink.y}, size, 0.2F, color);
+}
+
 void arrowPath(std::span<const Vector2> points, float thickness, Color color) {
     for (std::size_t index = 1; index < points.size(); ++index) {
         DrawLineEx(points[index - 1], points[index], thickness, color);
@@ -234,9 +241,12 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
         const Rectangle pill{bounds.x + bounds.width - 104, center.y - 14, 84, 28};
         DrawRectangleRounded(pill, 1, 12, *toggle ? Fade(kTeal, 0.20F) : Color{51, 66, 89, 255});
         DrawRectangleRoundedLinesEx(pill, 1, 12, 1, *toggle ? Fade(kTeal, 0.65F) : Color{75, 93, 120, 255});
-        DrawCircleV({pill.x + (*toggle ? pill.width - 14 : 14), center.y}, 9, *toggle ? kTeal : kQuiet);
-        centered(text, translate(*toggle ? Text::On : Text::Off, language), pill.x + (*toggle ? 29 : 55), center.y - 7, 11, 0.2F,
-            *toggle ? kTeal : kQuiet, 48);
+        const float knobX = pill.x + (*toggle ? pill.width - 14 : 14);
+        DrawCircleV({knobX, center.y}, 9, *toggle ? kTeal : kQuiet);
+        const float labelLeft = *toggle ? pill.x : knobX + 9;
+        const float labelRight = *toggle ? knobX - 9 : pill.x + pill.width;
+        centeredInk(text, translate(*toggle ? Text::On : Text::Off, language),
+            {labelLeft, pill.y, labelRight - labelLeft, pill.height}, 48, *toggle ? kTeal : kQuiet);
     } else if (theme.has_value()) {
         const bool light = *theme == BoardTheme::Light;
         const Color choiceFill = light ? kLightBoardPalette.surface : Fade(kGold, 0.10F);
@@ -245,8 +255,8 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
         const Rectangle pill{bounds.x + bounds.width - 116, center.y - 14, 96, 28};
         DrawRectangleRounded(pill, 1, 12, choiceFill);
         DrawRectangleRoundedLinesEx(pill, 1, 12, 1, choiceBorder);
-        centered(text, translate(light ? Text::Light : Text::Dark, language), pill.x + pill.width * 0.5F, center.y - 7,
-                 11, 0.2F, choiceInk, 62);
+        centeredInk(text, translate(light ? Text::Light : Text::Dark, language),
+                    {pill.x + 17, pill.y, 62, pill.height}, 62, choiceInk);
         for (float sign : {-1.0F, 1.0F}) {
             const float x = pill.x + pill.width * 0.5F + sign * 36;
             DrawLineEx({x - sign * 2, center.y - 3}, {x + sign * 1, center.y}, 1.2F, choiceInk);

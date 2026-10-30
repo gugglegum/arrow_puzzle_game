@@ -93,6 +93,7 @@ struct UiText::Impl {
         float spacing;
         Vector2 extent;
         Texture2D texture;
+        Rectangle ink{};
 
         std::size_t bytes() const {
             return static_cast<std::size_t>(texture.width) * texture.height * 4;
@@ -187,14 +188,27 @@ struct UiText::Impl {
             GdiFlush(); // Complete GDI's batch before reading DIB memory.
             if (rendered) {
                 std::vector<Color> rgba(area);
+                int left = width, top = height, right = -1, bottom = -1;
                 for (std::size_t index = 0; index < area; ++index) {
                     const std::uint32_t pixel = source[index];
+                    if ((pixel & 0x00ffffffU) != 0x00ffffffU) {
+                        const int x = static_cast<int>(index % width);
+                        const int y = static_cast<int>(index / width);
+                        left = std::min(left, x);
+                        top = std::min(top, y);
+                        right = std::max(right, x);
+                        bottom = std::max(bottom, y);
+                    }
                     rgba[index] = {
                         static_cast<unsigned char>(pixel >> 16),
                         static_cast<unsigned char>(pixel >> 8),
                         static_cast<unsigned char>(pixel), 255
                     };
                 }
+                if (right >= left) label.ink = {
+                    static_cast<float>(left - kPadding), static_cast<float>(top - kPadding),
+                    static_cast<float>(right - left + 1), static_cast<float>(bottom - top + 1)
+                };
                 label.texture = LoadTextureFromImage({
                     rgba.data(), width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
                 });
@@ -337,6 +351,48 @@ Vector2 UiText::measure(const char* text, float size, float spacing) {
         if (const auto* label = impl_->label(text, pixels, spacing)) return label->extent;
     }
     return MeasureTextEx(impl_->fallback(pixels, containsCjk(text)), text, size, spacing);
+}
+
+Rectangle UiText::inkBounds(const char* text, float size, float spacing) {
+    if (*text == '\0') return {};
+    const int pixels = std::max(1, static_cast<int>(std::lround(size)));
+    if (impl_->native()) {
+        if (const auto* label = impl_->label(text, pixels, spacing)) return label->ink;
+    }
+    const Font font = impl_->fallback(pixels, containsCjk(text));
+    const float scale = size / font.baseSize;
+    // Read the already loaded alpha masks: glyph cells can have empty edges.
+    // Offsets and advances follow DrawTextEx; no GPU readback or new atlas.
+    float pen = 0;
+    float left = 0, top = 0, right = 0, bottom = 0;
+    bool found = false;
+    for (const char* p = text; *p;) {
+        int bytes = 0;
+        const int codepoint = GetCodepointNext(p, &bytes);
+        const int index = GetGlyphIndex(font, codepoint);
+        const GlyphInfo& glyph = font.glyphs[index];
+        const Image& image = glyph.image;
+        if (codepoint != ' ' && codepoint != '\t') {
+            for (int y = 0; y < image.height; ++y) {
+                for (int x = 0; x < image.width; ++x) {
+                    if (GetImageColor(image, x, y).a == 0) continue;
+                    const float x0 = std::round(pen + (glyph.offsetX + x) * scale);
+                    const float y0 = std::round((glyph.offsetY + y) * scale);
+                    const float x1 = x0 + scale, y1 = y0 + scale;
+                    if (!found) {
+                        left = x0; top = y0; right = x1; bottom = y1;
+                        found = true;
+                    } else {
+                        left = std::min(left, x0); top = std::min(top, y0);
+                        right = std::max(right, x1); bottom = std::max(bottom, y1);
+                    }
+                }
+            }
+        }
+        pen += (glyph.advanceX == 0 ? font.recs[index].width : glyph.advanceX) * scale + spacing;
+        p += bytes;
+    }
+    return {left, top, right - left, bottom - top};
 }
 
 float UiText::fitSize(const char* text, float size, float spacing, float width) {

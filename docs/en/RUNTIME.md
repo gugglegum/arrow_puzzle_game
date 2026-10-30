@@ -241,6 +241,14 @@ font-smoothing settings, including ClearType. RGB masks are composed over the
 background. Its bounded cache is released before the graphics context closes.
 Menus, HUD, legend, and result screens share this text backend.
 
+Switch and board-theme captions use `UiText::inkBounds()` to centre visible
+glyph pixels rather than the full font cell. ON/OFF text is centred in the
+space between the knob's visible edge and the opposite end of the switch;
+theme text is centred between its chevrons. The language selector keeps its
+existing layout. Windows stores the ink rectangle alongside each cached RGB
+mask; the atlas backend reads the loaded glyph images. Neither path allocates
+another text texture for these measurements.
+
 CPU vertices are freed after upload. RAM retains small index arrays required
 by raylib; the temporary upload batch is bounded to 16,384 vertices. The cache
 does not contain a raster of the entire board at world scale. Release meshes

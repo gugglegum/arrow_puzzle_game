@@ -26,6 +26,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Centre switch and board-theme captions using their visible glyph bounds.
+  ON/OFF labels account for their individual widths and the space beside the
+  switch knob; the language selector retains its existing layout.
 - Build ordinary and portable executables for both platforms. Ordinary Windows
   builds use `%LOCALAPPDATA%\ArrowPuzzle`; ordinary Linux builds retain XDG.
   Portable builds keep settings/saves beside the executable or outer AppImage,
