@@ -275,11 +275,11 @@ Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'G
 & (Join-Path $qa 'Game.exe')
 ```
 
-Available hooks:
-
 For Windows QA, use an isolated copy of the portable Debug executable as above
 to keep settings/saves out of personal LocalAppData. For ordinary Linux Debug
 QA, set isolated absolute XDG paths. Portable mode remains baked in when renamed.
+
+Available hooks:
 
 - `ARROWPUZZLE_SEED`: reproducible seed;
 - `ARROWPUZZLE_DIFFICULTY`: difficulty 1..4;
@@ -332,10 +332,12 @@ After editing:
 - raylib 5.5: zlib/libpng, `THIRD_PARTY_NOTICES.md`.
 - Inter 4.1: SIL OFL 1.1, `assets/fonts/Inter-LICENSE.txt`.
 
-The CMake project version is 0.4.0; check GitHub Releases for published versions.
-A release ZIP contains standalone ArrowPuzzle.exe, both READMEs, changelog,
+The CMake project version is 0.5.0; check GitHub Releases for published versions.
+A release ZIP contains standalone `ArrowPuzzle.exe` (or `ArrowPuzzle-portable.exe`), both READMEs, changelog,
 documentation/screenshots, and licenses. Publication requires a clean Release
 build, full CTest, successful unpacked startup, and SHA-256 checks.
+The pipeline produces six ordinary/portable packages across Windows ZIP and
+Linux tar.gz/AppImage; see [storage and filenames](RELEASING.md#files-and-provenance).
 A `vX.Y.Z` tag starts Actions, which creates verifiable attestations and a draft
 as `github-actions[bot]`. Branch pushes and PRs run the separate **Build and test**
 workflow with Linux/Windows development artifacts and no release publication.

@@ -19,9 +19,30 @@ Local Windows validation: both Release executables build and all five CTest
 suites pass; both Debug executables build, menu/board capture checks pass, and
 a renamed lone portable EXE creates adjacent settings/save files. Production
 ignores all capture variables and F12/Control+F12, with clean startup/exit.
-Both ZIPs package successfully, and 16 assembly guard tests pass. Linux/CI and
-the complete six-package provenance path still need the new workflow run.
-The existing 0.5.0 draft, tag, packages and publication state remain unchanged.
+Both ZIPs package successfully, and 16 assembly guard tests pass. Debug
+persistence and the other short suites pass; the redundant full Debug generator
+run was stopped after several minutes (the full Release generator passed).
+Portable resume also passed with a renamed EXE, a Unicode/space-containing
+directory and a different working directory, preserving save SHA-256.
+
+CI on `105ecd5` is green: [Build and test run 40985578349](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40985578349)
+passed Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. The separate
+[Release verification run 40985598980](https://github.com/gugglegum/arrow_puzzle_game/actions/runs/40985598980)
+passed Windows/Linux packaging, all four Linux package launches, both Debug
+save/resume suites, per-platform provenance, common six-package assembly and
+checksum attestation. `create_release=false`; the draft job was skipped.
+The combined artifact (`12945969900`) was downloaded locally; its GitHub ZIP
+digest is `015f5ff18d5e47315bcfd6b703971930e2cbb3f470d286e89f0053be7babd528`.
+All ten checksum subjects, six metadata identities/storage modes, actual binary
+mode/capture signatures and tar/AppImage pairings were independently checked.
+`gh attestation verify --bundle` passed for all eleven provenance subjects,
+with repository, workflow, exact source digest and hosted-runner constraints.
+Files are under ignored `out/storage-ci-105ecd5/`. Real Mint desktop/FUSE testing
+of these new portable artifacts remains a manual check; CI uses Xvfb and
+extraction-and-run. The existing 0.5.0 draft/tag/assets remain unchanged.
+The downloaded attested Windows portable EXE also passed local startup after
+being copied/renamed alone: adjacent settings, ignored capture variables,
+no F12/Control+F12 captures and clean exit (`out/storage-ci-startup-20261030-063230/`).
 
 ## Screenshot cleanup, unreleased (2026-10-30)
 

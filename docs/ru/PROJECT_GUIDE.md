@@ -281,11 +281,11 @@ Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'G
 & (Join-Path $qa 'Game.exe')
 ```
 
-Доступные hooks:
-
 Для Windows QA используйте отдельную копию portable Debug-бинарника, как выше,
 чтобы не менять личный LocalAppData. В обычной Linux Debug-сборке задавайте
 изолированные абсолютные XDG-пути. Переименование сохраняет portable-режим.
+
+Доступные hooks:
 
 - `ARROWPUZZLE_SEED` — воспроизводимый seed;
 - `ARROWPUZZLE_DIFFICULTY` — сложность 1..4;
@@ -340,10 +340,13 @@ Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'G
 - raylib 5.5: zlib/libpng, `THIRD_PARTY_NOTICES.md`.
 - Inter 4.1: SIL OFL 1.1, `assets/fonts/Inter-LICENSE.txt`.
 
-Версия проекта в CMake — `0.4.0`; опубликованные релизы следует проверять в
-GitHub Releases. Релизный ZIP содержит автономный `ArrowPuzzle.exe`, оба README,
+Версия проекта в CMake — `0.5.0`; опубликованные релизы следует проверять в
+GitHub Releases. Релизный ZIP содержит автономный `ArrowPuzzle.exe` либо
+`ArrowPuzzle-portable.exe`, оба README,
 changelog, документацию со скриншотами и лицензии. Перед публикацией нужны
 чистая Release-сборка, полный `ctest`, запуск распакованного EXE и SHA-256.
+Сценарий создаёт шесть обычных/portable-пакетов: Windows ZIP и Linux tar.gz/AppImage;
+расположение данных и имена описаны в [руководстве по релизам](RELEASING.md).
 Тег `vX.Y.Z` запускает GitHub Actions, создающий проверяемые attestations и
 черновик релиза от `github-actions[bot]`. Push в ветки и PR запускают отдельный
 workflow **Build and test**: проверки и артефакты Linux/Windows без публикации релиза.
