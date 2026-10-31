@@ -37,6 +37,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Interface languages, Auto locale, embedded CJK font | [Localization notes](localization.md), [runtime guide](../docs/en/RUNTIME.md#interface-localization) | `Localization.cpp`, `UiText.cpp`, `MenuScreen.cpp`, `Persistence.cpp` |
 | Release procedure and verification | [Release guide](../docs/en/RELEASING.md) | `cmake/`, `tools/`, `.github/workflows/` |
 | Previously verified release evidence | [Release history](release-history.md) | Tagged source and Actions run |
+| Microsoft Store account, GDK publication path and submission planning | [Store planning](microsoft-store.md) | Store packaging not implemented yet |
 
 Technical facts and procedures live in [English docs](../docs/en/README.md), with
 a matching [Russian edition](../docs/ru/README.md), and serve both developers and
