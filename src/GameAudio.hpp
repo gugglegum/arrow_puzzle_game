@@ -22,6 +22,7 @@ public:
     void playDefeat();
     void playVictory();
     void playFirework();
+    void playHint();
     void stop();
     void release();
     [[nodiscard]] bool ready() const noexcept;
@@ -37,6 +38,7 @@ private:
     Sound defeatSource_{};
     Sound victorySource_{};
     Sound fireworkSource_{};
+    Sound hintSource_{};
     std::array<Sound, 4> launchVoices_{};
     std::array<Sound, 3> fireworkVoices_{};
     std::size_t nextVoice_{};

@@ -4,6 +4,32 @@ Snapshot: 2026-10-30, after publication and verification of 0.5.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Unlimited timed hints, development after 0.5.0 (2026-10-31)
+
+The accepted lightbulb sits immediately left of mute and starts gray. After
+30 seconds of focused gameplay without a fully exited arrow it becomes yellow;
+failed launches do not reset it. Menu/unfocused/generation/result time is
+excluded. Same-process Menu/Resume preserves the timer and highlight, whereas
+launching a new game or loading after restarting begins locked. While any
+arrow moves, hints wait for the board to settle. Each accepted click uniformly
+chooses a safe remaining arrow; the full path/head stays yellow until any launch.
+Repeated hints are unlimited and do not consume availability. The original
+two-note embedded chime respects mute; reproduce it with `tools/generate-hint.py`.
+
+`Hints.cpp` checks shared occupancy and exact self-tail vacancy ticks once per
+click, independently tested against `Board::canExit` through 24 complete small
+puzzles (loops on/off), plus a dense 160x160 board. Timer transition participates
+in idle redraw; a hint rebuilds static geometry only when selected/cleared.
+Windows ordinary/portable Release builds and all seven default suites pass.
+The six-effect mixer/mute tests and eight-language glyph/layout tests pass;
+the Chinese subset includes the new tooltip glyphs. An isolated production
+controller probe passes exact unlock, disabled/repeated clicks, focus/menu,
+resume, success reset, motion exclusion and failed-launch/recovery behavior.
+Dark/Light captures at 1100x900 and 720x600 were inspected. Probe/evidence are
+ignored under `out/hints/`; the probe injects frame duration and input around
+production controller code and does not establish native Linux desktop behavior.
+No release/tag change is part of this work.
+
 ## Release 0.5.0 published (2026-10-30)
 
 Public stable Latest 0.5.0 is published from `8f311b1`, with all six packages

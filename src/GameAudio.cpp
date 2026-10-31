@@ -35,8 +35,10 @@ bool GameAudio::load() {
     defeatSource_ = loadEmbeddedSound(assets::kDefeatWav, assets::kDefeatWavSize);
     victorySource_ = loadEmbeddedSound(assets::kVictoryWav, assets::kVictoryWavSize);
     fireworkSource_ = loadEmbeddedSound(assets::kFireworkWav, assets::kFireworkWavSize);
+    hintSource_ = loadEmbeddedSound(assets::kHintWav, assets::kHintWavSize);
     if (IsSoundValid(launchSource_) && IsSoundValid(collisionSource_) &&
-        IsSoundValid(defeatSource_) && IsSoundValid(victorySource_) && IsSoundValid(fireworkSource_)) {
+        IsSoundValid(defeatSource_) && IsSoundValid(victorySource_) && IsSoundValid(fireworkSource_) &&
+        IsSoundValid(hintSource_)) {
         loaded_ = true;
         for (Sound& voice : launchVoices_) {
             voice = LoadSoundAlias(launchSource_);
@@ -110,6 +112,12 @@ void GameAudio::playFirework() {
 
 void GameAudio::stop() { stopVoices(); }
 
+void GameAudio::playHint() {
+    if (!enabled_ || !loaded_) return;
+    StopSound(hintSource_);
+    PlaySound(hintSource_);
+}
+
 void GameAudio::playArrowLaunch() {
     if (!enabled_ || !loaded_) return;
     for (std::size_t offset = 0; offset < launchVoices_.size(); ++offset) {
@@ -135,7 +143,7 @@ void GameAudio::stopLaunches() {
 void GameAudio::stopVoices() {
     stopLaunches();
     stopFireworks();
-    for (const Sound sound : {collisionSource_, defeatSource_, victorySource_}) {
+    for (const Sound sound : {collisionSource_, defeatSource_, victorySource_, hintSource_}) {
         if (sound.stream.buffer != nullptr) StopSound(sound);
     }
 }
@@ -157,7 +165,7 @@ void GameAudio::release() {
         if (voice.stream.buffer != nullptr) UnloadSoundAlias(voice);
         voice = {};
     }
-    for (Sound* sound : {&launchSource_, &collisionSource_, &defeatSource_, &victorySource_, &fireworkSource_}) {
+    for (Sound* sound : {&launchSource_, &collisionSource_, &defeatSource_, &victorySource_, &fireworkSource_, &hintSource_}) {
         if (sound->stream.buffer != nullptr) UnloadSound(*sound);
         *sound = {};
     }

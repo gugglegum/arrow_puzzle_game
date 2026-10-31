@@ -153,6 +153,7 @@ another arrow's speed.
 | Space | Change the selected setting, including theme and language |
 | Top-left back arrow | Save the unfinished game and return to the menu |
 | HUD speaker button | Toggle sound |
+| HUD lightbulb button | Highlight a random safe arrow after 30 seconds without progress |
 | F11 or Left Alt+Enter | Toggle fullscreen |
 | Escape | Leave fullscreen, return to the menu, or close the main menu |
 | R | Generate a new board when no arrow is moving |

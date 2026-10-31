@@ -190,6 +190,20 @@ draws the supplied selection.
 The back arrow left of the title uses the same save/menu path as Escape; the
 speaker button changes the shared persisted sound preference.
 
+The lightbulb immediately left of the speaker starts gray. `HintState` counts
+30 seconds of focused gameplay without a completed arrow exit; menu time,
+generation, unfocused time and finished games do not count. Successful exits
+reset the timer; failed launches do not. Menu/Resume within the same process
+preserves the timer and selection, while a fresh/restored session starts locked.
+Hints wait for all arrows to stop, then each click uniformly chooses a safe
+remaining arrow and colors its whole path/head yellow until the next launch.
+Repeated hints have no limit and do not restart the timer. `Hints.cpp` builds
+occupancy once per click and checks exit rays, including the exact tick each
+self-body cell vacates; it does not run the generator or mutate the board.
+The hint recolors cached idle geometry once; the availability transition is
+part of the idle redraw state. The embedded two-note chime follows mute and
+the existing audio stop/release lifecycle. All tooltip strings are localized.
+
 ## 9. Rendering and performance
 
 Static arrows and grid dots use two cache levels:

@@ -74,6 +74,8 @@ int main(int argc, char** argv) {
              arrow::assets::kVictoryWavSize, 53760, &arrow::GameAudio::playVictory},
             {"firework-burst.wav", arrow::assets::kFireworkWav,
              arrow::assets::kFireworkWavSize, 46080, &arrow::GameAudio::playFirework},
+            {"hint-chime.wav", arrow::assets::kHintWav,
+             arrow::assets::kHintWavSize, 23040, &arrow::GameAudio::playHint},
         };
         require(!audio.ready() && !IsAudioDeviceReady(), "Audio opened before being enabled");
         for (const Effect& effect : effects) (audio.*effect.play)();
@@ -92,7 +94,7 @@ int main(int argc, char** argv) {
             }
             if (effect.play == &arrow::GameAudio::playArrowLaunch) {
                 maximumGameplayPeak += sourcePeak * 4 * 0.45F;
-            } else if (effect.play == &arrow::GameAudio::playCollision) {
+            } else if (effect.play == &arrow::GameAudio::playCollision || effect.play == &arrow::GameAudio::playHint) {
                 maximumGameplayPeak += sourcePeak * 0.45F;
             }
             UnloadWaveSamples(samples);
@@ -178,7 +180,7 @@ int main(int argc, char** argv) {
         attached = false;
         audio.release();
         require(!audio.ready() && !IsAudioDeviceReady(), "Audio resources did not close");
-        std::cout << "Audio tests passed: five exact embedded WAVs, fireworks, all effects, lazy init, overlap, mute, pause, re-enable, cleanup.\n"
+        std::cout << "Audio tests passed: six exact embedded WAVs, hints, fireworks, all effects, lazy init, overlap, mute, pause, re-enable, cleanup.\n"
                   << "Mixer peaks: single=" << singlePeak << " four=" << overlapPeak
                   << " collision+four=" << combinedPeak << " bound=" << maximumGameplayPeak << '\n';
         return 0;

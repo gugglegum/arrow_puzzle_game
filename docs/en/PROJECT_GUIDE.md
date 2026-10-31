@@ -129,6 +129,7 @@ CMake targets:
 - `arrow_tests`: generator, level quality, kinematics, and collisions;
 - `arrow_persistence_tests`: settings and saved games;
 - `arrow_localization_tests`: catalogs, language cycling and system locale resolution;
+- `arrow_hint_tests`: delay/reset, random safe choices, tail passes and self-collisions;
 - `arrow_menu_selection_tests`: window-free menu-selection logic;
 - `arrow_board_pointer_tests`: window-free click/drag and launch-cancellation checks;
 - `arrow_end_screen_tests`: window-free result-state/timing checks.

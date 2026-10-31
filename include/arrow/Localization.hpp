@@ -16,7 +16,7 @@ enum class Text {
     ArrowLoops, FlyingCollisions, CrosshairGuides, Sounds, LeftButtonDrag, BoardTheme, InterfaceLanguage,
     LoopsDetail, CollisionsDetail, GuidesDetail, SoundsDetail, LeftButtonDragDetail, ThemeDetail, LanguageDetail,
     On, Off, Light, Dark, MenuHint, DifficultyHint, SettingsHint, BackgroundGeneration,
-    SoundsOn, SoundsOff, Help, HelpCompact, HelpMiddleDrag, HelpMiddleDragCompact,
+    SoundsOn, SoundsOff, Hint, HintWaiting, HintSettling, Help, HelpCompact, HelpMiddleDrag, HelpMiddleDragCompact,
     Generating, GenerationFailed, Arrows,
     GeneratingLevel, SearchingPuzzle, RetryGeneration, GenerationErrorDetail,
     FinishingGeneration, ClosingGame, PuzzleComplete, OutOfLives, YouWon, GameOver,

@@ -1,6 +1,7 @@
 #include "arrow/Game.hpp"
 
 #include "arrow/Generator.hpp"
+#include "arrow/Hints.hpp"
 #include "arrow/MotionKinematics.hpp"
 #include "arrow/MotionResolver.hpp"
 #include "arrow/Persistence.hpp"
@@ -184,6 +185,10 @@ struct PlayingFrameState {
     BoardTheme boardTheme;
     bool soundButtonHovered;
     bool soundButtonPressed;
+    bool hintButtonEnabled;
+    bool hintButtonHovered;
+    bool hintButtonPressed;
+    bool hintTimerReady;
     bool menuButtonHovered;
     bool menuButtonPressed;
     std::optional<int> endButtonHovered;
@@ -251,6 +256,39 @@ Rectangle soundButtonRectangle() {
 
 Rectangle hudMenuButtonRectangle() {
     return {22.0F, 21.0F, 40.0F, 40.0F};
+}
+
+Rectangle hintButtonRectangle() {
+    return {soundButtonRectangle().x - 54.0F, 21.0F, 44.0F, 40.0F};
+}
+
+Color hintColor(const BoardPalette& palette) {
+    return palette.brightenGuides ? Color{255, 211, 64, 255} : Color{195, 145, 0, 255};
+}
+
+void drawHintButton(UiText& font, bool enabled, bool timerReady, bool hovered, bool pressed,
+                    const BoardPalette& palette, Language language) {
+    const Rectangle bounds = hintButtonRectangle();
+    const Color ink = enabled ? hintColor(palette) : palette.muted;
+    const Color fill = enabled && hovered && pressed ? palette.buttonPressed
+        : enabled && hovered ? palette.buttonHovered : palette.button;
+    DrawRectangleRounded(bounds, 0.22F, 8, fill);
+    DrawRectangleRoundedLinesEx(bounds, 0.22F, 8, 1.0F, enabled ? ink : palette.border);
+    const Vector2 center{bounds.x + bounds.width * 0.5F, bounds.y + bounds.height * 0.5F - 3.0F};
+    DrawRing(center, 6.5F, 8.3F, 140.0F, 400.0F, 32, ink);
+    DrawLineEx({center.x - 5, center.y + 5}, {center.x - 4, center.y + 11}, 1.8F, ink);
+    DrawLineEx({center.x + 5, center.y + 5}, {center.x + 4, center.y + 11}, 1.8F, ink);
+    DrawLineEx({center.x - 4, center.y + 11}, {center.x + 4, center.y + 11}, 1.8F, ink);
+    DrawLineEx({center.x - 2, center.y + 14}, {center.x + 2, center.y + 14}, 1.8F, ink);
+    if (enabled) {
+        DrawLineEx({center.x, center.y - 11}, {center.x, center.y - 14}, 1.8F, ink);
+        DrawLineEx({center.x - 11, center.y - 6}, {center.x - 14, center.y - 8}, 1.8F, ink);
+        DrawLineEx({center.x + 11, center.y - 6}, {center.x + 14, center.y - 8}, 1.8F, ink);
+    }
+    if (hovered) {
+        drawCenteredText(font, translate(enabled ? Text::Hint : timerReady ? Text::HintSettling : Text::HintWaiting, language),
+                         bounds.x + bounds.width * 0.5F, 4.0F, kMenuVersionText, palette.muted);
+    }
 }
 
 void drawHudMenuButton(UiText& font, bool hovered, bool pressed, const BoardPalette& palette, Language language) {
@@ -483,11 +521,11 @@ void drawArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const B
     );
 }
 
-void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const BoardPalette& palette) {
+void cacheIdleArrow(StaticBoardGeometry& geometry, const RuntimeArrow& value, const BoardPalette& palette, bool hinted) {
     if (value.cells.empty()) {
         return;
     }
-    const Color color = value.failed ? palette.error : palette.ink;
+    const Color color = hinted ? hintColor(palette) : value.failed ? palette.error : palette.ink;
     const Vector2 head = cellCenter(value.cells.front());
     addArrowStroke(geometry, value.cells.size(),
                    [&value](std::size_t index) { return cellCenter(value.cells[index]); },
@@ -501,7 +539,8 @@ void cacheIdleBoardGeometry(
     const Board& board,
     std::span<const RuntimeArrow> arrows,
     std::vector<std::uint8_t>& occupied,
-    const BoardPalette& palette
+    const BoardPalette& palette,
+    std::optional<std::size_t> hinted
 ) {
     geometry.begin();
     occupied.assign(
@@ -527,9 +566,10 @@ void cacheIdleBoardGeometry(
             }
         }
     }
-    for (const RuntimeArrow& value : arrows) {
+    for (std::size_t index = 0; index < arrows.size(); ++index) {
+        const RuntimeArrow& value = arrows[index];
         if (value.present && value.motion == Motion::Idle) {
-            cacheIdleArrow(geometry, value, palette);
+            cacheIdleArrow(geometry, value, palette, hinted == index);
         }
     }
     geometry.finish();
@@ -880,6 +920,9 @@ int Game::run() {
     // board data, which is moved into the live game at a frame boundary.
     Board board(20, 20, {});
     std::vector<RuntimeArrow> arrows;
+    HintState hints;
+    std::optional<HintState> pausedHints;
+    std::mt19937 hintRandom(seed ^ 0x48494E54U);
     std::unordered_set<std::uint64_t> movingContacts;
     double movingCollisionPauseRemaining = 0.0;
     double forwardTimeDebt = 0.0;
@@ -892,6 +935,7 @@ int Game::run() {
     BoardPointerGesture boardPointer;
     std::optional<int> pressedMenuButton;
     bool pressedSoundButton = false;
+    bool pressedHintButton = false;
     bool pressedHudMenuButton = false;
     std::optional<int> pressedEndButton;
     MenuSelection menuSelection;
@@ -972,6 +1016,8 @@ int Game::run() {
         staticBoardGeometryDirty = true;
     };
     auto resetRuntime = [&](const SavedGame* restored = nullptr) {
+        hints.reset();
+        pressedHintButton = false;
         endScreen.reset();
         pressedEndButton.reset();
         arrows.clear();
@@ -1182,6 +1228,7 @@ int Game::run() {
         if (generationInProgress) {
             return;
         }
+        pausedHints.reset();
         options.allowArrowLoops = settings.arrowLoops;
         endScreen.reset();
         pressedEndButton.reset();
@@ -1253,6 +1300,7 @@ int Game::run() {
             );
             updateBoardDimensions();
             resetRuntime(&restored);
+            if (pausedHints) hints = *std::exchange(pausedHints, std::nullopt);
             lives = restoredLives;
             currentGeneratorOptions =
                 optionsForDimensions(
@@ -1310,7 +1358,8 @@ int Game::run() {
     };
 
     const auto returnToMainMenu = [&]() {
-        (void)persistCurrentGame();
+        if (persistCurrentGame() && resumeAvailable) pausedHints = hints;
+        else pausedHints.reset();
         gameAudio.stop();
         endScreen.reset();
         pressedEndButton.reset();
@@ -1318,6 +1367,7 @@ int Game::run() {
         boardPointer.reset();
         pressedMenuButton.reset();
         pressedSoundButton = false;
+        pressedHintButton = false;
         pressedHudMenuButton = false;
         menuSelection.reset();
         screen = Screen::MainMenu;
@@ -1391,6 +1441,7 @@ int Game::run() {
         std::size_t arrowIndex
     ) {
         RuntimeArrow& value = arrows[arrowIndex];
+        hints.highlighted.reset();
         clearMovingContactsFor(arrowIndex);
         value.motion = Motion::Forward;
         value.progress = 0.0;
@@ -1665,6 +1716,7 @@ int Game::run() {
                 committed = true;
 
                 if (allOutside(value, board)) {
+                    hints.reset();
                     value.present = false;
                     value.history.clear();
                     value.motion = Motion::Idle;
@@ -1718,7 +1770,7 @@ int Game::run() {
 
         if (staticBoardGeometryDirty) {
             cacheIdleBoardGeometry(staticBoardGeometry, board, arrows, idleBoardOccupancy,
-                                   boardPalette(settings.boardTheme));
+                                   boardPalette(settings.boardTheme), hints.highlighted);
             staticBoardGeometryDirty = false;
         }
 
@@ -1846,6 +1898,7 @@ int Game::run() {
         }
         if (screen != Screen::Playing) {
             pressedSoundButton = false;
+            pressedHintButton = false;
             pressedHudMenuButton = false;
             const Screen menuScreen = screen;
             const MenuScreen::Page menuPage = menuScreen == Screen::MainMenu ? MenuScreen::Page::Main
@@ -2379,6 +2432,10 @@ int Game::run() {
             generationError.empty() &&
             !anyArrowRecovering &&
             movingCollisionPauseRemaining <= 0.0F;
+        if (activeGame && IsWindowFocused() && !generationBlocksInput && !endScreen.active() && lives > 0) {
+            hints.advance(delta);
+        }
+        const bool hintButtonEnabled = hints.ready() && launchInputAvailable && !anyArrowInMotion;
         const bool leftPressed =
             IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
         const bool leftReleased =
@@ -2397,16 +2454,20 @@ int Game::run() {
         }
         const bool soundButtonHovered = IsWindowFocused() &&
             CheckCollisionPointRec(mouse, soundButtonRectangle());
+        const bool hintButtonHovered = IsWindowFocused() && !generationBlocksInput && !endScreen.active() &&
+            CheckCollisionPointRec(mouse, hintButtonRectangle());
         const bool hudMenuButtonHovered = IsWindowFocused() &&
             CheckCollisionPointRec(mouse, hudMenuButtonRectangle());
         const std::optional<int> endButtonHovered = IsWindowFocused()
             ? endScreen.buttonAt(mouse, GetScreenWidth(), GetScreenHeight(), kHudHeight) : std::nullopt;
         if (!IsWindowFocused() || (!leftDown && !leftReleased)) {
             pressedSoundButton = false;
+            pressedHintButton = false;
             pressedHudMenuButton = false;
             pressedEndButton.reset();
         }
         if (leftPressed) {
+            pressedHintButton = hintButtonEnabled && CheckCollisionPointRec(pressMouse, hintButtonRectangle());
             pressedSoundButton = IsWindowFocused() &&
                 CheckCollisionPointRec(pressMouse, soundButtonRectangle());
             pressedHudMenuButton = IsWindowFocused() &&
@@ -2422,6 +2483,16 @@ int Game::run() {
             }
             if (std::exchange(pressedSoundButton, false) && soundButtonHovered) {
                 setSoundsEnabled(!settings.sounds);
+            }
+            if (std::exchange(pressedHintButton, false) && hintButtonHovered && hintButtonEnabled) {
+                std::vector<bool> present;
+                present.reserve(arrows.size());
+                for (const RuntimeArrow& value : arrows) present.push_back(value.present);
+                hints.highlighted = chooseHint(board, present, hintRandom);
+                if (hints.highlighted) {
+                    invalidateStaticBoard();
+                    gameAudio.playHint();
+                }
             }
             const std::optional<int> endAction = std::exchange(pressedEndButton, std::nullopt);
             if (endAction.has_value() && endAction == endButtonHovered) {
@@ -2927,6 +2998,10 @@ int Game::run() {
             settings.boardTheme,
             soundButtonHovered,
             pressedSoundButton,
+            hintButtonEnabled && !endScreen.active(),
+            hintButtonHovered,
+            pressedHintButton,
+            hints.ready(),
             hudMenuButtonHovered,
             pressedHudMenuButton,
             endButtonHovered,
@@ -3011,7 +3086,7 @@ int Game::run() {
                 : std::string(tr(Text::Arrows)) + "  " + std::to_string(remaining);
         TextStyle countStyle = kHudText;
         const float countLeft = 80.0F + brandSize.x + 20.0F;
-        const float countRight = soundButtonRectangle().x - 16.0F;
+        const float countRight = hintButtonRectangle().x - 16.0F;
         const float countWidth = std::max(1.0F, countRight - countLeft);
         const float measuredCountWidth = measureText(uiText, countText.c_str(), countStyle).x;
         if (measuredCountWidth > countWidth) {
@@ -3035,6 +3110,8 @@ int Game::run() {
         );
         drawHudMenuButton(uiText, hudMenuButtonHovered, pressedHudMenuButton, palette, uiLanguage);
         drawSoundButton(uiText, settings.sounds, soundButtonHovered, pressedSoundButton, palette, uiLanguage);
+        drawHintButton(uiText, hintButtonEnabled && !endScreen.active(), hints.ready(), hintButtonHovered,
+                       pressedHintButton, palette, uiLanguage);
         for (int index = 0; index < 3; ++index) {
             drawHeart(
                 {

@@ -55,6 +55,7 @@ FetchContent_MakeAvailable(raylib)
 
 add_library(arrow_core STATIC
     src/Board.cpp
+    src/Hints.cpp
     src/Generator.cpp
     src/FrontierGenerator.cpp
     src/MotionKinematics.cpp
@@ -136,6 +137,7 @@ arrow_embed_sound(c3-metal-clack.wav kCollisionWav)
 arrow_embed_sound(d4-retro-fail.wav kDefeatWav)
 arrow_embed_sound(v3-glass-chord.wav kVictoryWav)
 arrow_embed_sound(firework-burst.wav kFireworkWav)
+arrow_embed_sound(hint-chime.wav kHintWav)
 
 foreach(size 16 24 32 48 64 128 256)
     set(source "${CMAKE_CURRENT_BINARY_DIR}/generated/AppIcon${size}.cpp")
@@ -251,6 +253,10 @@ if(ARROWPUZZLE_BUILD_TESTS)
         target_compile_options(arrow_localization_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME arrow_localization_tests COMMAND arrow_localization_tests)
+
+    add_executable(arrow_hint_tests tests/HintTests.cpp)
+    target_link_libraries(arrow_hint_tests PRIVATE arrow_core)
+    add_test(NAME arrow_hint_tests COMMAND arrow_hint_tests)
 
     # Explicit measurement tool: run each seed in a fresh process. It reports
     # generation time/peak working set separately from independent verification.
