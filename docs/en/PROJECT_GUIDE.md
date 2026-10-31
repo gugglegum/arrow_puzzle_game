@@ -289,7 +289,7 @@ Available hooks:
 - `ARROWPUZZLE_DIFFICULTY`: difficulty 1..4;
 - `ARROWPUZZLE_SCREENSHOT`: output PNG and automatic exit;
 - `ARROWPUZZLE_SCREENSHOT_FRAME`: frame number for capture;
-- `ARROWPUZZLE_SCREENSHOT_MENU`: Main/New game/Settings as 1..3;
+- `ARROWPUZZLE_SCREENSHOT_MENU`: Main/New game/Settings/Saved games as 1..4;
 - `ARROWPUZZLE_SCREENSHOT_REMOVE`: hide the first N arrows;
 - `ARROWPUZZLE_SCREENSHOT_LAUNCH`: launch an arrow by index;
 - `ARROWPUZZLE_SCREENSHOT_LAUNCH_2`: launch a second arrow;

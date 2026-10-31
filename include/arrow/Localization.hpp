@@ -21,6 +21,10 @@ enum class Text {
     GeneratingLevel, SearchingPuzzle, RetryGeneration, GenerationErrorDetail,
     FinishingGeneration, ClosingGame, PuzzleComplete, OutOfLives, YouWon, GameOver,
     VictoryDetail, DefeatDetail, PlayAgain, EndHint,
+    Saves, SavesDetail, SavesSubtitle, CreateSave, CreateSaveDetail, LoadSave, RenameSave,
+    DeleteSave, DeleteSaveQuestion, DeleteSaveDetail, SaveName, SaveNameHint, Save, Cancel,
+    PreviousPage, NextPage, EmptySaves, SaveSuccess, SaveError, SaveUnreadable, NameInvalid,
+    LoadSaveDetail, Lives, PageNumber,
     Count
 };
 

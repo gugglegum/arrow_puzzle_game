@@ -227,8 +227,17 @@ When the game returns to the menu or exits with an uncleared board and at
 least one life remaining, it writes `savegame.txt`. The save contains the
 complete geometry, remaining and failed-arrow flags, and life count; it does
 not depend on a seed or the current generator implementation. Resume game is
-disabled when there is no valid unfinished game. Both text files are stored
-in the same directory as `ArrowPuzzle.exe`.
+disabled when there is no valid unfinished game. Storage follows the ordinary
+or portable location described above.
+
+For a separate snapshot, return to the menu and open **Saved games → Create
+save**. Keep the suggested date/time and board-size name or enter your own
+(up to 80 characters). The list shows creation time, size, remaining arrows and
+lives. Select a snapshot to load, rename or delete it; deletion asks for
+confirmation. Loading opens a copy, so the original snapshot remains available
+for another attempt. Finishing a game only clears the automatic Resume snapshot.
+Manual snapshots stay until you delete them. Each is a self-contained `.arrow`
+file under `saves/` beside `savegame.txt`; copy that folder when moving your data.
 
 ## Building on Linux
 

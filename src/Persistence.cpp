@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -660,14 +661,22 @@ bool Persistence::setLanguage(Settings& settings, Language language) const noexc
     return true;
 }
 
-std::optional<SavedGame> Persistence::loadSavedGame() const noexcept {
+namespace {
+struct SaveFile {
+    SavedGame game;
+    std::string name;
+    std::int64_t created{};
+};
+
+std::optional<SaveFile> readSaveFile(const std::filesystem::path& path, bool manual) noexcept {
     try {
-        std::ifstream input(saveGamePath(), std::ios::binary);
+        std::ifstream input(path, std::ios::binary);
         if (!input) {
             return std::nullopt;
         }
 
-        SavedGame game;
+        SaveFile file;
+        SavedGame& game = file.game;
         std::string line;
         std::string_view key;
         std::string_view value;
@@ -681,8 +690,19 @@ std::optional<SavedGame> Persistence::loadSavedGame() const noexcept {
             return std::nullopt;
         }
         int version{};
-        if (!parseInt(value, version) || version != kSaveGameVersion) {
+        if (!parseInt(value, version) || version != (manual ? 2 : kSaveGameVersion)) {
             return std::nullopt;
+        }
+
+        if (manual) {
+            if (!readLine(input, line) || !splitAssignment(line, key, value) || key != "name" ||
+                !isValidSaveName(value)) return std::nullopt;
+            file.name = value;
+            if (!readLine(input, line) || !splitAssignment(line, key, value) || key != "created")
+                return std::nullopt;
+            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), file.created);
+            if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || file.created <= 0)
+                return std::nullopt;
         }
 
         if (!readLine(input, line) ||
@@ -751,22 +771,24 @@ std::optional<SavedGame> Persistence::loadSavedGame() const noexcept {
             return std::nullopt;
         }
         return isValidSavedGame(game)
-            ? std::optional<SavedGame>{std::move(game)}
+            ? std::optional<SaveFile>{std::move(file)}
             : std::nullopt;
     } catch (...) {
         return std::nullopt;
     }
 }
 
-bool Persistence::saveSavedGame(const SavedGame& game) const noexcept {
+bool writeSaveFile(const std::filesystem::path& path, const SavedGame& game,
+                   const SaveFile* metadata = nullptr) {
     if (!isValidSavedGame(game)) {
         return false;
     }
 
-    return writeAtomically(saveGamePath(), [&game](std::ostream& output) {
+    return writeAtomically(path, [&game, metadata](std::ostream& output) {
         output << "format=" << kSaveGameFormat << '\n'
-               << "version=" << kSaveGameVersion << '\n'
-               << "columns=" << game.columns << '\n'
+               << "version=" << (metadata ? 2 : kSaveGameVersion) << '\n';
+        if (metadata) output << "name=" << metadata->name << '\n' << "created=" << metadata->created << '\n';
+        output << "columns=" << game.columns << '\n'
                << "rows=" << game.rows << '\n'
                << "lives=" << game.lives << '\n'
                << "arrow_count=" << game.arrows.size() << '\n';
@@ -790,6 +812,122 @@ bool Persistence::saveSavedGame(const SavedGame& game) const noexcept {
         output << "end=1\n";
         return static_cast<bool>(output);
     });
+}
+
+bool validSaveId(std::string_view id) noexcept {
+    return !id.empty() && id.size() <= 64 && std::ranges::all_of(id, [](char c) {
+        return (c >= '0' && c <= '9') || c == '-';
+    });
+}
+} // namespace
+
+bool isValidSaveName(std::string_view name) noexcept {
+    if (name.empty() || name.size() > 320 || name.front() == ' ' || name.back() == ' ') return false;
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < name.size();) {
+        const auto first = static_cast<unsigned char>(name[i++]);
+        unsigned code = first;
+        int extra = 0;
+        if (first >= 0xC2 && first <= 0xDF) { code = first & 0x1F; extra = 1; }
+        else if (first >= 0xE0 && first <= 0xEF) { code = first & 0x0F; extra = 2; }
+        else if (first >= 0xF0 && first <= 0xF4) { code = first & 0x07; extra = 3; }
+        else if (first >= 0x80) return false;
+        const int length = extra;
+        while (extra-- > 0) {
+            if (i == name.size()) return false;
+            const auto next = static_cast<unsigned char>(name[i++]);
+            if ((next & 0xC0) != 0x80) return false;
+            code = (code << 6) | (next & 0x3F);
+        }
+        if ((length == 1 && code < 0x80) || (length == 2 && code < 0x800) ||
+            (length == 3 && code < 0x10000) || code > 0x10FFFF ||
+            (code >= 0xD800 && code <= 0xDFFF) || code < 0x20 ||
+            (code >= 0x7F && code <= 0x9F) || code == 0x2028 || code == 0x2029) return false;
+        if (++count > 80) return false;
+    }
+    return true;
+}
+
+std::optional<SavedGame> Persistence::loadSavedGame() const noexcept {
+    try {
+        auto file = readSaveFile(saveGamePath(), false);
+        return file ? std::optional<SavedGame>{std::move(file->game)} : std::nullopt;
+    } catch (...) { return std::nullopt; }
+}
+
+bool Persistence::saveSavedGame(const SavedGame& game) const noexcept {
+    try { return writeSaveFile(saveGamePath(), game); }
+    catch (...) { return false; }
+}
+
+std::filesystem::path Persistence::manualSavesDirectory() const { return saveDirectory_ / "saves"; }
+
+std::optional<SaveCatalog> Persistence::listManualSaves() const noexcept {
+    try {
+        SaveCatalog result;
+        const auto directory = manualSavesDirectory();
+        if (!std::filesystem::exists(directory)) return result;
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            if (entry.path().extension() != ".arrow" || !entry.is_regular_file()) continue;
+            const auto id = entry.path().stem().string();
+            if (!validSaveId(id)) continue;
+            const auto file = readSaveFile(entry.path(), true);
+            if (!file) { ++result.unreadable; continue; }
+            const auto& game = file->game;
+            result.entries.push_back({id, file->name, file->created, game.columns, game.rows, game.lives,
+                static_cast<std::size_t>(std::ranges::count(game.present, true)), game.arrows.size()});
+        }
+        std::ranges::sort(result.entries, [](const ManualSave& a, const ManualSave& b) {
+            return a.created != b.created ? a.created > b.created : a.id > b.id;
+        });
+        return result;
+    } catch (...) { return std::nullopt; }
+}
+
+std::optional<std::string> Persistence::createManualSave(const SavedGame& game, std::string_view name) const noexcept {
+    try {
+        if (!isValidSaveName(name) || !isValidSavedGame(game)) return std::nullopt;
+        const auto now = std::chrono::system_clock::now().time_since_epoch();
+        const auto stamp = std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+        SaveFile metadata;
+        metadata.name = name;
+        metadata.created = std::chrono::duration_cast<std::chrono::seconds>(now).count();
+        for (int suffix = 0; suffix < 10000; ++suffix) {
+            const std::string id = std::to_string(stamp) + "-" + std::to_string(suffix);
+            const auto path = manualSavesDirectory() / (id + ".arrow");
+            if (std::filesystem::exists(path)) continue;
+            if (!writeSaveFile(path, game, &metadata)) return std::nullopt;
+            return id;
+        }
+    } catch (...) {}
+    return std::nullopt;
+}
+
+std::optional<SavedGame> Persistence::loadManualSave(std::string_view id) const noexcept {
+    try {
+        if (!validSaveId(id)) return std::nullopt;
+        auto file = readSaveFile(manualSavesDirectory() / (std::string(id) + ".arrow"), true);
+        return file ? std::optional<SavedGame>{std::move(file->game)} : std::nullopt;
+    } catch (...) { return std::nullopt; }
+}
+
+bool Persistence::renameManualSave(std::string_view id, std::string_view name) const noexcept {
+    try {
+        if (!validSaveId(id) || !isValidSaveName(name)) return false;
+        const auto path = manualSavesDirectory() / (std::string(id) + ".arrow");
+        auto file = readSaveFile(path, true);
+        if (!file) return false;
+        file->name = name;
+        return writeSaveFile(path, file->game, &*file);
+    } catch (...) { return false; }
+}
+
+bool Persistence::removeManualSave(std::string_view id) const noexcept {
+    try {
+        if (!validSaveId(id)) return false;
+        std::filesystem::remove(manualSavesDirectory() / (std::string(id) + ".arrow"));
+        return true;
+    } catch (...) { return false; }
 }
 
 bool Persistence::removeSavedGame() const noexcept {

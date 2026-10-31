@@ -267,14 +267,32 @@ struct UiText::Impl {
 #endif
     }
 
-    Font fallback(int size, bool cjk) {
+    Font fallback(int size, bool cjk, const char* text) {
         const auto key = std::pair{size, cjk};
-        if (const auto found = fallbackFonts.find(key); found != fallbackFonts.end()) {
-            return found->second;
-        }
         static auto latinCodepoints = codepointsForFont(false);
         static auto cjkCodepoints = codepointsForFont(true);
-        auto& codepoints = cjk ? cjkCodepoints : latinCodepoints;
+        auto codepoints = cjk ? cjkCodepoints : latinCodepoints;
+        const auto found = fallbackFonts.find(key);
+        if (found != fallbackFonts.end()) {
+            codepoints.clear();
+            for (int i = 0; i < found->second.glyphCount; ++i) codepoints.push_back(found->second.glyphs[i].value);
+        }
+        const auto previousCount = codepoints.size();
+        // Save titles are user text, so their letters need not appear in the UI catalog.
+        for (const char* p = text; *p;) {
+            int bytes = 0;
+            codepoints.push_back(GetCodepointNext(p, &bytes));
+            p += bytes;
+        }
+        std::ranges::sort(codepoints);
+        codepoints.erase(std::unique(codepoints.begin(), codepoints.end()), codepoints.end());
+        if (found != fallbackFonts.end()) {
+            if (previousCount == codepoints.size()) return found->second;
+            // Earlier labels in this frame may still reference the old atlas.
+            rlDrawRenderBatchActive();
+            if (found->second.texture.id != GetFontDefault().texture.id) UnloadFont(found->second);
+            fallbackFonts.erase(found);
+        }
         Font font = LoadFontFromMemory(
             ".ttf", cjk ? assets::kCjkFontData : assets::kUiFontData,
             static_cast<int>(cjk ? assets::kCjkFontDataSize : assets::kUiFontDataSize),
@@ -350,7 +368,7 @@ Vector2 UiText::measure(const char* text, float size, float spacing) {
     if (impl_->native()) {
         if (const auto* label = impl_->label(text, pixels, spacing)) return label->extent;
     }
-    return MeasureTextEx(impl_->fallback(pixels, containsCjk(text)), text, size, spacing);
+    return MeasureTextEx(impl_->fallback(pixels, containsCjk(text), text), text, size, spacing);
 }
 
 Rectangle UiText::inkBounds(const char* text, float size, float spacing) {
@@ -359,7 +377,7 @@ Rectangle UiText::inkBounds(const char* text, float size, float spacing) {
     if (impl_->native()) {
         if (const auto* label = impl_->label(text, pixels, spacing)) return label->ink;
     }
-    const Font font = impl_->fallback(pixels, containsCjk(text));
+    const Font font = impl_->fallback(pixels, containsCjk(text), text);
     const float scale = size / font.baseSize;
     // Read the already loaded alpha masks: glyph cells can have empty edges.
     // Offsets and advances follow DrawTextEx; no GPU readback or new atlas.
@@ -435,7 +453,7 @@ void UiText::draw(const char* text, Vector2 position, float size, float spacing,
             return;
         }
     }
-    DrawTextEx(impl_->fallback(pixels, containsCjk(text)), text, position, size, spacing, color);
+    DrawTextEx(impl_->fallback(pixels, containsCjk(text), text), text, position, size, spacing, color);
 }
 
 void UiText::release() { impl_->release(); }

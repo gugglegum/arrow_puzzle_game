@@ -294,7 +294,7 @@ Copy-Item .\build\windows-msvc-debug\arrow_puzzle_portable.exe (Join-Path $qa 'G
 - `ARROWPUZZLE_DIFFICULTY` — сложность 1..4;
 - `ARROWPUZZLE_SCREENSHOT` — путь итогового PNG и автоматическое завершение;
 - `ARROWPUZZLE_SCREENSHOT_FRAME` — номер кадра для снимка;
-- `ARROWPUZZLE_SCREENSHOT_MENU` — Main/New game/Settings как 1..3;
+- `ARROWPUZZLE_SCREENSHOT_MENU` — Main/New game/Settings/Saved games как 1..4;
 - `ARROWPUZZLE_SCREENSHOT_REMOVE` — скрыть первые N стрелок;
 - `ARROWPUZZLE_SCREENSHOT_LAUNCH` — запустить стрелку по индексу;
 - `ARROWPUZZLE_SCREENSHOT_LAUNCH_2` — запустить вторую стрелку;

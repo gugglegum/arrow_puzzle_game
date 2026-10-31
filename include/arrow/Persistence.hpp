@@ -4,7 +4,10 @@
 #include "arrow/Localization.hpp"
 
 #include <filesystem>
+#include <cstdint>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace arrow {
@@ -34,6 +37,22 @@ struct SavedGame {
 };
 
 [[nodiscard]] bool isValidSavedGame(const SavedGame& game) noexcept;
+
+struct ManualSave {
+    std::string id;
+    std::string name;
+    std::int64_t created{}; // Unix seconds, unchanged by renaming/loading.
+    int columns{}, rows{}, lives{};
+    std::size_t remaining{}, total{};
+};
+
+struct SaveCatalog {
+    std::vector<ManualSave> entries; // Newest first; IDs break timestamp ties.
+    std::size_t unreadable{};
+};
+
+// UTF-8, at most 80 characters, no controls or leading/trailing ASCII spaces.
+[[nodiscard]] bool isValidSaveName(std::string_view name) noexcept;
 
 // Persistence never throws for file I/O. A failed settings load returns the
 // defaults, while a missing or invalid saved game returns std::nullopt.
@@ -84,6 +103,14 @@ public:
     [[nodiscard]] std::optional<SavedGame> loadSavedGame() const noexcept;
     [[nodiscard]] bool saveSavedGame(const SavedGame& game) const noexcept;
     [[nodiscard]] bool removeSavedGame() const noexcept;
+
+    [[nodiscard]] std::filesystem::path manualSavesDirectory() const;
+    [[nodiscard]] std::optional<SaveCatalog> listManualSaves() const noexcept;
+    [[nodiscard]] std::optional<std::string> createManualSave(
+        const SavedGame& game, std::string_view name) const noexcept;
+    [[nodiscard]] std::optional<SavedGame> loadManualSave(std::string_view id) const noexcept;
+    [[nodiscard]] bool renameManualSave(std::string_view id, std::string_view name) const noexcept;
+    [[nodiscard]] bool removeManualSave(std::string_view id) const noexcept;
 
 private:
     std::filesystem::path directory_;

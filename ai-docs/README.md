@@ -25,6 +25,7 @@ tests, Git history, and the current instructions settle discrepancies.
 | Generation, solvability, arrow composition | [Generator guide](../docs/en/GENERATOR.md) | `Generator.cpp`, `Board.cpp` |
 | Very Hard 0.4.0 work, benchmark evidence | [Generator work](generator-0.4.md) | `FrontierGenerator.cpp`, `GeneratorBenchmark.cpp` |
 | Flight, collisions, rollback, saves | [Runtime guide](../docs/en/RUNTIME.md) | `Game.cpp`, `MotionResolver.cpp`, `Persistence.cpp` |
+| Manual named snapshots, catalog, load/rename/delete | [Runtime guide, manual snapshots](../docs/en/RUNTIME.md#manual-snapshots) | `Persistence.cpp`, `Game.cpp`, `MenuScreen.cpp`, persistence tests |
 | Touchpad, click/drag safety, keyboard zoom/fit | [Runtime guide, section 8](../docs/en/RUNTIME.md) | `BoardPointerGesture.hpp`, `BoardPointerGestureTests.cpp`, `Game.cpp` |
 | Panning, antialiasing, idle load, fonts | [Runtime guide, section 9](../docs/en/RUNTIME.md) | `StaticBoardGeometry.cpp`, `UiText.cpp` |
 | Debug-only screenshot hooks; no capture hotkeys | [Project guide, section 7](../docs/en/PROJECT_GUIDE.md), [capture policy](portable-distribution.md#accepted-screenshot-policy) | `Game.cpp`, CMake, `smoke-linux.py` |

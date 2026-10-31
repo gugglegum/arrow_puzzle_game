@@ -1,6 +1,7 @@
 #include "arrow/Persistence.hpp"
 
 #include <array>
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -723,6 +724,96 @@ void testCorruptAndUnsupportedSavesAreIgnored() {
     );
 }
 
+void testManualSavesAreIndependentSnapshots() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path() / "config", temporary.path() / "data"};
+    const auto game = sampleGame();
+    require(persistence.saveSavedGame(game), "Autosave setup failed");
+    const auto autosave = readText(persistence.saveGamePath());
+    require(persistence.manualSavesDirectory() == temporary.path() / "data/saves", "Manual save location is wrong");
+    const auto empty = persistence.listManualSaves();
+    require(empty && empty->entries.empty() && empty->unreadable == 0, "Missing directory is not an empty catalog");
+    std::vector<std::string> ids;
+    for (int i = 0; i < 6; ++i) {
+        const auto id = persistence.createManualSave(game, "Попытка / café = 你好");
+        require(id.has_value(), "Unicode save creation failed");
+        require(std::ranges::find(ids, *id) == ids.end(), "Manual save overwrote a duplicate name");
+        ids.push_back(*id);
+        const auto loaded = persistence.loadManualSave(*id);
+        require(loaded && equal(*loaded, game), "Manual save changed geometry, lives or flags");
+        const auto path = persistence.manualSavesDirectory() / (*id + ".arrow");
+        require(readText(path).find("version=2\nname=") != std::string::npos, "Manual metadata is not versioned");
+        require(!std::filesystem::exists(path.string() + ".tmp"), "Temporary file left after manual save");
+    }
+    const auto catalog = persistence.listManualSaves();
+    require(catalog && catalog->entries.size() == 6, "Catalog lost same-name saves");
+    for (std::size_t i = 0; i < catalog->entries.size(); ++i) {
+        const auto& entry = catalog->entries[i];
+        require(entry.name == "Попытка / café = 你好" && entry.columns == 4 && entry.rows == 3 &&
+            entry.lives == 2 && entry.remaining == 2 && entry.total == 3 && entry.created > 0,
+            "Catalog summary differs from saved game");
+        if (i > 0) require(catalog->entries[i-1].created >= entry.created, "Catalog is not newest first");
+    }
+    require(persistence.renameManualSave(ids.front(), "Новая попытка"), "Rename failed");
+    require(!persistence.renameManualSave(ids.front(), "bad\nname"), "Invalid rename succeeded");
+    const auto renamed = persistence.listManualSaves();
+    const auto entry = std::ranges::find(renamed->entries, ids.front(), &arrow::ManualSave::id);
+    require(entry != renamed->entries.end() && entry->name == "Новая попытка", "Rename lost title");
+    const auto oldEntry = std::ranges::find(catalog->entries, ids.front(), &arrow::ManualSave::id);
+    require(entry->created == oldEntry->created, "Rename changed creation time");
+    auto loaded = persistence.loadManualSave(ids.front());
+    require(loaded && equal(*loaded, game), "Rename changed snapshot");
+    loaded->lives = 1;
+    require(persistence.saveSavedGame(*loaded), "Loaded-copy autosave failed");
+    require(equal(*persistence.loadManualSave(ids.front()), game), "Playing a loaded copy changed its snapshot");
+    require(persistence.removeSavedGame() && persistence.loadManualSave(ids.front()).has_value(),
+        "Clearing autosave removed manual saves");
+    require(persistence.saveSavedGame(game), "Autosave recreation failed");
+    require(persistence.removeManualSave(ids.front()) && persistence.removeManualSave(ids.front()), "Manual removal failed");
+    require(!persistence.loadManualSave(ids.front()), "Deleted manual save remains loadable");
+    require(readText(persistence.saveGamePath()) == autosave, "Manual operations changed autosave");
+    require(persistence.listManualSaves()->entries.size() == 5, "Deleting one snapshot affected others");
+}
+
+void testManualSaveFailuresAndValidation() {
+    TemporaryDirectory temporary;
+    const arrow::Persistence persistence{temporary.path()};
+    const auto game = sampleGame();
+    for (const auto name : {"", " ", " leading", "trailing ", "a\nb", "a\rb", "a\tb", "\xC0\xAF", "\xED\xA0\x80"}) {
+        require(!arrow::isValidSaveName(name) && !persistence.createManualSave(game, name), "Invalid name accepted");
+    }
+    require(arrow::isValidSaveName(std::string(80, 'a')) && !arrow::isValidSaveName(std::string(81, 'a')),
+        "Name limit is incorrect");
+    std::string unicode;
+    for (int i = 0; i < 80; ++i) unicode += "я";
+    require(arrow::isValidSaveName(unicode) && !arrow::isValidSaveName(unicode + "я"), "UTF-8 character limit is incorrect");
+    auto invalid = game; invalid.lives = -1;
+    require(!persistence.createManualSave(invalid, "invalid"), "Invalid game accepted as manual save");
+    const auto id = *persistence.createManualSave(game, "good");
+    for (const auto unsafe : {"../savegame", "../1", "1/2", "1\\2", "/1", "", "1.arrow"}) {
+        require(!persistence.loadManualSave(unsafe) && !persistence.renameManualSave(unsafe, "bad") &&
+            !persistence.removeManualSave(unsafe), "Unsafe ID reached the filesystem");
+    }
+    writeText(persistence.manualSavesDirectory() / "123-1.arrow", "corrupt");
+    writeText(persistence.manualSavesDirectory() / "123-2.arrow.tmp", "interrupted write");
+    const auto catalog = persistence.listManualSaves();
+    require(catalog && catalog->entries.size() == 1 && catalog->unreadable == 1, "Corrupt save broke valid catalog entries");
+    require(!persistence.loadManualSave("123-1") && !persistence.renameManualSave("123-1", "bad"),
+        "Corrupt manual file accepted");
+    // A failed atomic replacement must leave the old title and geometry intact.
+    const auto path = persistence.manualSavesDirectory() / (id + ".arrow");
+    const auto before = readText(path);
+    std::filesystem::create_directory(path.string() + ".tmp");
+    writeText(std::filesystem::path(path.string() + ".tmp") / "blocker", "keep nonempty");
+    require(!persistence.renameManualSave(id, "replacement") && readText(path) == before,
+        "Failed rename damaged existing snapshot");
+    TemporaryDirectory blocked;
+    const arrow::Persistence noDirectory{blocked.path()};
+    writeText(noDirectory.manualSavesDirectory(), "blocks directory creation");
+    require(!noDirectory.listManualSaves() && !noDirectory.createManualSave(game, "blocked"),
+        "Filesystem failure was reported as success");
+}
+
 void testRemoveSavedGameIsIdempotent() {
     TemporaryDirectory temporary;
     const arrow::Persistence persistence{temporary.path()};
@@ -765,6 +856,8 @@ int main() {
         testInvalidGamesAreRejectedWithoutDestroyingOldSave();
         testCorruptAndUnsupportedSavesAreIgnored();
         testRemoveSavedGameIsIdempotent();
+        testManualSavesAreIndependentSnapshots();
+        testManualSaveFailuresAndValidation();
         std::cout << "Persistence tests passed\n";
         return 0;
     } catch (const std::exception& exception) {

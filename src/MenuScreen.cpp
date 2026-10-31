@@ -48,7 +48,25 @@ void arrowPath(std::span<const Vector2> points, float thickness, Color color) {
 }
 
 void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
-    if (page == MenuScreen::Page::Difficulty && index < 4) {
+    const bool back = (page == MenuScreen::Page::Saves && index >= 5) ||
+        (page == MenuScreen::Page::SaveActions && index == 3) ||
+        (page == MenuScreen::Page::SaveName && index == 2) ||
+        (page == MenuScreen::Page::DeleteSave && index == 0);
+    if (back) {
+        const float sign = page == MenuScreen::Page::Saves && index == 6 ? -1.0F : 1.0F;
+        DrawLineEx({center.x + sign * 9, center.y}, {center.x - sign * 9, center.y}, 1.8F, ink);
+        DrawLineEx({center.x - sign * 9, center.y}, {center.x - sign * 3, center.y - 6}, 1.8F, ink);
+        DrawLineEx({center.x - sign * 9, center.y}, {center.x - sign * 3, center.y + 6}, 1.8F, ink);
+    } else if ((page == MenuScreen::Page::SaveActions && index == 2) ||
+               (page == MenuScreen::Page::DeleteSave && index == 1)) {
+        DrawRectangleLinesEx({center.x - 8, center.y - 6, 16, 18}, 1.5F, ink);
+        DrawLineEx({center.x - 11, center.y - 9}, {center.x + 11, center.y - 9}, 1.8F, ink);
+        DrawLineEx({center.x - 4, center.y - 12}, {center.x + 4, center.y - 12}, 1.8F, ink);
+    } else if (page >= MenuScreen::Page::Saves || (page == MenuScreen::Page::Main && index == 2)) {
+        DrawRectangleRoundedLinesEx({center.x - 10, center.y - 11, 20, 22}, 0.15F, 4, 1.5F, ink);
+        DrawRectangleLinesEx({center.x - 5, center.y - 10, 10, 7}, 1.5F, ink);
+        DrawRectangleLinesEx({center.x - 6, center.y + 2, 12, 8}, 1.5F, ink);
+    } else if (page == MenuScreen::Page::Difficulty && index < 4) {
         for (int bar = 0; bar < 4; ++bar) {
             const float height = 5 + bar * 4.0F;
             DrawRectangleRounded({center.x - 13 + bar * 7.0F, center.y + 10 - height, 4, height},
@@ -61,7 +79,7 @@ void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
     } else if (page == MenuScreen::Page::Main && index < 2) {
         DrawTriangle({center.x - 4, center.y - 9}, {center.x - 4, center.y + 9}, {center.x + 8, center.y}, ink);
         if (index == 1) DrawLineEx({center.x - 10, center.y - 9}, {center.x - 10, center.y + 9}, 2, ink);
-    } else if (page == MenuScreen::Page::Main && index == 3) {
+    } else if (page == MenuScreen::Page::Main && index == 4) {
         DrawLineEx({center.x - 5, center.y - 10}, {center.x - 10, center.y - 10}, 1.8F, ink);
         DrawLineEx({center.x - 10, center.y - 10}, {center.x - 10, center.y + 10}, 1.8F, ink);
         DrawLineEx({center.x - 10, center.y + 10}, {center.x - 5, center.y + 10}, 1.8F, ink);
@@ -110,10 +128,11 @@ void icon(MenuScreen::Page page, int index, Vector2 center, Color ink) {
 }
 
 const char* description(MenuScreen::Page page, int index, bool enabled, Language language) {
-    constexpr std::array main{Text::NewGameDetail, Text::ResumeDetail, Text::SettingsDetail, Text::ExitDetail};
+    constexpr std::array main{Text::NewGameDetail, Text::ResumeDetail, Text::SavesDetail, Text::SettingsDetail, Text::ExitDetail};
     constexpr std::array difficulty{Text::Cells20, Text::Cells40, Text::Cells80, Text::Cells160};
     constexpr std::array settings{Text::LoopsDetail, Text::CollisionsDetail, Text::GuidesDetail,
         Text::SoundsDetail, Text::LeftButtonDragDetail, Text::ThemeDetail, Text::LanguageDetail};
+    if (page >= MenuScreen::Page::Saves) return nullptr;
     if (page == MenuScreen::Page::Main)
         return translate(index == 1 && !enabled ? Text::NoSavedPuzzle : main[index], language);
     if (index == (page == MenuScreen::Page::Settings ? 7 : 4)) return nullptr;
@@ -128,7 +147,7 @@ Rectangle MenuScreen::Layout::button(int index) const {
 
 MenuScreen::Layout MenuScreen::layout(int width, int height, int count) {
     const float panelWidth = std::min(620.0F, static_cast<float>(width) - 64);
-    const float panelHeight = std::min(count == 4 ? 550.0F : count == 5 ? 600.0F : 754.0F,
+    const float panelHeight = std::min(count <= 4 ? 550.0F : count == 5 ? 600.0F : 754.0F,
         static_cast<float>(height) - 72);
     const Rectangle panel{std::round((width - panelWidth) * 0.5F), std::round((height - panelHeight) * 0.5F),
                           panelWidth, panelHeight};
@@ -174,7 +193,8 @@ void MenuScreen::drawBackground(int width, int height) {
     arrowPath(rightPath, 2.0F, Fade(kCyan, 0.14F));
 }
 
-void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int count, Language language) {
+void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int count, Language language,
+                             const char* title, const char* subtitle) {
     const Rectangle panel = layout(width, height, count).panel;
     const float center = static_cast<float>(width) * 0.5F;
     DrawRectangleRounded({panel.x + 4, panel.y + 8, panel.width, panel.height}, 0.075F, 16, Fade(BLACK, 0.2F));
@@ -188,14 +208,15 @@ void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int
             {center + 11, panel.y - 8}, {center + 11, panel.y + 11}}};
         arrowPath(path, 3.0F, kGold);
     } else {
-        icon(page == Page::Settings ? Page::Main : Page::Difficulty, 2, badge, kGold);
+        icon(page >= Page::Saves ? Page::Saves : page == Page::Settings ? Page::Main : Page::Difficulty,
+            page >= Page::Saves ? 0 : page == Page::Settings ? 3 : 2, badge, kGold);
     }
     const bool compact = count > 5 && height < 700;
     centered(text, page == Page::Main ? translate(Text::MainMenu, language) : "ARROW PUZZLE", center,
         panel.y + (compact ? 38 : 43), compact ? 11.0F : 12.0F, 2.6F, kQuiet);
-    centered(text, page == Page::Main ? "ARROW PUZZLE" : translate(page == Page::Settings ? Text::Settings : Text::NewGame, language),
+    centered(text, title ? title : page == Page::Main ? "ARROW PUZZLE" : translate(page == Page::Settings ? Text::Settings : Text::NewGame, language),
         center, panel.y + (compact ? 59 : 68), page == Page::Main ? 46.0F : compact ? 36.0F : 42.0F, 1.5F, kGold);
-    centered(text, translate(page == Page::Main ? Text::MainSubtitle : page == Page::Settings
+    centered(text, subtitle ? subtitle : translate(page == Page::Main ? Text::MainSubtitle : page == Page::Settings
         ? Text::SettingsSubtitle : Text::DifficultySubtitle, language), center, panel.y + (compact ? 102 : 126),
         compact ? 15.0F : 17.0F, 0.2F, kLight);
 }
@@ -203,7 +224,7 @@ void MenuScreen::drawHeading(UiText& text, Page page, int width, int height, int
 void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, Page page,
                             int index, bool enabled, bool selected, bool armed,
                             std::optional<bool> toggle, std::optional<BoardTheme> theme,
-                            std::optional<Language> languageChoice, Language language) {
+                            std::optional<Language> languageChoice, Language language, const char* customDetail) {
     const bool highlighted = enabled && selected;
     const bool pressed = highlighted && armed;
     const bool primary = page == Page::Main && index == 0;
@@ -222,7 +243,7 @@ void MenuScreen::drawButton(UiText& text, Rectangle bounds, const char* label, P
         primarySelected ? kGold : highlighted ? Fade(accent, 0.8F) : Color{50, 69, 96, 255});
     const Vector2 center{bounds.x + 32, bounds.y + bounds.height * 0.5F};
     icon(page, index, center, enabled ? primarySelected ? ink : highlighted ? accent : kQuiet : secondary);
-    const char* detail = description(page, index, enabled, language);
+    const char* detail = customDetail ? customDetail : description(page, index, enabled, language);
     const bool compact = bounds.height < 57;
     const bool tight = bounds.height < 44;
     const float reserved = toggle ? 120.0F : theme ? 132.0F : languageChoice ? 184.0F : 44.0F;

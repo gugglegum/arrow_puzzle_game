@@ -4,6 +4,34 @@ Snapshot: 2026-10-30, after publication and verification of 0.5.0. Check
 `git status`, recent history, and [CHANGELOG.md](../CHANGELOG.md) before treating
 this as current state.
 
+## Manual saved games, development after 0.5.0 (2026-10-31)
+
+The main menu now includes Saved games. Create save copies the automatic
+Resume snapshot; a date/time + dimensions name is suggested and can be kept
+or replaced (80 UTF-8 characters). Four entries per page show date, dimensions,
+remaining/total arrows and lives. Selecting an entry offers Load, Rename,
+Delete and Back; deletion has a separate Cancel-first confirmation. Loading
+opens a copy and resets hints. Further play, victory/defeat and automatic
+saving never overwrite/remove a manual snapshot.
+
+Each snapshot is a self-contained version-2 `saves/<numeric-id>.arrow` file
+under the existing save-data root. Names are metadata, not paths; duplicates
+are allowed. Atomic writes, stable creation timestamps, per-file validation
+and visible I/O/corruption notices avoid a shared index and isolate bad files.
+The existing version-1 `savegame.txt` and automatic menu/exit behavior remain
+compatible. Copy `saves/` along with the automatic file when moving data.
+See the bilingual runtime guide for the contract. The Chinese font subset
+includes all new translations; Linux atlases admit user-title glyphs on demand.
+
+Windows ordinary/portable Release builds, all seven CTest suites, eight-language
+glyph/layout checks and hidden production-controller scenarios pass. The latter cover Unicode input/paste,
+same-name saves, pagination, load/autosave, rename, blank/invalid names,
+Cancel-first deletion and atomic-write failure at 1100x900 and 720x600; captures
+were inspected. Disposable evidence is under `out/manual-saves/`. Native
+computer-use launch timed out before starting, so native injected-input QA
+was replaced by controller-driven rendering checks. No Linux desktop run or
+release publication is part of this work.
+
 ## Unlimited timed hints, development after 0.5.0 (2026-10-31)
 
 The accepted lightbulb sits immediately left of mute and starts gray. After

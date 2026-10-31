@@ -67,6 +67,7 @@ arrow-puzzle-screenshot.png
 /settings.txt.tmp
 /savegame.txt
 /savegame.txt.tmp
+/saves/
 *.dmp
 *.log
 

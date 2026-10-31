@@ -13,7 +13,7 @@ enum class BoardTheme;
 // Stateless menu rendering: no animation clock or additional texture cache.
 class MenuScreen {
 public:
-    enum class Page { Main, Difficulty, Settings };
+    enum class Page { Main, Difficulty, Settings, Saves, SaveActions, SaveName, DeleteSave };
     struct Layout {
         Rectangle panel{};
         float rowTop{};
@@ -25,13 +25,14 @@ public:
     [[nodiscard]] static Layout layout(int width, int height, int count);
     static void drawBackground(int width, int height);
     static void drawHeading(UiText& text, Page page, int width, int height, int count,
-                            Language language = Language::English);
+                            Language language = Language::English,
+                            const char* title = nullptr, const char* subtitle = nullptr);
     static void drawButton(UiText& text, Rectangle bounds, const char* label, Page page,
                            int index, bool enabled, bool selected, bool armed,
                            std::optional<bool> toggle = std::nullopt,
                            std::optional<BoardTheme> theme = std::nullopt,
                            std::optional<Language> languageChoice = std::nullopt,
-                           Language language = Language::English);
+                           Language language = Language::English, const char* detail = nullptr);
     static void drawFooter(UiText& text, const char* label, int width, int height, int count);
     [[nodiscard]] static Color mutedColor();
 };

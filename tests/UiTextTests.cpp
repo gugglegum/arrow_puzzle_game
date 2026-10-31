@@ -204,27 +204,43 @@ void checkControlLabelAlignment(arrow::UiText& text, RenderTexture2D target) {
 void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
     using arrow::Text;
     using arrow::MenuScreen;
-    constexpr std::array main{Text::NewGame, Text::ResumeGame, Text::Settings, Text::Exit};
+    constexpr std::array main{Text::NewGame, Text::ResumeGame, Text::Saves, Text::Settings, Text::Exit};
     constexpr std::array difficulty{Text::Simple, Text::Middle, Text::Hard, Text::VeryHard, Text::Back};
     constexpr std::array settings{Text::ArrowLoops, Text::FlyingCollisions, Text::CrosshairGuides,
         Text::Sounds, Text::LeftButtonDrag, Text::BoardTheme, Text::InterfaceLanguage, Text::Back};
+    constexpr std::array saves{Text::CreateSave, Text::SaveName, Text::SaveName, Text::SaveName,
+        Text::SaveName, Text::PreviousPage, Text::NextPage, Text::Back};
+    constexpr std::array actions{Text::LoadSave, Text::RenameSave, Text::DeleteSave, Text::Back};
+    constexpr std::array editor{Text::SaveName, Text::Save, Text::Cancel};
+    constexpr std::array deletion{Text::Cancel, Text::DeleteSave};
     for (int width : {720, 1100}) {
         const int height = width == 720 ? 600 : 900;
         SetWindowSize(width, height);
         PollInputEvents();
         for (int l = 1; l < static_cast<int>(arrow::Language::Count); ++l) {
             const auto language = static_cast<arrow::Language>(l);
-            for (const auto page : {MenuScreen::Page::Main, MenuScreen::Page::Difficulty, MenuScreen::Page::Settings}) {
-                const int count = page == MenuScreen::Page::Main ? 4 : page == MenuScreen::Page::Difficulty ? 5 : 8;
+            for (const auto page : {MenuScreen::Page::Main, MenuScreen::Page::Difficulty, MenuScreen::Page::Settings,
+                                   MenuScreen::Page::Saves, MenuScreen::Page::SaveActions,
+                                   MenuScreen::Page::SaveName, MenuScreen::Page::DeleteSave}) {
+                const int count = page == MenuScreen::Page::Main || page == MenuScreen::Page::Difficulty ? 5
+                    : page == MenuScreen::Page::SaveActions ? 4 : page == MenuScreen::Page::SaveName ? 3
+                    : page == MenuScreen::Page::DeleteSave ? 2 : 8;
                 const auto layout = MenuScreen::layout(width, height, count);
                 BeginDrawing();
                 MenuScreen::drawBackground(width, height);
-                MenuScreen::drawHeading(text, page, width, height, count, language);
+                const bool savePage = page >= MenuScreen::Page::Saves;
+                const auto title = page == MenuScreen::Page::SaveName ? Text::CreateSave
+                    : page == MenuScreen::Page::DeleteSave ? Text::DeleteSaveQuestion : Text::Saves;
+                MenuScreen::drawHeading(text, page, width, height, count, language,
+                    savePage ? arrow::translate(title, language) : nullptr,
+                    savePage ? arrow::translate(page == MenuScreen::Page::SaveName ? Text::SaveNameHint : Text::SavesSubtitle, language) : nullptr);
                 for (int i = 0; i < count; ++i) {
                     const auto bounds = layout.button(i);
                     require(bounds.y >= layout.panel.y + 120 && bounds.y + bounds.height < layout.panel.y + layout.panel.height - 35,
                             "Translated settings rows overlap heading or footer");
-                    const auto id = page == MenuScreen::Page::Main ? main[i] : page == MenuScreen::Page::Difficulty ? difficulty[i] : settings[i];
+                    const auto id = page == MenuScreen::Page::Main ? main[i] : page == MenuScreen::Page::Difficulty ? difficulty[i]
+                        : page == MenuScreen::Page::Saves ? saves[i] : page == MenuScreen::Page::SaveActions ? actions[i]
+                        : page == MenuScreen::Page::SaveName ? editor[i] : page == MenuScreen::Page::DeleteSave ? deletion[i] : settings[i];
                     const char* label = arrow::translate(id, language);
                     const auto size = text.fitSize(label, 19, 0.2F, bounds.width - 200);
                     require(text.measure(label, size, 0.2F).x <= bounds.width - 200, "Localized title does not fit");
@@ -235,10 +251,12 @@ void checkTranslatedScreens(arrow::UiText& text, bool screenshots) {
                         page == MenuScreen::Page::Settings && i == 6 ? std::optional{language} : std::nullopt, language);
                 }
                 MenuScreen::drawFooter(text, arrow::translate(page == MenuScreen::Page::Main ? Text::MenuHint :
-                    page == MenuScreen::Page::Difficulty ? Text::DifficultyHint : Text::SettingsHint, language), width, height, count);
+                    page == MenuScreen::Page::Difficulty ? Text::DifficultyHint : savePage ? Text::SaveUnreadable : Text::SettingsHint, language), width, height, count);
                 if (screenshots) {
                     const std::string filename = std::string(page == MenuScreen::Page::Main ? "main-" :
-                        page == MenuScreen::Page::Difficulty ? "difficulty-" : "settings-") +
+                        page == MenuScreen::Page::Difficulty ? "difficulty-" : page == MenuScreen::Page::Saves ? "saves-"
+                        : page == MenuScreen::Page::SaveActions ? "save-actions-" : page == MenuScreen::Page::SaveName ? "save-name-"
+                        : page == MenuScreen::Page::DeleteSave ? "delete-save-" : "settings-") +
                         arrow::languageCode(language) + "-" + std::to_string(width) + ".png";
                     rlDrawRenderBatchActive();
                     TakeScreenshot(filename.c_str());

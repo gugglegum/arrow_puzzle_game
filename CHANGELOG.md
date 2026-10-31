@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Manual saved games alongside the existing automatic Resume snapshot. The
+  Saved games menu creates named snapshots, shows date, board size, remaining
+  arrows and lives, and supports loading, renaming and confirmed deletion.
+  Each snapshot is an independent atomic file in the save-data `saves` folder.
 - Unlimited hints: a lightbulb button beside the sound toggle becomes available
   after 20 seconds without a successful arrow exit. It highlights a random safe
   arrow in yellow and plays an embedded chime, respecting the sound setting.

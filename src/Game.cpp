@@ -87,6 +87,10 @@ enum class Screen {
     MainMenu,
     NewGameMenu,
     SettingsMenu,
+    SavesMenu,
+    SaveActions,
+    SaveName,
+    DeleteSave,
     Playing
 };
 
@@ -170,6 +174,7 @@ struct MenuFrameState {
     bool resumeAvailable;
     bool generationInProgress;
     bool windowFocused;
+    std::uint64_t saveRevision;
 
     bool operator==(const MenuFrameState&) const = default;
 };
@@ -248,6 +253,25 @@ void drawCenteredText(
 
 Rectangle menuButtonRectangle(int index, int count) {
     return MenuScreen::layout(GetScreenWidth(), GetScreenHeight(), count).button(index);
+}
+
+std::string saveDate(std::int64_t seconds) {
+    const auto value = static_cast<std::time_t>(seconds);
+    std::tm date{};
+#if defined(_WIN32)
+    if (localtime_s(&date, &value) != 0) return {};
+#else
+    if (localtime_r(&value, &date) == nullptr) return {};
+#endif
+    char result[32]{};
+    std::strftime(result, sizeof(result), "%Y-%m-%d %H:%M:%S", &date);
+    return result;
+}
+
+std::string trimmedSaveName(std::string value) {
+    const auto first = value.find_first_not_of(' ');
+    if (first == std::string::npos) return {};
+    return value.substr(first, value.find_last_not_of(' ') - first + 1);
 }
 
 Rectangle soundButtonRectangle() {
@@ -902,6 +926,29 @@ int Game::run() {
     bool resumeAvailable = savedGame.has_value();
     Screen screen = Screen::MainMenu;
     bool activeGame = false;
+    SaveCatalog saveCatalog;
+    std::size_t savePage = 0;
+    std::optional<ManualSave> selectedSave;
+    std::optional<SavedGame> manualSnapshot;
+    std::string saveName;
+    bool replaceSaveName = false;
+    bool renamingSave = false;
+    std::optional<Text> saveStatus;
+    std::uint64_t saveRevision = 0;
+    const auto refreshSaves = [&]() {
+        auto catalog = persistence.listManualSaves();
+        saveStatus.reset();
+        if (catalog) {
+            saveCatalog = std::move(*catalog);
+            if (saveCatalog.unreadable) saveStatus = Text::SaveUnreadable;
+        } else {
+            saveCatalog = {};
+            saveStatus = Text::SaveError;
+        }
+        savePage = std::min(savePage, saveCatalog.entries.empty() ? std::size_t{0}
+            : (saveCatalog.entries.size() - 1) / 4);
+        ++saveRevision;
+    };
 
     std::uint32_t seed = static_cast<std::uint32_t>(std::time(nullptr));
 #if ARROWPUZZLE_SCREENSHOT_HOOKS
@@ -1104,6 +1151,9 @@ int Game::run() {
         screen = Screen::NewGameMenu;
     } else if (automatedMenuScreen == 3) {
         screen = Screen::SettingsMenu;
+    } else if (automatedMenuScreen == 4) {
+        refreshSaves();
+        screen = Screen::SavesMenu;
     }
     bool automatedInitialSetupPending =
         !automatedScreenshot.empty();
@@ -1891,7 +1941,11 @@ int Game::run() {
             } else if (screen != Screen::MainMenu) {
                 pressedMenuButton.reset();
                 menuSelection.reset();
-                screen = Screen::MainMenu;
+                screen = screen == Screen::DeleteSave || (screen == Screen::SaveName && renamingSave)
+                    ? Screen::SaveActions : screen == Screen::SaveName || screen == Screen::SaveActions
+                    ? Screen::SavesMenu : Screen::MainMenu;
+                saveStatus.reset();
+                ++saveRevision;
             } else {
                 closeRequested = true;
             }
@@ -1902,11 +1956,16 @@ int Game::run() {
             pressedHudMenuButton = false;
             const Screen menuScreen = screen;
             const MenuScreen::Page menuPage = menuScreen == Screen::MainMenu ? MenuScreen::Page::Main
-                : menuScreen == Screen::SettingsMenu ? MenuScreen::Page::Settings : MenuScreen::Page::Difficulty;
+                : menuScreen == Screen::SettingsMenu ? MenuScreen::Page::Settings
+                : menuScreen == Screen::SavesMenu ? MenuScreen::Page::Saves
+                : menuScreen == Screen::SaveActions ? MenuScreen::Page::SaveActions
+                : menuScreen == Screen::SaveName ? MenuScreen::Page::SaveName
+                : menuScreen == Screen::DeleteSave ? MenuScreen::Page::DeleteSave : MenuScreen::Page::Difficulty;
             const int menuItemCount =
                 menuScreen == Screen::MainMenu
-                ? 4
-                : menuScreen == Screen::SettingsMenu ? 8 : 5;
+                ? 5 : menuScreen == Screen::SaveName ? 3 : menuScreen == Screen::SaveActions ? 4
+                : menuScreen == Screen::DeleteSave ? 2
+                : menuScreen == Screen::SettingsMenu || menuScreen == Screen::SavesMenu ? 8 : 5;
             const auto menuItemEnabled = [&](int index) {
                 if (index < 0 || index >= menuItemCount) {
                     return false;
@@ -1919,6 +1978,12 @@ int Game::run() {
                         return resumeAvailable &&
                                !generationInProgress;
                     }
+                }
+                if (menuScreen == Screen::SavesMenu) {
+                    if (index == 0) return resumeAvailable && !generationInProgress;
+                    if (index <= 4) return savePage * 4 + index - 1 < saveCatalog.entries.size();
+                    if (index == 5) return savePage > 0;
+                    if (index == 6) return (savePage + 1) * 4 < saveCatalog.entries.size();
                 }
                 return true;
             };
@@ -1964,6 +2029,55 @@ int Game::run() {
             if (windowFocused && menuKeyPressed(KEY_DOWN)) {
                 menuSelection.move(1, menuItemCount, menuItemEnabled);
                 pressedMenuButton.reset();
+            }
+            if (windowFocused && menuKeyPressed(KEY_TAB)) {
+                menuSelection.move(IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ? -1 : 1,
+                    menuItemCount, menuItemEnabled);
+                pressedMenuButton.reset();
+            }
+            // Text events are drained on every screen so opening the editor cannot
+            // insert the key that opened it. The suggested name starts selected.
+            const bool editingName = menuScreen == Screen::SaveName && menuSelection.selected() == 0;
+            const bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+            if (windowFocused && editingName) {
+                if (control && menuKeyPressed(KEY_A)) { replaceSaveName = true; ++saveRevision; }
+                if (menuKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
+                    if (replaceSaveName) saveName.clear();
+                    else if (!saveName.empty()) {
+                        auto end = saveName.size() - 1;
+                        while (end > 0 && (static_cast<unsigned char>(saveName[end]) & 0xC0) == 0x80) --end;
+                        saveName.erase(end);
+                    }
+                    replaceSaveName = false;
+                    saveStatus.reset();
+                    ++saveRevision;
+                }
+                if (control && menuKeyPressed(KEY_V)) {
+                    if (const char* pasted = GetClipboardText()) {
+                        std::string candidate = replaceSaveName ? std::string{} : saveName;
+                        candidate += pasted;
+                        if (isValidSaveName(trimmedSaveName(candidate))) {
+                            saveName = std::move(candidate);
+                            replaceSaveName = false;
+                            saveStatus.reset();
+                            ++saveRevision;
+                        } else { saveStatus = Text::NameInvalid; ++saveRevision; }
+                    }
+                }
+            }
+            for (int code = GetCharPressed(); code != 0; code = GetCharPressed()) {
+                if (!windowFocused || !editingName || control || code < 32 || (code >= 127 && code <= 159)) continue;
+                int length = 0;
+                const char* encoded = CodepointToUTF8(code, &length);
+                std::string candidate = replaceSaveName ? std::string{} : saveName;
+                candidate.append(encoded, static_cast<std::size_t>(length));
+                // Permit spaces while typing; enforce the limit on all characters.
+                if (candidate.size() <= 320 && GetCodepointCount(candidate.c_str()) <= 80) {
+                    saveName = std::move(candidate);
+                    replaceSaveName = false;
+                    saveStatus.reset();
+                    ++saveRevision;
+                }
             }
 
             std::optional<int> activatedMenuButton;
@@ -2038,7 +2152,8 @@ int Game::run() {
                 settings,
                 resumeAvailable,
                 generationInProgress,
-                windowFocused
+                windowFocused,
+                saveRevision
             };
             if (!captureActive &&
                 delta < 0.1F &&
@@ -2054,7 +2169,8 @@ int Game::run() {
                 int index,
                 Rectangle bounds,
                 const char* label,
-                bool enabled = true
+                bool enabled = true,
+                const char* detail = nullptr
             ) {
                 const int id =
                     static_cast<int>(menuScreen) * 16 + index;
@@ -2083,7 +2199,8 @@ int Game::run() {
                     toggle,
                     theme,
                     languageChoice,
-                    uiLanguage
+                    uiLanguage,
+                    detail
                 );
                 return enabled &&
                        activatedMenuButton == index;
@@ -2092,10 +2209,17 @@ int Game::run() {
             BeginDrawing();
             ClearBackground(Color{10, 20, 41, 255});
             MenuScreen::drawBackground(GetScreenWidth(), GetScreenHeight());
-            MenuScreen::drawHeading(uiText, menuPage, GetScreenWidth(), GetScreenHeight(), menuItemCount, uiLanguage);
+            const bool saveScreen = menuPage >= MenuScreen::Page::Saves;
+            const char* saveTitle = menuScreen == Screen::SaveName ? tr(renamingSave ? Text::RenameSave : Text::CreateSave)
+                : menuScreen == Screen::DeleteSave ? tr(Text::DeleteSaveQuestion) : tr(Text::Saves);
+            const char* saveSubtitle = menuScreen == Screen::SaveName ? tr(Text::SaveNameHint)
+                : selectedSave && (menuScreen == Screen::SaveActions || menuScreen == Screen::DeleteSave)
+                ? selectedSave->name.c_str() : tr(Text::SavesSubtitle);
+            MenuScreen::drawHeading(uiText, menuPage, GetScreenWidth(), GetScreenHeight(), menuItemCount, uiLanguage,
+                saveScreen ? saveTitle : nullptr, saveScreen ? saveSubtitle : nullptr);
 
             if (screen == Screen::MainMenu) {
-                constexpr int buttonCount = 4;
+                constexpr int buttonCount = 5;
                 if (menuButton(
                         0,
                         menuButtonRectangle(0, buttonCount),
@@ -2124,13 +2248,21 @@ int Game::run() {
                 if (menuButton(
                         2,
                         menuButtonRectangle(2, buttonCount),
+                        tr(Text::Saves)
+                    )) {
+                    refreshSaves();
+                    screen = Screen::SavesMenu;
+                }
+                if (menuButton(
+                        3,
+                        menuButtonRectangle(3, buttonCount),
                         tr(Text::Settings)
                     )) {
                     screen = Screen::SettingsMenu;
                 }
                 if (menuButton(
-                        3,
-                        menuButtonRectangle(3, buttonCount),
+                        4,
+                        menuButtonRectangle(4, buttonCount),
                         tr(Text::Exit)
                     )) {
                     (void)persistCurrentGame();
@@ -2149,6 +2281,116 @@ int Game::run() {
                         GetScreenWidth(), GetScreenHeight(), menuItemCount
                     );
                 }
+            } else if (menuScreen == Screen::SavesMenu) {
+                if (menuButton(0, menuButtonRectangle(0, menuItemCount), tr(Text::CreateSave),
+                        menuItemEnabled(0), tr(resumeAvailable ? Text::CreateSaveDetail : Text::NoSavedPuzzle))) {
+                    manualSnapshot = persistence.loadSavedGame();
+                    if (manualSnapshot) {
+                        saveName = saveDate(static_cast<std::int64_t>(std::time(nullptr))) + "  " +
+                            std::to_string(manualSnapshot->columns) + " x " + std::to_string(manualSnapshot->rows);
+                        replaceSaveName = true;
+                        renamingSave = false;
+                        saveStatus.reset();
+                        screen = Screen::SaveName;
+                    } else { saveStatus = Text::SaveError; ++saveRevision; }
+                }
+                for (int row = 1; row <= 4; ++row) {
+                    const auto index = savePage * 4 + row - 1;
+                    if (index >= saveCatalog.entries.size()) {
+                        (void)menuButton(row, menuButtonRectangle(row, menuItemCount),
+                            row == 1 && saveCatalog.entries.empty() ? tr(Text::EmptySaves) : "—", false);
+                        continue;
+                    }
+                    const auto& entry = saveCatalog.entries[index];
+                    const std::string detail = saveDate(entry.created) + "   |   " + std::to_string(entry.columns) +
+                        " x " + std::to_string(entry.rows) + "   |   " + tr(Text::Arrows) + " " +
+                        std::to_string(entry.remaining) + "/" + std::to_string(entry.total) + "   |   " +
+                        tr(Text::Lives) + " " + std::to_string(entry.lives);
+                    if (menuButton(row, menuButtonRectangle(row, menuItemCount), entry.name.c_str(), true, detail.c_str())) {
+                        selectedSave = entry;
+                        saveStatus.reset();
+                        screen = Screen::SaveActions;
+                    }
+                }
+                if (menuButton(5, menuButtonRectangle(5, menuItemCount), tr(Text::PreviousPage), menuItemEnabled(5))) {
+                    --savePage; ++saveRevision;
+                }
+                if (menuButton(6, menuButtonRectangle(6, menuItemCount), tr(Text::NextPage), menuItemEnabled(6))) {
+                    ++savePage; ++saveRevision;
+                }
+                if (menuButton(7, menuButtonRectangle(7, menuItemCount), tr(Text::Back))) screen = Screen::MainMenu;
+                const std::string footer = saveStatus ? tr(*saveStatus) : std::string(tr(Text::PageNumber)) + " " +
+                    std::to_string(savePage + 1) + " / " +
+                    std::to_string(std::max(std::size_t{1}, (saveCatalog.entries.size() + 3) / 4));
+                MenuScreen::drawFooter(uiText, footer.c_str(), GetScreenWidth(), GetScreenHeight(), menuItemCount);
+            } else if (menuScreen == Screen::SaveActions && selectedSave) {
+                if (menuButton(0, menuButtonRectangle(0, menuItemCount), tr(Text::LoadSave), true, tr(Text::LoadSaveDetail))) {
+                    auto restored = persistence.loadManualSave(selectedSave->id);
+                    if (restored) {
+                        pausedHints.reset();
+                        if (!restoreSavedGame(std::move(*restored))) saveStatus = Text::SaveError;
+                    } else saveStatus = Text::SaveError;
+                    ++saveRevision;
+                }
+                if (menuButton(1, menuButtonRectangle(1, menuItemCount), tr(Text::RenameSave))) {
+                    saveName = selectedSave->name;
+                    replaceSaveName = true;
+                    renamingSave = true;
+                    saveStatus.reset();
+                    screen = Screen::SaveName;
+                }
+                if (menuButton(2, menuButtonRectangle(2, menuItemCount), tr(Text::DeleteSave))) {
+                    saveStatus.reset();
+                    screen = Screen::DeleteSave;
+                }
+                if (menuButton(3, menuButtonRectangle(3, menuItemCount), tr(Text::Back))) {
+                    refreshSaves(); screen = Screen::SavesMenu;
+                }
+                MenuScreen::drawFooter(uiText, tr(saveStatus.value_or(Text::MenuHint)),
+                    GetScreenWidth(), GetScreenHeight(), menuItemCount);
+            } else if (menuScreen == Screen::SaveName) {
+                const std::string displayedName = saveName + (editingName && !replaceSaveName ? " |" : "");
+                const bool submitField = menuButton(0, menuButtonRectangle(0, menuItemCount), displayedName.c_str(),
+                    true, tr(Text::SaveName));
+                if (replaceSaveName && selectedMenuButton == 0) {
+                    const auto bounds = menuButtonRectangle(0, menuItemCount);
+                    DrawLineEx({bounds.x + 64, bounds.y + bounds.height - 6},
+                        {bounds.x + bounds.width - 44, bounds.y + bounds.height - 6}, 2, Color{128, 210, 255, 255});
+                }
+                const bool submit = menuButton(1, menuButtonRectangle(1, menuItemCount), tr(Text::Save));
+                if (submit || (submitField && !mouseReleased)) {
+                    const auto name = trimmedSaveName(saveName);
+                    if (!isValidSaveName(name)) saveStatus = Text::NameInvalid;
+                    else {
+                        const bool success = renamingSave
+                            ? selectedSave && persistence.renameManualSave(selectedSave->id, name)
+                            : manualSnapshot && persistence.createManualSave(*manualSnapshot, name).has_value();
+                        if (success) {
+                            refreshSaves();
+                            saveStatus = Text::SaveSuccess;
+                            screen = Screen::SavesMenu;
+                            manualSnapshot.reset();
+                        } else saveStatus = Text::SaveError;
+                    }
+                    ++saveRevision;
+                }
+                if (menuButton(2, menuButtonRectangle(2, menuItemCount), tr(Text::Cancel))) {
+                    saveStatus.reset();
+                    screen = renamingSave ? Screen::SaveActions : Screen::SavesMenu;
+                }
+                MenuScreen::drawFooter(uiText, saveStatus ? tr(*saveStatus) : "Ctrl+A   Ctrl+V   Backspace   Tab   Enter   Esc",
+                    GetScreenWidth(), GetScreenHeight(), menuItemCount);
+            } else if (menuScreen == Screen::DeleteSave && selectedSave) {
+                if (menuButton(0, menuButtonRectangle(0, menuItemCount), tr(Text::Cancel))) screen = Screen::SaveActions;
+                if (menuButton(1, menuButtonRectangle(1, menuItemCount), tr(Text::DeleteSave), true, tr(Text::DeleteSaveDetail))) {
+                    if (persistence.removeManualSave(selectedSave->id)) {
+                        selectedSave.reset();
+                        refreshSaves();
+                        screen = Screen::SavesMenu;
+                    } else { saveStatus = Text::SaveError; ++saveRevision; }
+                }
+                MenuScreen::drawFooter(uiText, tr(saveStatus.value_or(Text::DeleteSaveDetail)),
+                    GetScreenWidth(), GetScreenHeight(), menuItemCount);
             } else if (screen == Screen::NewGameMenu) {
                 constexpr int buttonCount = 5;
                 for (int index = 0;

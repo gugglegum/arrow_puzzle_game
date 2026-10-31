@@ -412,6 +412,33 @@ A game is saved when returning to the menu or exiting if:
 Victory or loss of all lives removes the save and disables Resume. Corrupt or
 incompatible saves are ignored.
 
+### Manual snapshots
+
+The main menu's Saved games page lists four snapshots per page, newest first,
+with creation time, dimensions, remaining/total arrows and lives. Create save
+copies the automatic Resume snapshot, including a previously saved game after
+restart. The suggested name is local date/time plus dimensions. Names are
+editable UTF-8 (1–80 codepoints, no controls; outer ASCII spaces are trimmed by
+the editor). The editor supports typing, Backspace/repeat, Ctrl+A, Ctrl+V,
+Tab, Enter and Escape. The suggestion starts selected. Names are display
+metadata, never paths; duplicate names create independent snapshots.
+
+Each `saves/<numeric-id>.arrow` file lives under the same data root as
+`savegame.txt`, including Linux's XDG data directory and portable/AppImage
+locations. It uses `format=arrow-puzzle-save`, version 2, adding `name` and
+`created` (Unix seconds) before the unchanged geometry fields. The automatic
+file remains version 1 and needs no migration. IDs do not derive from names.
+Creation and renaming use atomic replacement; renaming preserves timestamp
+and geometry. No index file is required. Listing validates each snapshot,
+skips damaged/unsupported files with a visible notice, and reports directory
+errors. `.tmp` files are ignored. Loading revalidates the file and resets the
+hint timer, opening a copy; further play/autosave never updates that snapshot.
+Deletion has a separate confirmation page whose default is Cancel. Only
+manual deletion removes a manual file; victory/defeat only clears autosave.
+Animation normalization matches the automatic save contract above. Copy the
+`saves` directory when migrating data. Glyph coverage follows the embedded
+fonts; Linux font atlases also include user-title characters on demand.
+
 `EndScreen` displays YOU WON! or GAME OVER; Game stops gameplay updates and
 releases rewind history. Fireworks and their reports are finite; after the
 animation, unchanged result frames are also skipped. Sounds do not replay on
