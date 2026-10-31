@@ -10,7 +10,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 
 - Unlimited hints: a lightbulb button beside the sound toggle becomes available
-  after 30 seconds without a successful arrow exit. It highlights a random safe
+  after 20 seconds without a successful arrow exit. It highlights a random safe
   arrow in yellow and plays an embedded chime, respecting the sound setting.
 
 ## [0.5.0] - 2026-10-30

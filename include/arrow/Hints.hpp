@@ -10,7 +10,7 @@ namespace arrow {
 
 class HintState {
 public:
-    static constexpr double delay = 30.0;
+    static constexpr double delay = 20.0;
 
     void reset() { elapsed_ = 0.0; highlighted.reset(); }
     void advance(double seconds) { elapsed_ = std::clamp(elapsed_ + seconds, 0.0, delay); }

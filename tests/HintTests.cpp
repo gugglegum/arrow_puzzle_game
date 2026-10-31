@@ -22,15 +22,15 @@ int main() {
     try {
         arrow::HintState hints;
         require(!hints.ready(), "New board offered a hint immediately");
-        hints.advance(29.99);
-        require(!hints.ready(), "Hint unlocked before 30 seconds");
+        hints.advance(19.99);
+        require(!hints.ready(), "Hint unlocked before 20 seconds");
         hints.advance(0.01);
-        require(hints.ready(), "Hint did not unlock at 30 seconds");
+        require(hints.ready(), "Hint did not unlock at 20 seconds");
         hints.highlighted = 2;
         hints.advance(3600);
         require(hints.ready() && hints.highlighted == 2, "Hint expired without progress");
         hints.reset();
-        hints.advance(29.9);
+        hints.advance(19.9);
         require(!hints.ready() && !hints.highlighted, "Progress did not reset the timer and highlight");
 
         // The head enters the original tail cell on step one: legal because

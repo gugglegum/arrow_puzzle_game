@@ -191,7 +191,7 @@ The back arrow left of the title uses the same save/menu path as Escape; the
 speaker button changes the shared persisted sound preference.
 
 The lightbulb immediately left of the speaker starts gray. `HintState` counts
-30 seconds of focused gameplay without a completed arrow exit; menu time,
+20 seconds of focused gameplay without a completed arrow exit; menu time,
 generation, unfocused time and finished games do not count. Successful exits
 reset the timer; failed launches do not. Menu/Resume within the same process
 preserves the timer and selection, while a fresh/restored session starts locked.

@@ -7,7 +7,7 @@ this as current state.
 ## Unlimited timed hints, development after 0.5.0 (2026-10-31)
 
 The accepted lightbulb sits immediately left of mute and starts gray. After
-30 seconds of focused gameplay without a fully exited arrow it becomes yellow;
+20 seconds of focused gameplay without a fully exited arrow it becomes yellow;
 failed launches do not reset it. Menu/unfocused/generation/result time is
 excluded. Same-process Menu/Resume preserves the timer and highlight, whereas
 launching a new game or loading after restarting begins locked. While any
