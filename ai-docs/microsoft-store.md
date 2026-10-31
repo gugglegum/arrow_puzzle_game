@@ -43,6 +43,36 @@ compatibility or certification readiness.
    The self-service guide estimates up to three business days for certification,
    plus processing/publishing; this is not a guaranteed deadline.
 
+### Name availability and later renaming (2026-11-01)
+
+The maintainer reports that Partner Center rejects `Arrow Puzzle` as taken
+but offers `ArrowPuzzle` as available. They see many similarly named arrow
+puzzles in Store search. This is a user-observed availability check, not a
+completed reservation or an independently verified trademark clearance.
+
+An unavailable name need not have a public search result: Microsoft documents
+names reserved for products not yet submitted; visibility and market settings
+can also affect discovery. There is no evidence why other publishers did not
+choose the joined spelling, or that their choices establish a search penalty.
+Do not claim Store search treats joined/spaced words identically; this was not
+documented or tested. Use relevant listing Keywords (for example `arrow puzzle`,
+`logic puzzle`, `головоломка со стрелками`) and check real searches after public
+indexing. Keywords help discovery but do not guarantee ranking. Avoid copying
+competitor titles or stuffing descriptive search phrases into the product name.
+
+The [game-name guide](https://learn.microsoft.com/en-us/gaming/game-publishing/concepts/name)
+allows additional names for the same game through Manage product names, including
+when changing its name. Select the new reserved Product name in each affected
+Store listing and publish the listing update. The installed display name comes
+from the package manifest/config and needs a package update for consistency.
+Product Identity Details retain their original values; do not create a different
+product/identity merely to rename the game. The public name is changeable, but
+renaming does not free or grant the currently occupied `Arrow Puzzle` name.
+See [Store listing fields](https://learn.microsoft.com/en-us/gaming/game-publishing/concepts/store-listing)
+and [Store policy 10.1](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies#101-distinct-function--value-accurate-representation).
+`ArrowPuzzle` is a reasonable provisional recommendation, not a user-approved
+final naming decision.
+
 ### Packaging references and caveats
 
 - [Create a GDK game](https://learn.microsoft.com/en-us/gaming/game-publishing/tutorial-xbox-managed/how-to-create-a-title-and-configure-game-setup?pivots=msow)
