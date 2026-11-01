@@ -5,9 +5,12 @@
 The maintainer reports completing Individual developer registration using a
 Russian identity document and Russian address. Their screenshot shows the
 Apps and games overview with no products and the new GDK/MSIX game-path banner.
-Account verification, product creation, monetization eligibility and actual
-payout availability have not been independently checked. This discussion is
-publication guidance, not authorization to create or submit a Store product.
+Later in this discussion, the maintainer reports reserving `Arrow Puzzle Game`.
+Their new screenshots confirm an existing product on the self-service Win32
+Game setup page, marked Complete, with assigned identity values. Account
+verification, monetization eligibility and actual payout availability have not
+been independently checked. This discussion provides guidance; the maintainer
+performs Partner Center actions. It does not authorize agent submission.
 
 ### Recommended starting path
 
@@ -27,10 +30,9 @@ compatibility or certification readiness.
 
 ### Next steps
 
-1. In Partner Center, select New product > GDK game and reserve the preferred
-   name `Arrow Puzzle Game` (reported available by the maintainer). Keep Desktop
-   as the initial device family. Retrieve the assigned product identity from
-   Game setup before authoring a production package.
+1. Name reservation and product creation are now complete: `Arrow Puzzle Game`.
+   Keep Desktop as the initial device family. Use the assigned identity values
+   from Game setup when authoring the production package.
 2. Install the public GDK and prepare MicrosoftGame.config, shell images,
    executable and required license notices. Build and validate a Store package,
    then test installation, launch, saved games, update and uninstall.
@@ -74,8 +76,34 @@ The maintainer subsequently checked `Arrow Puzzle Game`, found it available,
 and expressed a preference for using it. This supersedes the earlier provisional
 `ArrowPuzzle` recommendation. They accept a descriptive name despite similar
 games and do not require a distinctive invented brand. Use `Arrow Puzzle Game`
-as the preferred Store name in further preparation; actual reservation has not
-been reported. No repository/executable/internal identifier rename is requested.
+as the Store name in further preparation. Reservation was subsequently confirmed
+by the maintainer and product screenshots. No repository/executable/internal
+identifier rename is requested.
+
+### Observed Game setup page and field guidance
+
+The screenshots show Desktop Retail checked and Desktop Sandboxes checked but
+disabled, other device families unchecked, and future-device availability checked.
+The page is already Complete; its long identity section is assigned reference
+data rather than a questionnaire. Desktop Retail also selects Sandboxes by
+design. Retail here enables that publishing target; it does not publish a game
+by itself. Recommend retaining Desktop only and clearing automatic future-device
+availability for this first PC-only release. This is advice, not a confirmed
+user change or an app compatibility guarantee.
+
+Observed Package/Identity/Name: `PavelMelekhov.ArrowPuzzleGame`; publisher display
+name: `Pavel Melekhov`. Retrieve exact publisher CN, PFN and Store ID from Partner
+Center when packaging rather than transcribing image GUIDs speculatively.
+Do not manually replace identity values. Xbox Title ID, SCID and MSA App ID are
+already displayed, but their presence alone does not establish Xbox-service
+integration. No legacy product ID is needed for this new PC-only game. As noted
+below, omit Xbox-service elements from MicrosoftGame.config for a game that
+doesn't use those services.
+
+If changing checkboxes, use Save draft. Do not use Review and publish just to
+save this page; the final submission depends on completing the package and other
+product modules. Properties is a practical next manual step while Store
+packaging remains unimplemented.
 
 ### Packaging references and caveats
 
