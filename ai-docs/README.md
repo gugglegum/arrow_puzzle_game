@@ -13,9 +13,10 @@ tests, Git history, and the current instructions settle discrepancies.
 3. Use the table below to open only the relevant technical guide and implementation.
 4. Read [workflow notes](workflow-notes.md) and choose checks from the developer
    guide before changing behavior.
-5. Complete the change, maintain relevant notes, then commit and push according
-   to AGENTS.md. Branch pushes run development build/test CI; release preparation
-   uses the separate tag/manual workflow, and publication is a separate action.
+5. Complete the code change and include relevant roadmap updates in its commit
+   according to AGENTS.md. Do not commit ai-docs-only changes separately. Build
+   and test runs only on explicit manual request; release checks use the separate
+   tag/manual workflow, and publication is a separate action.
 
 ## Find the right entry point
 

@@ -352,8 +352,9 @@ changelog, документацию со скриншотами и лиценз�
 Сценарий создаёт шесть обычных/portable-пакетов: Windows ZIP и Linux tar.gz/AppImage;
 расположение данных и имена описаны в [руководстве по релизам](RELEASING.md).
 Тег `vX.Y.Z` запускает GitHub Actions, создающий проверяемые attestations и
-черновик релиза от `github-actions[bot]`. Push в ветки и PR запускают отдельный
-workflow **Build and test**: проверки и артефакты Linux/Windows без публикации релиза.
+черновик релиза от `github-actions[bot]`. Отдельный workflow **Build and test**
+запускается только по явному запросу вручную: проверки и артефакты Linux/Windows
+без публикации релиза. Push в ветки и PR его не запускают.
 
 Надпись версии определяется Git-тегом; между релизами добавляются число коммитов
 и короткий hash. Отдельная локальная сборка с `ARROWPUZZLE_RELEASE_PREVIEW=ON`

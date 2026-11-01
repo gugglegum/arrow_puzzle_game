@@ -10,8 +10,9 @@ manual. The workflow never creates/moves tags or publishes a release.
 
 ## Development checks before release
 
-The separate **Build and test** workflow (`build.yml`) runs on branch pushes,
-pull requests and manual dispatch. It builds Release and runs the six default
+The separate **Build and test** workflow (`build.yml`) runs only on explicit
+manual request: **Actions → Build and test → Run workflow**. Branch pushes and
+pull requests do not start builds. It builds Release and runs the seven default
 CTest suites on Windows/MSVC, Ubuntu 22.04/GCC and Ubuntu 24.04/Clang. It also
 checks release assembly guards: mixed commits/versions, dirty metadata,
 modified packages/binaries, missing signatures and invalid draft inputs.

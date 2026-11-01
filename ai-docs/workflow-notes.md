@@ -7,12 +7,18 @@ hooks. Use those references instead of maintaining duplicate procedures here.
 
 ## Useful habits from previous work
 
-- After pushing, inspect the resulting Actions run and resolve failures rather
-  than treating a successful push as successful CI. On 2026-11-01, Store-note
-  commits repeatedly triggered an existing Linux production smoke failure from
-  the manual-save menu change: its fixed main-menu Settings click still used
-  the old four-row layout. The smoke now enters Settings with Up/Up/Enter from
-  the fresh New game selection; settings-row mouse/keyboard assertions remain.
+- Build and test is manual-only as requested on 2026-11-01; ordinary pushes and
+  pull requests do not run it. Release keeps its version-tag/manual triggers.
+  Run remote checks only when explicitly requested or as part of an authorized
+  release. Inspect the resulting run when checks are requested. Keep ai-docs
+  updates uncommitted until the next completed code change, per AGENTS.md.
+- Store-note pushes exposed a Linux production smoke fixture left behind by
+  the manual-save menu change: Settings moved in the five-row main menu. The
+  first keyboard-navigation fix passed Windows/GCC but could exit under Clang
+  timing. At the maintainer's request, that intermediate fix was reverted and
+  smoke repair is deferred until the save/menu work is complete. The old
+  main-menu click is still stale; update and validate the fixture before the
+  next Linux release. Do not report the Linux package checks as passing.
 - Read the relevant code before trusting a snapshot. Search by module/function
   names; Game.cpp is the main controller and remains a large file.
 - Identify the actual running EXE and adjacent settings/save. Multiple copies

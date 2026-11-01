@@ -98,12 +98,9 @@ def production_smoke(executable, appimage, work, env, settings_path):
                     raise RuntimeError(f"Language selector did not save {code} after {action}: {contents!r}; "
                                        f"window={window}, focus={focus.stdout.strip()}; see {work / 'production.log'}")
 
-            # Fresh startup selects New game. Navigate back through Exit to
-            # Settings so inserting other main-menu rows cannot shift our target.
-            for name in ("Up", "Up", "Return"):
-                key(name)
-            # Target settings rows in the standard 1100x900 fixture; page
-            # transitions reset shared mouse/keyboard selection.
+            # Target the visible rows explicitly in the standard 1100x900
+            # fixture; page transitions reset shared mouse/keyboard selection.
+            point(550, 547, click=True)  # Main menu: Settings.
             def expect_drag(enabled):
                 value = "on" if enabled else "off"
                 contents = settings_path.read_text()

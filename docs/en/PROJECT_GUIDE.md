@@ -344,8 +344,9 @@ build, full CTest, successful unpacked startup, and SHA-256 checks.
 The pipeline produces six ordinary/portable packages across Windows ZIP and
 Linux tar.gz/AppImage; see [storage and filenames](RELEASING.md#files-and-provenance).
 A `vX.Y.Z` tag starts Actions, which creates verifiable attestations and a draft
-as `github-actions[bot]`. Branch pushes and PRs run the separate **Build and test**
-workflow with Linux/Windows development artifacts and no release publication.
+as `github-actions[bot]`. The separate **Build and test** workflow runs only on
+explicit manual request, with Linux/Windows development artifacts and no release
+publication. Branch pushes and PRs do not start it.
 
 The displayed version comes from Git tags; intermediate builds add the commit
 count and short hash. An isolated local build with
