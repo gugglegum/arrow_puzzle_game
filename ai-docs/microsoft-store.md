@@ -87,9 +87,9 @@ disabled, other device families unchecked, and future-device availability checke
 The page is already Complete; its long identity section is assigned reference
 data rather than a questionnaire. Desktop Retail also selects Sandboxes by
 design. Retail here enables that publishing target; it does not publish a game
-by itself. Recommend retaining Desktop only and clearing automatic future-device
-availability for this first PC-only release. This is advice, not a confirmed
-user change or an app compatibility guarantee.
+by itself. The maintainer subsequently confirms clearing automatic future-device
+availability and saving the draft. Desktop-only targeting is the current plan;
+this is not an app compatibility guarantee.
 
 Observed Package/Identity/Name: `PavelMelekhov.ArrowPuzzleGame`; publisher display
 name: `Pavel Melekhov`. Retrieve exact publisher CN, PFN and Store ID from Partner
@@ -104,6 +104,32 @@ If changing checkboxes, use Save draft. Do not use Review and publish just to
 save this page; the final submission depends on completing the package and other
 product modules. Properties is a practical next manual step while Store
 packaging remains unimplemented.
+
+### Basic Info form guidance (screenshots supplied)
+
+Recommend selecting Puzzles & trivia as both the genre keyword and primary
+genre, enabling Single player (Desktop/PC if a platform selector appears), and
+leaving Multiplayer disabled. Do not claim tested accessibility compliance:
+there has been no Xbox Accessibility Guidelines assessment. These are proposed
+field values; saving this form has not been confirmed.
+
+Support accepts an actual monitored email or support-page URL. The maintainer
+has not selected a public support contact. Website is optional; no dedicated
+game website was identified. Do not invent contact data or suggest placeholder
+postal codes/phone numbers. The form explicitly says contact/address/phone
+details can appear publicly and incomplete details fall back to the account's
+Customer contact information. Leaving optional fields blank does not guarantee
+that the corresponding personal details remain undisclosed.
+
+No privacy-policy file was found in the repository. README describes no ads,
+telemetry, accounts or runtime network access. A dedicated policy URL still
+needs preparation before submission: Store policy 10.5.1 explicitly requires
+privacy policies for Win32 products. Do not substitute Microsoft's policy or
+the ordinary project README. Verify actual runtime/storage behavior before
+publishing policy text, including user-chosen manual-save names and the Store's
+own separately governed data processing.
+Sources: [Basic Info fields](https://learn.microsoft.com/en-us/gaming/game-publishing/concepts/properties-basic-info)
+and [current Store policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies#105-personal-information).
 
 ### Packaging references and caveats
 
