@@ -27,8 +27,8 @@ compatibility or certification readiness.
 
 ### Next steps
 
-1. In Partner Center, select New product > GDK game, check the desired name
-   (ArrowPuzzle / Arrow Puzzle), and reserve an available name. Keep Desktop
+1. In Partner Center, select New product > GDK game and reserve the preferred
+   name `Arrow Puzzle Game` (reported available by the maintainer). Keep Desktop
    as the initial device family. Retrieve the assigned product identity from
    Game setup before authoring a production package.
 2. Install the public GDK and prepare MicrosoftGame.config, shell images,
@@ -70,8 +70,12 @@ product/identity merely to rename the game. The public name is changeable, but
 renaming does not free or grant the currently occupied `Arrow Puzzle` name.
 See [Store listing fields](https://learn.microsoft.com/en-us/gaming/game-publishing/concepts/store-listing)
 and [Store policy 10.1](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies#101-distinct-function--value-accurate-representation).
-`ArrowPuzzle` is a reasonable provisional recommendation, not a user-approved
-final naming decision.
+The maintainer subsequently checked `Arrow Puzzle Game`, found it available,
+and expressed a preference for using it. This supersedes the earlier provisional
+`ArrowPuzzle` recommendation. They accept a descriptive name despite similar
+games and do not require a distinctive invented brand. Use `Arrow Puzzle Game`
+as the preferred Store name in further preparation; actual reservation has not
+been reported. No repository/executable/internal identifier rename is requested.
 
 ### Packaging references and caveats
 
