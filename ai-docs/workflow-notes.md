@@ -7,6 +7,12 @@ hooks. Use those references instead of maintaining duplicate procedures here.
 
 ## Useful habits from previous work
 
+- After pushing, inspect the resulting Actions run and resolve failures rather
+  than treating a successful push as successful CI. On 2026-11-01, Store-note
+  commits repeatedly triggered an existing Linux production smoke failure from
+  the manual-save menu change: its fixed main-menu Settings click still used
+  the old four-row layout. The smoke now enters Settings with Up/Up/Enter from
+  the fresh New game selection; settings-row mouse/keyboard assertions remain.
 - Read the relevant code before trusting a snapshot. Search by module/function
   names; Game.cpp is the main controller and remains a large file.
 - Identify the actual running EXE and adjacent settings/save. Multiple copies
